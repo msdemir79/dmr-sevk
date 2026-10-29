@@ -36,18 +36,17 @@ Bu dosya, henüz uygulanmayan ama değerlendirilen geliştirmeleri tutar. Uygula
 5. Renk × beden matrisi; sipariş ve sevk görünümü; renk+mod gruplaması.
 6. Fiş: yalnızca sevk edilenler; boş beden yok; “Açık · 9’lu”; tutar.
 
-### Kalan tek UX sorusu
+### UX kararı (30.10.2026)
 
-- **Açık çok beden girişi:** Her beden için ayrı satır mı (prototip böyle), yoksa tek renk satırında **beden ızgarası** mı olsun?
-  - Ayrı satır: basit, mevcut tablo yapısı, çok satır.
-  - Beden ızgarası: tek satırda 40–48 kutuları, daha kompakt ama yeni arayüz.
+- **Açık çok beden girişi:** Her beden için **ayrı satır** (prototip v3’teki yöntem) seçildi.
+- Üretim planı: [docs/matris-uretim-plani.md](docs/matris-uretim-plani.md)
 
 ### Aşamalar
 
 1. ✅ Kağıt tasarım — kategori, asorti, açık sipariş, fiş kararları.
 2. ✅ HTML prototip v3 — çoklu renk, açıkta çok beden, kısmi sevk, 9’lu, fiyat.
-3. ⏳ Geri bildirim / onay — açık giriş tercihi ve üretim onayı.
-4. ⏳ Çekirdek — veri modeli, Excel şeması (`MATRİS` sayfası), migration, testler.
+3. ✅ Geri bildirim — açık giriş yöntemi: her beden ayrı satır.
+4. ⏳ Çekirdek — veri modeli, Excel şeması (`SİPARİŞ SATIRLARI`), migration, testler.
 5. ⏳ Arayüz — mevcut uygulamaya sipariş matrisi + fiş seçeneği.
 6. ⏳ Rapor + kabul testi → sürüm.
 
