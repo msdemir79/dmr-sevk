@@ -343,14 +343,17 @@
 
   function orderInfo(data, order, shipped) {
     var giden = (shipped || shippedMap(data))[order.id] || 0;
-    var adet = num(order.adet);
+    var satirlar = (data.orderLines || []).filter(function (l) { return l.orderId === order.id; });
+    var toplam = satirlar.length ? Matris.orderTotals(data, order.id) : null;
+    var adet = toplam && toplam.cift ? toplam.cift : num(order.adet);
+    var koli = toplam && toplam.koli ? toplam.koli : adet / (num(order.asorti) || 1);
     var kalan = Math.max(0, adet - giden);
-    var asorti = num(order.asorti) || 1;
+    var kalanKoli = adet ? kalan * (koli / adet) : 0;
     return {
       giden: giden,
       kalan: kalan,
-      kalanKoli: kalan / asorti,
-      koli: adet / asorti,
+      kalanKoli: kalanKoli,
+      koli: koli,
       tutar: round2(adet * num(order.fiyat)),
       kalanTutar: round2(kalan * num(order.fiyat)),
       durum: kalan <= 0 ? 'TAMAMLANDI' : (giden > 0 ? 'KISMİ' : 'AÇIK')

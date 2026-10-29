@@ -97,6 +97,7 @@ BOOT = r"""
     Core.addModel(d, { model: 'TALKIEN SİYAH HUC', fiyat: 62, maliyet: 45, asorti: 10, barkod: '8680000000042', sezon: '2026', resim: svgImg('#7c2d12', 'TALK') });
     Core.addModel(d, { model: 'BENZEMA FÜME RSZ', fiyat: 62, maliyet: 43, asorti: 10, barkod: '8680000000059', sezon: '2026' });
     Core.addModel(d, { model: 'BİRCE BEJ', fiyat: 62, maliyet: 40, asorti: 10, sezon: '2025' });
+    Core.addModel(d, { model: '6049', kategori: 'MERDANE', renkler: ['SİYAH', 'BEYAZ', 'LACİVERT', 'KAHVE'], asortiSablon: { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 }, fiyat: 75, maliyet: 48, asorti: 10, sezon: '2026' });
 
     Core.audit(d, 'Ali Veli', 'SEVK FİŞİ', '#246 · YILDIZ SPOR · 400 çift');
     Core.audit(d, 'Ali Veli', 'SİPARİŞ EKLE', 'RUNNER LACİVERT · 800 çift · YILDIZ SPOR');
@@ -148,14 +149,78 @@ BOOT = r"""
         document.querySelector('[data-act="order-new"]').click();
         setTimeout(function () {
           var f = document.getElementById('orderForm');
-          document.getElementById('ofModel').value = 'TEST MODEL ÇOK CARİ';
-          document.getElementById('ofAdet').value = '120';
+          var model = document.getElementById('ofModel');
+          model.value = 'TEST MODEL ÇOK CARİ';
+          model.dispatchEvent(new Event('change', { bubbles: true }));
           document.getElementById('ofFiyat').value = '99,50';
           document.getElementById('ofCari').value = String(mod.id);
-          f.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+          var renk = document.querySelector('[data-f="renk"][data-i="0"]');
+          var koli = document.querySelector('[data-f="koli"][data-i="0"]');
+          var koliIci = document.querySelector('[data-f="koliIci"][data-i="0"]');
+          if (renk) renk.value = 'SİYAH';
+          if (koli) koli.value = '12';
+          if (koliIci) koliIci.value = '10';
+          setTimeout(function () { f.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }, 100);
         }, 200);
       }, 150);
-    }    if (h === 'modal-order') setTimeout(function () { document.querySelector('[data-act="order-new"]').click(); }, 150);
+    }    if (h === 'order-form-matris') {
+      APP.S.view = 'orders'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        document.querySelector('[data-act="order-new"]').click();
+        setTimeout(function () {
+          var model = document.getElementById('ofModel');
+          model.value = '6049';
+          model.dispatchEvent(new Event('change', { bubbles: true }));
+          setTimeout(function () {
+            document.getElementById('ofAddLine').click();
+            setTimeout(function () {
+              var i = 1;
+              var mod = document.querySelector('[data-f="mod"][data-i="' + i + '"]');
+              mod.value = 'ACIK';
+              mod.dispatchEvent(new Event('change', { bubbles: true }));
+              setTimeout(function () {
+                var renk = document.querySelector('[data-f="renk"][data-i="' + i + '"]'); if (renk) renk.value = 'BEYAZ';
+                var beden = document.querySelector('[data-f="beden"][data-i="' + i + '"]'); if (beden) beden.value = '42';
+                var koli = document.querySelector('[data-f="koli"][data-i="' + i + '"]'); if (koli) koli.value = '2';
+                var ki = document.querySelector('[data-f="koliIci"][data-i="' + i + '"]'); if (ki) ki.value = '9';
+                var k0 = document.querySelector('[data-f="koli"][data-i="0"]'); if (k0) k0.value = '3';
+                document.getElementById('orderForm').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+              }, 150);
+            }, 150);
+          }, 200);
+        }, 200);
+      }, 150);
+    }
+    if (h === 'model-form-matris') {
+      APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        document.querySelector('[data-act="model-new"]').click();
+        setTimeout(function () {
+          var sel = document.getElementById('mfKategori');
+          sel.value = 'MERDANE';
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          var ins = document.querySelectorAll('#mfAsortiGrid input');
+          [1, 2, 3, 2, 1, 1].forEach(function (v, i) { if (ins[i]) ins[i].value = v; });
+        }, 200);
+      }, 150);
+    }
+    if (h === 'model-save-matris') {
+      APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        document.querySelector('[data-act="model-new"]').click();
+        setTimeout(function () {
+          document.getElementById('mfModel').value = 'TEST 6049';
+          document.getElementById('mfFiyat').value = '88';
+          var sel = document.getElementById('mfKategori');
+          sel.value = 'MERDANE';
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          var ins = document.querySelectorAll('#mfAsortiGrid input');
+          [1, 2, 3, 2, 1, 1].forEach(function (v, i) { if (ins[i]) { ins[i].value = v; ins[i].dispatchEvent(new Event('input', { bubbles: true })); } });
+          setTimeout(function () { document.getElementById('modelForm').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }, 120);
+        }, 200);
+      }, 150);
+    }
+    if (h === 'modal-order') setTimeout(function () { document.querySelector('[data-act="order-new"]').click(); }, 150);
     if (h === 'modal-cari') { APP.S.view = 'cariler'; APP.updateChrome(); APP.renderView(); setTimeout(function () { document.querySelector('[data-act="cari-new"]').click(); }, 150); }
     if (h === 'modal-ship') { APP.previewShipment(3); }
     if (h === 'upgrade') {

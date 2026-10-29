@@ -241,7 +241,7 @@
     }
     lines.forEach(function (l) {
       out.koli = round3(out.koli + num(l.koli));
-      out.cift = round3(out.cift + lineCift(l, kart));
+      out.cift = round3(out.cift + (num(l.cift) || lineCift(l, kart)));
       dagilimEkle(out.dagilim, lineDagilim(l, kart));
     });
     return out;

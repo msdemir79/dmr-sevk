@@ -1,6 +1,6 @@
 # Renk–beden–asorti matrisi — üretim planı
 
-**Durum:** Aşama 1 (çekirdek + Excel + migration) eature/matris dalında tamamlandı; testler geçti. Arayüz aşaması bekliyor. main/v1.8.0 etkilenmedi.
+**Durum:** Aşama 1 (çekirdek + Excel) ve aşama 2 (model kartı + sipariş satırları) eature/matris dalında tamamlandı. Aşama 3 (sevk + fiş) bekliyor. main/v1.8.0 etkilenmedi.
 **Hedef sürüm:** v2.0.0 (veri şeması değişiyor).
 **Prototip:** [`prototype/matris.html`](../prototype/matris.html) · **Issue:** [#1](https://github.com/msdemir79/dmr-sevk/issues/1)
 

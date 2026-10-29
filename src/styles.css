@@ -740,3 +740,20 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
   .kpis { grid-template-columns: 1fr; }
   .topbar { flex-direction: column; align-items: flex-start; }
 }
+
+/* --- asorti izgarası (model kartı) --- */
+.m-sz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 6px; margin-top: 4px; }
+.m-sz { border: 1px solid var(--line); border-radius: 8px; padding: 4px; text-align: center; background: var(--surface-2); }
+.m-sz span { display: block; font-size: 10px; color: var(--muted); line-height: 1.6; }
+.m-sz input { width: 100%; border: 0; background: transparent; text-align: center; font-weight: 650; padding: 2px; font: inherit; font-size: 13px; color: var(--ink); }
+.m-sz input:focus { outline: 0; box-shadow: none; }
+
+/* --- sipariş satırları --- */
+.order-lines { width: 100%; border-collapse: collapse; font-size: 12px; }
+.order-lines th { text-align: left; padding: 6px 6px; background: var(--surface-2); border-bottom: 1px solid var(--line); font-size: 9.5px; text-transform: uppercase; letter-spacing: .02em; color: var(--muted); white-space: nowrap; }
+.order-lines td { padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.order-lines tr:last-child td { border-bottom: 0; }
+.order-lines input, .order-lines select { width: 100%; border: 1px solid #cbd5e1; border-radius: 7px; padding: 5px 6px; font: inherit; font-size: 12px; background: #fff; color: var(--ink); min-width: 0; }
+.order-lines input:focus, .order-lines select:focus { outline: 0; border-color: var(--brand-2, #14b8a6); box-shadow: 0 0 0 3px rgba(20,184,166,.15); }
+.order-lines .right { text-align: right; }
+.order-lines .btn-icon { width: 26px; height: 26px; padding: 0; }
