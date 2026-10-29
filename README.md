@@ -52,6 +52,10 @@ CI, kaynaklardan yeniden derler ve `DMR_SEVK.html` dosyasının güncel olduğun
 
 Eski (VBA) dosyalar `Ayarlar → Eski dosyadan yeni veritabanı oluştur` ile veya mevcut veritabanına `Excel dosyasından cari aktar` ile alınabilir.
 
+## Yol haritası
+
+Planlanan geliştirmeler ve tasarım notları: [ROADMAP.md](ROADMAP.md). Örnek: **renk–beden–asorti matrisi** (planlama aşamasında, henüz kod yok).
+
 ## Sürüm
 
 Güncel sürüm: **v1.8.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
