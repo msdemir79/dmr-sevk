@@ -1,5 +1,5 @@
 /*!
- * core.js — ASLANLAR FABRİKA veri modeli ve iş kuralları
+ * core.js — DMR AYAKKABI veri modeli ve iş kuralları
  * Sipariş, sevk fişi ve cari hesap işlemlerinin tamamı burada; arayüzden bağımsız.
  */
 (function (root, factory) {
@@ -107,10 +107,24 @@
   /* ------------------------------------------------------------------ */
   /* Varsayılanlar                                                       */
   /* ------------------------------------------------------------------ */
+  /** Eski marka ayarlarını DMR'ye taşır (veri kaybetmeden). */
+  function markaMigrate(data) {
+    var s = data && data.settings;
+    if (!s) return data;
+    // Eski varsayılan firma adı, markanın da eski varsayılan olduğunu gösterir.
+    if (s.firmaAdi === 'DEMİR AYAKKABI - FABRİKA') {
+      s.firmaAdi = 'DMR AYAKKABI - FABRİKA';
+      s.markaAdi = 'DMR';
+      s.markaAlt = 'AYAKKABI';
+      s.markaKisa = 'DMR';
+    }
+    return data;
+  }
+
   function defaultSettings() {
     return {
-      firmaAdi: 'DEMİR AYAKKABI - FABRİKA',
-      cariAdi: 'ASLANLAR AYAKKABI',
+      firmaAdi: 'DMR AYAKKABI - FABRİKA',
+      cariAdi: 'YENİ CARİ',
       firmaAdres: 'SEFAKÖY',
       firmaTel: '',
       vergiDairesi: '',
@@ -118,10 +132,10 @@
       sevkBaslik: 'SEVK FİŞİ',
       kagit: 'A4',
       para: '₺',
-      markaAdi: 'ASLANLAR',
-      markaAlt: 'FABRİKA',
-      markaKisa: 'AF',
-      dosyaAdi: 'ASLANLAR_VERI',
+      markaAdi: 'DMR',
+      markaAlt: 'AYAKKABI',
+      markaKisa: 'DMR',
+      dosyaAdi: 'DMR_VERI',
       sonSiparisNo: 0,
       sonFisNo: 0,
       varsayilanAsorti: 10,
@@ -140,7 +154,7 @@
   /** Yeni dosya: boş veri + varsayılan cari hesap. */
   function newData() {
     var d = emptyData();
-    d.cariler.push(defaultCari(d.settings.cariAdi || 'ASLANLAR AYAKKABI'));
+    d.cariler.push(defaultCari(d.settings.cariAdi || 'YENİ CARİ'));
     d.settings.kurulum = new Date().toISOString();
     return d;
   }
@@ -222,7 +236,7 @@
     return {
       id: 1,
       kod: 'C1',
-      ad: String(ad || 'ASLANLAR AYAKKABI').trim(),
+      ad: String(ad || 'YENİ CARİ').trim(),
       adres: '',
       tel: '',
       vergiDairesi: '',
@@ -1214,9 +1228,9 @@
 
   function readData(sheets) {
     var ordersSheet = sheetByName(sheets, SHEET.ORDERS) || sheetByName(sheets, 'SİPARİŞ TAKİBİ');
-    if (!ordersSheet) throw new Error('Bu dosya ASLANLAR veri dosyası değil (SİPARİŞLER sayfası yok).');
+    if (!ordersSheet) throw new Error('Bu dosya DMR veri dosyası değil (SİPARİŞLER sayfası yok).');
     if (!sheetByName(sheets, SHEET.ORDERS) && !sheetByName(sheets, SHEET.LINES)) {
-      throw new Error('Bu dosya eski ASLANLAR dosyası gibi görünüyor. "Eski Excel\'den içe aktar" seçeneğini kullanın.');
+      throw new Error('Bu dosya eski VBA dosyası gibi görünüyor. "Eski Excel\'den içe aktar" seçeneğini kullanın.');
     }
 
     var data = emptyData();
@@ -1262,7 +1276,7 @@
       }
     }
     if (!data.cariler.length) {
-      var def = defaultCari(data.settings.cariAdi || 'ASLANLAR AYAKKABI');
+      var def = defaultCari(data.settings.cariAdi || 'YENİ CARİ');
       if (data.settings.firmaAdres) def.adres = data.settings.firmaAdres;
       data.cariler.push(def);
       data._upgraded = !cariSheet;
@@ -1503,7 +1517,7 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /* Eski ASLANLAR FABRİKA dosyasından içe aktarma                       */
+  /* Eski VBA dosyasından içe aktarma                       */
   /* ------------------------------------------------------------------ */
   function importLegacy(sheets) {
     var data = emptyData();
@@ -1537,7 +1551,7 @@
     }
 
     // tek cari oluştur (eski dosya tek müşteriye ait)
-    var legacyCari = defaultCari(data.settings.cariAdi || 'ASLANLAR AYAKKABI');
+    var legacyCari = defaultCari(data.settings.cariAdi || 'YENİ CARİ');
     legacyCari.id = 1;
     if (data.settings.firmaAdres) legacyCari.adres = data.settings.firmaAdres;
     data.cariler.push(legacyCari);
@@ -1716,7 +1730,7 @@
   }
 
   /**
-   * Eski bir ASLANLAR dosyasını mevcut veritabanına yeni bir cari olarak ekler.
+   * Eski bir VBA dosyasını mevcut veritabanına yeni bir cari olarak ekler.
    * Kimlikler, fiş numaraları ve bağlantılar çakışmayacak şekilde yeniden üretilir.
    */
   function mergeLegacy(data, legacy, opts) {
@@ -1835,6 +1849,7 @@
     kullaniciById: kullaniciById,
     kullaniciBul: kullaniciBul,
     aktifYoneticiVar: aktifYoneticiVar,
+    markaMigrate: markaMigrate,
     modelKart: modelKart,
     addModel: addModel,
     updateModel: updateModel,

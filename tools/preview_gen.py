@@ -5,7 +5,7 @@ import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "ASLANLAR_SEVK.html")
+SRC = os.path.join(ROOT, "DMR_SEVK.html")
 OUT = os.path.join(ROOT, "tests", "preview.html")
 
 BOOT = r"""
@@ -27,7 +27,7 @@ BOOT = r"""
     st.textContent = '.modal-backdrop{animation:none!important;opacity:1!important}';
     document.head.appendChild(st);
     var d = Core.emptyData();
-    d.settings.firmaAdi = 'DEMİR AYAKKABI - FABRİKA';
+    d.settings.firmaAdi = 'DMR AYAKKABI - FABRİKA';
     d.settings.firmaAdres = 'SEFAKÖY / İSTANBUL';
     d.settings.firmaTel = '0212 555 44 33';
     d.settings.sonFisNo = 244;
@@ -38,7 +38,7 @@ BOOT = r"""
     var admin = Core.addKullanici(d, { ad: 'Ali Veli', kullanici: 'ali', tuz: tuz, sifre: adminHash, rol: 'YÖNETİCİ' });
     Core.addKullanici(d, { ad: 'Ayşe Kaya', kullanici: 'ayse', tuz: tuz, sifre: adminHash, rol: 'KULLANICI' });
 
-    var asl = Core.addCari(d, { ad: 'ASLANLAR AYAKKABI', kod: 'ASL', adres: 'Sefaköy / İstanbul', tel: '0212 555 44 33' });
+    var gns = Core.addCari(d, { ad: 'GÜNEŞ AYAKKABI', kod: 'GNS', adres: 'Sefaköy / İstanbul', tel: '0212 555 44 33' });
     var mod = Core.addCari(d, { ad: 'MODA AYAKKABI', kod: 'MOD', adres: 'İkitelli / İstanbul', tel: '0212 444 22 11', devir: 25000, devirYon: 'BORC' });
     var yld = Core.addCari(d, { ad: 'YILDIZ SPOR', kod: 'YLD', adres: 'Kadıköy / İstanbul', tel: '0216 333 11 22' });
 
@@ -51,13 +51,13 @@ BOOT = r"""
     function dt(daysAgo) { var x = new Date(t.getFullYear(), t.getMonth(), t.getDate() - daysAgo); return x.toISOString().slice(0, 10); }
 
     var tanim = [
-      [asl, 'JALEPENO- J5E - BEYAZ', 'BEYAZ', 10, 3000, 75, 'MERDANE', '#0f766e', 'J5E'],
-      [asl, 'JALEPENO SİYAH SİYAH -2 - AÇIK', 'SİYAH SİYAH', 8, 2200, 62, 'MERDANE', '#334155', 'J5S'],
-      [asl, 'CURE GARSON SİYAH', 'SİYAH', 10, 1800, 62, 'MERDANE', '#1e293b', 'CURE'],
-      [asl, 'CURE GARSON BEYAZ - AÇIK ASORTİ', 'BEYAZ', 10, 1500, 62, 'MERDANE', '', ''],
-      [asl, 'MOCHA GARSON BEYAZ', 'BEYAZ', 8, 960, 62, 'GARSON', '', ''],
-      [asl, 'TALKIEN SİYAH HUC', 'SİYAH', 10, 1200, 62, 'MERDANE', '#7c2d12', 'TALK'],
-      [asl, 'BENZEMA FÜME RSZ', 'FÜME', 10, 900, 62, 'SPOR', '', ''],
+      [gns, 'JALEPENO- J5E - BEYAZ', 'BEYAZ', 10, 3000, 75, 'MERDANE', '#0f766e', 'J5E'],
+      [gns, 'JALEPENO SİYAH SİYAH -2 - AÇIK', 'SİYAH SİYAH', 8, 2200, 62, 'MERDANE', '#334155', 'J5S'],
+      [gns, 'CURE GARSON SİYAH', 'SİYAH', 10, 1800, 62, 'MERDANE', '#1e293b', 'CURE'],
+      [gns, 'CURE GARSON BEYAZ - AÇIK ASORTİ', 'BEYAZ', 10, 1500, 62, 'MERDANE', '', ''],
+      [gns, 'MOCHA GARSON BEYAZ', 'BEYAZ', 8, 960, 62, 'GARSON', '', ''],
+      [gns, 'TALKIEN SİYAH HUC', 'SİYAH', 10, 1200, 62, 'MERDANE', '#7c2d12', 'TALK'],
+      [gns, 'BENZEMA FÜME RSZ', 'FÜME', 10, 900, 62, 'SPOR', '', ''],
       [mod, 'BİRCE BEJ', 'BEJ', 10, 640, 62, 'BATTAL', '', ''],
       [mod, 'NAIROBI - HUC - SİYAH', 'SİYAH', 10, 5000, 75, 'MERDANE', '#0b4a6f', 'NAIR'],
       [mod, 'PABLO HUC', 'SİYAH', 10, 10000, 75, 'MERDANE', '', ''],
@@ -74,14 +74,14 @@ BOOT = r"""
     });
 
     var o = d.orders;
-    Core.createShipment(d, { cariId: asl.id, tarih: dt(30), fisNo: 242, aciklama: 'Kargo: Aras', lines: [
+    Core.createShipment(d, { cariId: gns.id, tarih: dt(30), fisNo: 242, aciklama: 'Kargo: Aras', lines: [
       { orderId: o[0].id, cift: 1200 }, { orderId: o[2].id, cift: 600 }
     ] });
-    Core.createShipment(d, { cariId: asl.id, tarih: dt(18), fisNo: 243, lines: [
+    Core.createShipment(d, { cariId: gns.id, tarih: dt(18), fisNo: 243, lines: [
       { orderId: o[0].id, cift: 800 }, { orderId: o[1].id, cift: 900 },
       { orderId: o[3].id, cift: 640 }, { orderId: o[4].id, cift: 480 }
     ] });
-    Core.createShipment(d, { cariId: asl.id, tarih: dt(6), fisNo: 244, lines: [
+    Core.createShipment(d, { cariId: gns.id, tarih: dt(6), fisNo: 244, lines: [
       { orderId: o[5].id, cift: 500 }, { orderId: o[6].id, cift: 400 }
     ] });
     Core.createShipment(d, { cariId: mod.id, tarih: dt(12), fisNo: 245, aciklama: 'Kargo: MNG', lines: [
@@ -100,23 +100,23 @@ BOOT = r"""
 
     Core.audit(d, 'Ali Veli', 'SEVK FİŞİ', '#246 · YILDIZ SPOR · 400 çift');
     Core.audit(d, 'Ali Veli', 'SİPARİŞ EKLE', 'RUNNER LACİVERT · 800 çift · YILDIZ SPOR');
-    Core.audit(d, 'Ayşe Kaya', 'HAREKET EKLE', 'TAHSİLAT · 90.000,00 ₺ · ASLANLAR AYAKKABI');
+    Core.audit(d, 'Ayşe Kaya', 'HAREKET EKLE', 'TAHSİLAT · 90.000,00 ₺ · GÜNEŞ AYAKKABI');
     var gecici = Core.addOrder(d, { cariId: yld.id, model: 'SİLİNEN MODEL', renk: 'GRİ', asorti: 10, adet: 120, fiyat: 70 });
     Core.deleteOrder(d, gecici.id, 'Ali Veli');
     d.orders = d.orders.filter(function (x) { return x.id !== gecici.id; });
 
-    Core.addLedgerEntry(d, { cariId: asl.id, tarih: dt(28), islem: 'TAHSİLAT', tutar: 120000, aciklama: 'Havale', fisNo: 'T- 41' });
-    Core.addLedgerEntry(d, { cariId: asl.id, tarih: dt(14), islem: 'TAHSİLAT', tutar: 90000, aciklama: 'Nakit tahsilat', fisNo: 'T- 42' });
-    Core.addLedgerEntry(d, { cariId: asl.id, tarih: dt(9), islem: 'ALIŞ', tutar: 45280, aciklama: '18.112 çift bağcık', fisNo: 'T- 43' });
-    Core.addLedgerEntry(d, { cariId: asl.id, tarih: dt(8), islem: 'GELİR', tutar: 1983.72, aciklama: 'İlaç ve silme suyu', fisNo: 'T- 44' });
+    Core.addLedgerEntry(d, { cariId: gns.id, tarih: dt(28), islem: 'TAHSİLAT', tutar: 120000, aciklama: 'Havale', fisNo: 'T- 41' });
+    Core.addLedgerEntry(d, { cariId: gns.id, tarih: dt(14), islem: 'TAHSİLAT', tutar: 90000, aciklama: 'Nakit tahsilat', fisNo: 'T- 42' });
+    Core.addLedgerEntry(d, { cariId: gns.id, tarih: dt(9), islem: 'ALIŞ', tutar: 45280, aciklama: '18.112 çift bağcık', fisNo: 'T- 43' });
+    Core.addLedgerEntry(d, { cariId: gns.id, tarih: dt(8), islem: 'GELİR', tutar: 1983.72, aciklama: 'İlaç ve silme suyu', fisNo: 'T- 44' });
     Core.addLedgerEntry(d, { cariId: mod.id, tarih: dt(10), islem: 'TAHSİLAT', tutar: 40000, aciklama: 'Çek tahsilatı', fisNo: 'T- 51' });
 
     APP.data = d;
-    APP.S.file.name = 'ASLANLAR_VERI.xlsx';
+    APP.S.file.name = 'DMR_VERI.xlsx';
     APP.S.file.lastSaved = new Date();
     APP.S.file.dirty = false;
-    APP.S.ui.cariId = asl.id;
-    APP.S.ui.shipCariId = asl.id;
+    APP.S.ui.cariId = gns.id;
+    APP.S.ui.shipCariId = gns.id;
     APP.S.user = admin;
     APP.startApp();
 
@@ -162,13 +162,13 @@ BOOT = r"""
       var v1 = { sheets: [
         { name: 'SİPARİŞLER', rows: [['ID', 'SİP. NO', 'TARİH', 'MODEL', 'SİPARİŞ ÇİFT', 'FİYAT'], [1, 1, '2026-01-05', 'ESKİ MODEL', 100, 50]] },
         { name: 'CARİ HESAP', rows: [['ID', 'TARİH', 'FİŞ NO', 'İŞLEM', 'AÇIKLAMA', 'TUTAR', 'BORÇ', 'ALACAK'], [1, '2026-01-06', 1, 'SATIŞ', 'ESKİ MODEL', 5000, 5000, 0]] },
-        { name: 'SEVK FİŞLERİ', rows: [['ID', 'FİŞ NO', 'TARİH', 'CARİ', 'ÇİFT'], [1, 1, '2026-01-06', 'ASLANLAR AYAKKABI', 100]] },
-        { name: 'AYARLAR', rows: [['AYAR', 'DEĞER'], ['cariAdi', 'ASLANLAR AYAKKABI'], ['firmaAdres', 'Sefaköy']] }
+        { name: 'SEVK FİŞLERİ', rows: [['ID', 'FİŞ NO', 'TARİH', 'CARİ', 'ÇİFT'], [1, 1, '2026-01-06', 'GÜNEŞ AYAKKABI', 100]] },
+        { name: 'AYARLAR', rows: [['AYAR', 'DEĞER'], ['cariAdi', 'GÜNEŞ AYAKKABI'], ['firmaAdres', 'Sefaköy']] }
       ] };
       var up = Core.readData(v1.sheets);
       APP.data = up;
       APP.S.ui.cariId = up.cariler[0].id;
-      APP.S.file.name = 'ASLANLAR_VERI.xlsx';
+      APP.S.file.name = 'DMR_VERI.xlsx';
       APP.startApp();
     }
     if (h === 'brand') {
@@ -235,7 +235,7 @@ BOOT = r"""
       }, 300);
     }
     if (h === 'login-remember') {
-      try { localStorage.setItem('aslanlar:hatirla', 'ali'); } catch (e) { }
+      try { localStorage.setItem('dmr:hatirla', 'ali'); } catch (e) { }
       APP.S.user = null;
       APP.startApp();
       APP.showLogin();
@@ -361,7 +361,7 @@ BOOT = r"""
     if (h === 'do-first-user') {
       APP.S.user = null;
       APP.data = Core.newData();
-      APP.S.file.name = 'ASLANLAR_VERI.xlsx';
+      APP.S.file.name = 'DMR_VERI.xlsx';
       APP.showFirstUser();
       setTimeout(function () {
         document.getElementById('fuAd').value = 'Mehmet Demir';
@@ -374,7 +374,7 @@ BOOT = r"""
     if (h === 'first-user') {
       APP.S.user = null;
       APP.data = Core.newData();
-      APP.S.file.name = 'ASLANLAR_VERI.xlsx';
+      APP.S.file.name = 'DMR_VERI.xlsx';
       APP.showFirstUser();
     }
     if (h === 'settings-users') {

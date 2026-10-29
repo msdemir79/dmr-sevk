@@ -1,5 +1,5 @@
 /*!
- * ui.js — ASLANLAR FABRİKA Sevk & Cari Yönetimi arayüzü
+ * ui.js — DMR AYAKKABI Sevk & Cari Yönetimi arayüzü
  */
 (function () {
   'use strict';
@@ -121,7 +121,7 @@
     S.ui.orderPage = 1;
     S.ui.ledgerPage = 1;
     S.ui.shipListPage = 1;
-    try { localStorage.setItem('aslanlar:cari', String(S.ui.cariId)); } catch (e) { }
+    try { localStorage.setItem('dmr:cari', String(S.ui.cariId)); } catch (e) { }
     updateChrome();
     renderView();
   }
@@ -129,9 +129,9 @@
   /* ------------------------------------------------------------------ */
   /* Marka                                                               */
   /* ------------------------------------------------------------------ */
-  function markaAdi() { return (data && data.settings.markaAdi) || 'ASLANLAR'; }
-  function markaAlt() { return (data && data.settings.markaAlt) || 'FABRİKA'; }
-  function markaKisa() { return (data && data.settings.markaKisa) || 'AF'; }
+  function markaAdi() { return (data && data.settings.markaAdi) || 'DMR'; }
+  function markaAlt() { return (data && data.settings.markaAlt) || 'AYAKKABI'; }
+  function markaKisa() { return (data && data.settings.markaKisa) || 'DMR'; }
   function markaLogo() { return (data && data.settings.logo) || ''; }
   function markaTam() { return (markaAdi() + ' ' + markaAlt()).trim(); }
   function brandMark(cls) {
@@ -195,7 +195,7 @@
   /* ------------------------------------------------------------------ */
   /* IndexedDB (dosya tanıtıcısı + kurtarma önbelleği)                   */
   /* ------------------------------------------------------------------ */
-  var DB_NAME = 'aslanlar-sevk';
+  var DB_NAME = 'dmr-sevk';
   function idb() {
     return new Promise(function (resolve, reject) {
       if (!window.indexedDB) return reject(new Error('no-idb'));
@@ -343,7 +343,7 @@
 
   function writeBytes() {
     var wb = Core.buildWorkbook(data);
-    return XLSX.writeWorkbook(wb, { title: 'ASLANLAR FABRİKA — ' + (activeCari() ? activeCari().ad : 'Tüm cariler'), creator: 'ASLANLAR Sevk' });
+    return XLSX.writeWorkbook(wb, { title: 'DMR AYAKKABI — ' + (activeCari() ? activeCari().ad : 'Tüm cariler'), creator: 'DMR Sevk' });
   }
 
   function saveFile(opts) {
@@ -380,7 +380,7 @@
 
     if (FS_OK) {
       return window.showSaveFilePicker({
-        suggestedName: S.file.name || 'ASLANLAR_VERI.xlsx',
+        suggestedName: S.file.name || 'DMR_VERI.xlsx',
         types: XLSX_TYPES
       }).then(function (handle) {
         return handle.createWritable()
@@ -392,13 +392,13 @@
       }).catch(function (err) {
         if (err && err.name === 'AbortError') return false;
         // Dosya seçici kullanılamıyorsa indirme moduna düş
-        download(bytes, S.file.name || 'ASLANLAR_VERI.xlsx');
-        return done(S.file.name || 'ASLANLAR_VERI.xlsx', null);
+        download(bytes, S.file.name || 'DMR_VERI.xlsx');
+        return done(S.file.name || 'DMR_VERI.xlsx', null);
       });
     }
 
-    download(bytes, S.file.name || 'ASLANLAR_VERI.xlsx');
-    return Promise.resolve(done(S.file.name || 'ASLANLAR_VERI.xlsx', null));
+    download(bytes, S.file.name || 'DMR_VERI.xlsx');
+    return Promise.resolve(done(S.file.name || 'DMR_VERI.xlsx', null));
   }
 
   function applyLoadedData(d, fileName, handle) {
@@ -407,14 +407,15 @@
       if (!Array.isArray(data[k])) data[k] = [];
     });
     if (!data.modelImages || typeof data.modelImages !== 'object') data.modelImages = {};
+    try { Core.markaMigrate(data); } catch (e) { }
     try { Core.trashTemizle(data, 30); } catch (e) { }
-    S.file.name = fileName || 'ASLANLAR_VERI.xlsx';
+    S.file.name = fileName || 'DMR_VERI.xlsx';
     S.file.handle = handle || null;
     S.file.dirty = false;
     S.file.lastSaved = new Date();
     S.ui.cart = [];
     var savedCari = 0;
-    try { savedCari = parseInt(localStorage.getItem('aslanlar:cari'), 10) || 0; } catch (e) { }
+    try { savedCari = parseInt(localStorage.getItem('dmr:cari'), 10) || 0; } catch (e) { }
     S.ui.cariId = (savedCari && Core.cariById(d, savedCari)) ? savedCari : (d.cariler[0] ? d.cariler[0].id : 0);
     S.ui.shipCariId = S.ui.cariId;
     S.ui.shipFisNo = Core.nextFisNo(data);
@@ -485,7 +486,7 @@
     }
     d.settings.sonFisNo = 0;
     d.settings.sonSiparisNo = 0;
-    var dosya = String(d.settings.dosyaAdi || 'ASLANLAR_VERI').replace(/\.xlsx$/i, '') + '.xlsx';
+    var dosya = String(d.settings.dosyaAdi || 'DMR_VERI').replace(/\.xlsx$/i, '') + '.xlsx';
     applyLoadedData(d, dosya, null);
     beginSession(async function () {
       setDirty(true);
@@ -524,7 +525,7 @@
           if (data.settings[k] !== undefined) d.settings[k] = data.settings[k];
         });
       }
-      var yeniAd = String(d.settings.dosyaAdi || 'ASLANLAR_VERI').replace(/\.xlsx$/i, '') + '.xlsx';
+      var yeniAd = String(d.settings.dosyaAdi || 'DMR_VERI').replace(/\.xlsx$/i, '') + '.xlsx';
       applyLoadedData(d, yeniAd, null);
       beginSession(async function () {
         setDirty(true);
@@ -675,7 +676,7 @@
 
   function sessionUser() {
     try {
-      var raw = sessionStorage.getItem('aslanlar:oturum');
+      var raw = sessionStorage.getItem('dmr:oturum');
       if (!raw) return null;
       var s = JSON.parse(raw);
       var u = Core.kullaniciById(data, s.id);
@@ -686,7 +687,7 @@
 
   function setSession(u) {
     try {
-      sessionStorage.setItem('aslanlar:oturum', JSON.stringify({ id: u.id, kullanici: u.kullanici }));
+      sessionStorage.setItem('dmr:oturum', JSON.stringify({ id: u.id, kullanici: u.kullanici }));
     } catch (e) { }
   }
 
@@ -718,7 +719,7 @@
     runOnReady();
   }
 
-  var HATIRLA_KEY = 'aslanlar:hatirla';
+  var HATIRLA_KEY = 'dmr:hatirla';
 
   function hatirlananKullanici() {
     try { return localStorage.getItem(HATIRLA_KEY) || ''; } catch (e) { return ''; }
@@ -726,7 +727,7 @@
 
   function authShell(inner, opts) {
     opts = opts || {};
-    var dosya = S.file.name || 'ASLANLAR_VERI.xlsx';
+    var dosya = S.file.name || 'DMR_VERI.xlsx';
     document.getElementById('root').innerHTML =
       '<div class="auth-page">' +
       '  <div class="auth-panel">' +
@@ -850,7 +851,7 @@
 
   function lockSession() {
     S.user = null;
-    try { sessionStorage.removeItem('aslanlar:oturum'); } catch (e) { }
+    try { sessionStorage.removeItem('dmr:oturum'); } catch (e) { }
     showLogin();
   }
 
@@ -944,7 +945,7 @@
     var mode = S.file.handle ? 'Excel dosyasına bağlı' : (S.file.name ? 'Tarayıcı modu' : 'Dosya seçilmedi');
     var status = S.file.dirty ? 'Kaydedilmedi' : (S.file.lastSaved ? 'Kaydedildi ' + timeTR(S.file.lastSaved) : 'Hazır');
     chip.innerHTML =
-      '<div class="fname">' + ICONS.file + '<span title="' + esc(S.file.name) + '">' + esc(S.file.name || 'ASLANLAR_VERI.xlsx') + '</span></div>' +
+      '<div class="fname">' + ICONS.file + '<span title="' + esc(S.file.name) + '">' + esc(S.file.name || 'DMR_VERI.xlsx') + '</span></div>' +
       '<div class="fstat"><i class="dot ' + (S.file.dirty ? 'dirty' : S.file.handle ? 'ok' : 'off') + '"></i>' + esc(status) + '</div>' +
       '<div class="fstat muted" style="margin-top:2px">' + esc(mode) + '</div>' +
       '<button class="fsave" data-act="save">' + (S.file.dirty ? 'Kaydet' : 'Excel\'e kaydet') + '</button>' +
@@ -1875,9 +1876,17 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '1.7.0';
+  var SURUM = '1.8.0';
 
   var YENILIKLER = [
+    {
+      v: '1.8.0', t: '30.10.2026', m: [
+        'Proje adı DMR AYAKKABI olarak güncellendi',
+        'Uygulama dosyası DMR_SEVK.html, veri dosyası DMR_VERI.xlsx',
+        'Varsayılan marka DMR / AYAKKABI; ilk cari YENİ CARİ',
+        'Eski dosyalardaki marka ayarı açılışta DMR markasına taşınır'
+      ]
+    },
     {
       v: '1.7.0', t: '30.10.2026', m: [
         'Model kartlarına resim ve asorti alanı',
@@ -2395,10 +2404,10 @@ function viewShipments() {
     return '<div class="grid-2 even">' +
       '<div class="card"><div class="card-head"><div><h2>Firma ve görünüm</h2><div class="sub">Sol üst marka ve sevk fişi başlığı</div></div></div>' +
       '<form id="settingsForm" class="card-body form-grid g2">' +
-      '  <div class="field"><label for="setMarka">Uygulama adı <span class="hint">(sol üst)</span></label><input id="setMarka" name="markaAdi" class="input" maxlength="24" value="' + esc(s.markaAdi || 'ASLANLAR') + '"></div>' +
-      '  <div class="field"><label for="setMarkaAlt">Alt başlık</label><input id="setMarkaAlt" name="markaAlt" class="input" maxlength="24" value="' + esc(s.markaAlt || 'FABRİKA') + '"></div>' +
-      '  <div class="field"><label for="setMarkaKisa">Kısa işaret <span class="hint">(logo yoksa)</span></label><input id="setMarkaKisa" name="markaKisa" class="input" maxlength="3" value="' + esc(s.markaKisa || 'AF') + '"></div>' +
-      '  <div class="field"><label for="setDosyaAdi">Varsayılan dosya adı</label><input id="setDosyaAdi" name="dosyaAdi" class="input" value="' + esc(s.dosyaAdi || 'ASLANLAR_VERI') + '" placeholder="Database"></div>' +
+      '  <div class="field"><label for="setMarka">Uygulama adı <span class="hint">(sol üst)</span></label><input id="setMarka" name="markaAdi" class="input" maxlength="24" value="' + esc(s.markaAdi || 'DMR') + '"></div>' +
+      '  <div class="field"><label for="setMarkaAlt">Alt başlık</label><input id="setMarkaAlt" name="markaAlt" class="input" maxlength="24" value="' + esc(s.markaAlt || 'AYAKKABI') + '"></div>' +
+      '  <div class="field"><label for="setMarkaKisa">Kısa işaret <span class="hint">(logo yoksa)</span></label><input id="setMarkaKisa" name="markaKisa" class="input" maxlength="3" value="' + esc(s.markaKisa || 'DMR') + '"></div>' +
+      '  <div class="field"><label for="setDosyaAdi">Varsayılan dosya adı</label><input id="setDosyaAdi" name="dosyaAdi" class="input" value="' + esc(s.dosyaAdi || 'DMR_VERI') + '" placeholder="Database"></div>' +
       '  <div class="field span2"><label for="setFirma">Firma adı (sevk eden)</label><input id="setFirma" name="firmaAdi" class="input" value="' + esc(s.firmaAdi) + '"></div>' +
       '  <div class="field"><label for="setTel">Telefon</label><input id="setTel" name="firmaTel" class="input" value="' + esc(s.firmaTel) + '"></div>' +
       '  <div class="field"><label for="setVd">Vergi dairesi</label><input id="setVd" name="vergiDairesi" class="input" value="' + esc(s.vergiDairesi) + '"></div>' +
@@ -2733,7 +2742,7 @@ function viewShipments() {
 
     var body =
       '<form id="cariForm" class="form-grid g2" autocomplete="off">' +
-      '  <div class="field span2"><label for="cfAd">Cari adı *</label><input id="cfAd" name="ad" class="input" required value="' + esc(c.ad) + '" placeholder="Örn. ASLANLAR AYAKKABI"></div>' +
+      '  <div class="field span2"><label for="cfAd">Cari adı *</label><input id="cfAd" name="ad" class="input" required value="' + esc(c.ad) + '" placeholder="Örn. MÜŞTERİ AYAKKABI"></div>' +
       '  <div class="field"><label for="cfKod">Kısa kod</label><input id="cfKod" name="kod" class="input" value="' + esc(c.kod) + '" placeholder="' + esc(sonKod) + '"></div>' +
       '  <div class="field"><label for="cfTel">Telefon</label><input id="cfTel" name="tel" class="input" value="' + esc(c.tel) + '"></div>' +
       '  <div class="field span2"><label for="cfAdres">Adres</label><input id="cfAdres" name="adres" class="input" value="' + esc(c.adres) + '"></div>' +
@@ -3532,7 +3541,7 @@ function viewShipments() {
       '<div class="row"><span class="k">TOPLAM</span><span class="v">' + money(toplamTutar) + '</span></div></div>' +
       '<table class="pf-table"><thead><tr><th>' + (cid ? 'MODEL' : 'CARİ') + '</th><th style="width:70px">KOLİ</th><th style="width:70px">ÇİFT</th><th style="width:100px">TUTAR</th></tr></thead><tbody>' + body + '</tbody>' +
       '<tfoot><tr><td>TOPLAM</td><td class="n">' + nf1(list.reduce(function (a, m) { return a + m.koli; }, 0)) + '</td><td class="n">' + nf0(toplamCift) + '</td><td class="n">' + nf2(toplamTutar) + '</td></tr></tfoot></table>' +
-      '<div class="pf-foot"><span>' + esc(data.settings.firmaAdi) + '</span><span>ASLANLAR Sevk</span></div></div>');
+      '<div class="pf-foot"><span>' + esc(data.settings.firmaAdi) + '</span><span>DMR Sevk</span></div></div>');
   }
 
   function backup() {
@@ -3540,7 +3549,7 @@ function viewShipments() {
       var bytes = writeBytes();
       var d = new Date();
       var stamp = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + '_' + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
-      download(bytes, 'ASLANLAR_YEDEK_' + stamp + '.xlsx');
+      download(bytes, 'DMR_YEDEK_' + stamp + '.xlsx');
       toast('Yedek indirildi', 'ok');
     } catch (e) { toast('Yedek oluşturulamadı: ' + e.message, 'err'); }
   }
@@ -3607,7 +3616,7 @@ function viewShipments() {
     }
     if (t.id === 'autoSaveChk') {
       S.autosave = t.checked;
-      try { localStorage.setItem('aslanlar:autosave', S.autosave ? '1' : '0'); } catch (err) { }
+      try { localStorage.setItem('dmr:autosave', S.autosave ? '1' : '0'); } catch (err) { }
       toast(S.autosave ? 'Otomatik kaydetme açık' : 'Otomatik kaydetme kapalı', 'ok');
     }
     if (t.id === 'logoInput' && t.files && t.files[0]) {
@@ -3670,10 +3679,10 @@ function viewShipments() {
     if (f.id === 'settingsForm') {
       e.preventDefault();
       var fd = new FormData(f);
-      data.settings.markaAdi = String(fd.get('markaAdi') || '').trim() || 'ASLANLAR';
+      data.settings.markaAdi = String(fd.get('markaAdi') || '').trim() || 'DMR';
       data.settings.markaAlt = String(fd.get('markaAlt') || '').trim();
       data.settings.markaKisa = (String(fd.get('markaKisa') || '').trim() || 'AF').slice(0, 3).toLocaleUpperCase('tr-TR');
-      data.settings.dosyaAdi = String(fd.get('dosyaAdi') || '').trim().replace(/\.xlsx$/i, '') || 'ASLANLAR_VERI';
+      data.settings.dosyaAdi = String(fd.get('dosyaAdi') || '').trim().replace(/\.xlsx$/i, '') || 'DMR_VERI';
       data.settings.firmaAdi = String(fd.get('firmaAdi') || '').trim();
       data.settings.firmaAdres = String(fd.get('firmaAdres') || '').trim();
       data.settings.firmaTel = String(fd.get('firmaTel') || '').trim();
@@ -3705,7 +3714,7 @@ function viewShipments() {
       '<div class="welcome"><div class="welcome-card">' +
       '<div class="welcome-head">' +
       '  <div class="logo">AF</div>' +
-      '  <h1>ASLANLAR FABRİKA</h1>' +
+      '  <h1>DMR AYAKKABI</h1>' +
       '  <p>Sipariş, sevk fişi ve cari hesap takibi. Tüm verileriniz seçtiğiniz Excel dosyasında saklanır; internet bağlantısı gerekmez.</p>' +
       '</div>';
 
@@ -3720,9 +3729,9 @@ function viewShipments() {
       '  <button class="choice" id="btnNew"><div class="ic">' + ICONS.plus + '</div><b>Yeni dosya oluştur</b>' +
       '    <span>Boş bir Excel veri dosyası oluşturup sipariş girmeye başlayın.</span></button>' +
       '  <button class="choice" id="btnOpen"><div class="ic">' + ICONS.folder + '</div><b>Excel dosyası aç</b>' +
-      '    <span>Daha önce bu programla oluşturulmuş ASLANLAR veri dosyasını açın.</span></button>' +
+      '    <span>Daha önce bu programla oluşturulmuş DMR veri dosyasını açın.</span></button>' +
       '  <button class="choice" id="btnImport"><div class="ic">' + ICONS.upload + '</div><b>Eski Excel\'den aktar</b>' +
-      '    <span>Mevcut ASLANLAR FABRİKA dosyanızdaki sipariş ve cari kayıtlarını içe aktarın.</span></button>' +
+      '    <span>Mevcut Excel dosyanızdaki sipariş ve cari kayıtlarını içe aktarın.</span></button>' +
       '</div>' +
       '<div class="welcome-foot">' +
       (FS_OK ? 'Dosya erişimi destekleniyor — kayıtlar doğrudan seçtiğiniz Excel dosyasına yazılır.' : 'Bu tarayıcıda dosya erişimi kısıtlı; kayıtlar indirilen Excel dosyası olarak alınır. Chrome veya Edge önerilir.') +
@@ -3743,7 +3752,7 @@ function viewShipments() {
           if (ok) return;
         }
         if (ctx.cache && ctx.cache.data) {
-          applyLoadedData(ctx.cache.data, 'ASLANLAR_VERI.xlsx', null);
+          applyLoadedData(ctx.cache.data, 'DMR_VERI.xlsx', null);
           beginSession();
           toast('Kaydedilmemiş çalışma geri yüklendi. Excel\'e kaydetmeyi unutmayın.', '');
         }
@@ -3759,7 +3768,7 @@ function viewShipments() {
     if (booted) return;
     booted = true;
     try {
-      var v = localStorage.getItem('aslanlar:autosave');
+      var v = localStorage.getItem('dmr:autosave');
       if (v === '0') S.autosave = false;
     } catch (e) { }
 

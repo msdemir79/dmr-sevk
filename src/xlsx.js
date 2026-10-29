@@ -1,6 +1,6 @@
 /*!
  * xlsx-lite — bağımlılıksız XLSX okuyucu / yazıcı
- * ASLANLAR FABRİKA Sevk & Cari Yönetimi için özel olarak yazıldı.
+ * DMR AYAKKABI Sevk & Cari Yönetimi için özel olarak yazıldı.
  * Okuma: ZIP (store/deflate) + SpreadsheetML (sharedStrings, inlineStr, sayı, tarih)
  * Yazma: ZIP (store) + minimal SpreadsheetML + stiller (başlık, sayı, tarih, para)
  */
@@ -597,9 +597,9 @@
     var now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
     var coreXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">' +
-      '<dc:title>' + esc(meta.title || 'ASLANLAR FABRİKA Veri') + '</dc:title>' +
-      '<dc:creator>' + esc(meta.creator || 'ASLANLAR Sevk') + '</dc:creator>' +
-      '<cp:lastModifiedBy>' + esc(meta.creator || 'ASLANLAR Sevk') + '</cp:lastModifiedBy>' +
+      '<dc:title>' + esc(meta.title || 'DMR AYAKKABI Veri') + '</dc:title>' +
+      '<dc:creator>' + esc(meta.creator || 'DMR Sevk') + '</dc:creator>' +
+      '<cp:lastModifiedBy>' + esc(meta.creator || 'DMR Sevk') + '</cp:lastModifiedBy>' +
       '<dcterms:created xsi:type="dcterms:W3CDTF">' + now + '</dcterms:created>' +
       '<dcterms:modified xsi:type="dcterms:W3CDTF">' + now + '</dcterms:modified>' +
       '</cp:coreProperties>';

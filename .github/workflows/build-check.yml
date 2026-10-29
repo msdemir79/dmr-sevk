@@ -18,4 +18,4 @@ jobs:
         run: python tools/build.py
 
       - name: Derlenen dosya kaynaklarla aynı mı?
-        run: git diff --exit-code ASLANLAR_SEVK.html
+        run: git diff --exit-code DMR_SEVK.html

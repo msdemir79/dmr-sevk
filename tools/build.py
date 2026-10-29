@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-"""ASLANLAR_SEVK.html dosyasını src/ parçalarından derler."""
+"""DMR_SEVK.html dosyasını src/ parçalarından derler."""
 import io
 import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "ASLANLAR_SEVK.html")
+OUT = os.path.join(ROOT, "DMR_SEVK.html")
 
 
 def read(name):

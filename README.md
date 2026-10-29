@@ -1,6 +1,6 @@
 # DMR AYAKKABI — Sevk ve Cari Yönetimi
 
-![build-check](https://github.com/msdemir79/aslanlar-sevk/actions/workflows/build-check.yml/badge.svg)
+![build-check](https://github.com/msdemir79/dmr-sevk/actions/workflows/build-check.yml/badge.svg)
 
 Tek bir HTML dosyası olarak çalışan, verilerini seçtiğiniz **Excel (.xlsx)** dosyasında tutan sipariş, sevk fişi ve cari hesap uygulaması. Kurulum, sunucu ve internet bağlantısı gerektirmez; Chrome veya Edge ile açılır.
 
@@ -18,7 +18,7 @@ Tek bir HTML dosyası olarak çalışan, verilerini seçtiğiniz **Excel (.xlsx)
 
 ## Hızlı başlangıç
 
-1. `ASLANLAR_SEVK.html` dosyasını indirin.
+1. `DMR_SEVK.html` dosyasını indirin.
 2. Chrome veya Edge ile açın (çift tıklama yeterli).
 3. **Yeni dosya oluştur** deyin veya mevcut `.xlsx` veri dosyanızı açın.
 
@@ -44,7 +44,7 @@ python tools/build.py
 | `tools/build.py` | Derleme |
 | `tools/preview_gen.py` | Demo verili önizleme (geliştirme aracı) |
 
-CI, kaynaklardan yeniden derler ve `ASLANLAR_SEVK.html` dosyasının güncel olduğunu doğrular.
+CI, kaynaklardan yeniden derler ve `DMR_SEVK.html` dosyasının güncel olduğunu doğrular.
 
 ## Excel sayfaları
 
@@ -54,19 +54,19 @@ Eski (VBA) dosyalar `Ayarlar → Eski dosyadan yeni veritabanı oluştur` ile ve
 
 ## Sürüm
 
-Güncel sürüm: **v1.7.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `ASLANLAR_SEVK.html` eklenir.
+Güncel sürüm: **v1.8.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
 
 ### Yeni sürüm çıkarma
 
 ```bash
 python tools/build.py
 git add -A
-git commit -m "v1.6.1: kısa açıklama"
-git tag -a v1.6.1 -m "Sürüm 1.6.1"
+git commit -m "v1.8.1: kısa açıklama"
+git tag -a v1.8.1 -m "Sürüm 1.6.1"
 git push origin main --tags
 ```
 
-Ardından GitHub'da **Releases → Draft a new release** ile `v1.6.1` etiketini seçip `ASLANLAR_SEVK.html` dosyasını ekleyin. CI, HTML'in kaynaklarla aynı olduğunu otomatik doğrular.
+Ardından GitHub'da **Releases → Draft a new release** ile `v1.8.1` etiketini seçip `DMR_SEVK.html` dosyasını ekleyin. CI, HTML'in kaynaklarla aynı olduğunu otomatik doğrular.
 
 ## Gizlilik
 
