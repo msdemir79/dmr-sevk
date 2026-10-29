@@ -6,7 +6,9 @@ Bu dosya, henüz uygulanmayan ama değerlendirilen geliştirmeleri tutar. Uygula
 
 **Durum:** Tasarım netleşti, prototip hazır — üretim koduna **henüz alınmadı**. Takip: [#1](https://github.com/msdemir79/dmr-sevk/issues/1)
 
-**Deneme ekranı:** [`prototype/matris.html`](../prototype/matris.html) — veri kaydetmez; 6049, 1001 açık ve karışık örnekleri içerir.
+**Deneme ekranı:** [`prototype/matris.html`](prototype/matris.html) — veri kaydetmez; 6049, 1001 açık ve karışık örnekleri içerir.
+
+![Karışık örnek](prototype/onizleme-mix.png)
 
 **Amaç:** Siparişi renk × beden kırılımında girmek; asorti şablonuyla koli içi dağılımı otomatik hesaplamak; fişte isteğe bağlı beden dökümü göstermek. Sevkiyat ve stok takibi **toplam koli/çift** üzerinden devam eder.
 
