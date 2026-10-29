@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASLANLAR FABRİKA · Sevk ve Cari Yönetimi</title>
+<meta name="description" content="Sipariş, sevk fişi ve cari hesap takibi. Veriler Excel dosyasında saklanır.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f766e'/%3E%3Ctext x='32' y='42' font-family='Segoe UI,Arial' font-size='24' font-weight='700' fill='white' text-anchor='middle'%3EAF%3C/text%3E%3C/svg%3E">
+<style>
+{{STYLES}}
+</style>
+</head>
+<body>
+<div id="root">
+  <div style="min-height:100vh;display:grid;place-items:center;color:#74839a;font-family:'Segoe UI',Arial,sans-serif;font-size:13px">
+    Yükleniyor…
+  </div>
+</div>
+<div id="modalRoot"></div>
+<div id="toastRoot" class="toast-root"></div>
+<div id="printRoot" class="print-root"></div>
+<input type="file" id="fileInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden">
+<input type="file" id="legacyInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden">
+<input type="file" id="cariImportInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden">
+<script>
+{{XLSX}}
+</script>
+<script>
+{{CORE}}
+</script>
+<script>
+{{UI}}
+</script>
+</body>
+</html>

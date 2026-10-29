@@ -1,0 +1,406 @@
+# -*- coding: utf-8 -*-
+"""Görsel doğrulama için çoklu cari demo sayfası üretir."""
+import io
+import os
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(ROOT, "ASLANLAR_SEVK.html")
+OUT = os.path.join(ROOT, "tests", "preview.html")
+
+BOOT = r"""
+<script>
+(function () {
+  function showErr(msg) {
+    var d = document.getElementById('screenshot-errors') || document.createElement('div');
+    d.id = 'screenshot-errors';
+    d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;background:#7f1d1d;color:#fff;font:12px monospace;padding:8px 12px;z-index:9999;white-space:pre-wrap';
+    d.textContent += msg + '\n';
+    document.body.appendChild(d);
+  }
+  window.addEventListener('error', function (e) { showErr('HATA: ' + e.message + ' @ ' + (e.filename || '') + ':' + e.lineno); });
+  window.addEventListener('unhandledrejection', function (e) { showErr('PROMISE: ' + (e.reason && e.reason.message ? e.reason.message : e.reason)); });
+
+  async function demo() {
+    var Core = window.Core, APP = window.APP;
+    var st = document.createElement('style');
+    st.textContent = '.modal-backdrop{animation:none!important;opacity:1!important}';
+    document.head.appendChild(st);
+    var d = Core.emptyData();
+    d.settings.firmaAdi = 'DEMİR AYAKKABI - FABRİKA';
+    d.settings.firmaAdres = 'SEFAKÖY / İSTANBUL';
+    d.settings.firmaTel = '0212 555 44 33';
+    d.settings.sonFisNo = 244;
+    d.settings.sonSiparisNo = 68;
+
+    var tuz = 'demotuz';
+    var adminHash = await APP.sifreHash('ali', '1234', tuz);
+    var admin = Core.addKullanici(d, { ad: 'Ali Veli', kullanici: 'ali', tuz: tuz, sifre: adminHash, rol: 'YÖNETİCİ' });
+    Core.addKullanici(d, { ad: 'Ayşe Kaya', kullanici: 'ayse', tuz: tuz, sifre: adminHash, rol: 'KULLANICI' });
+
+    var asl = Core.addCari(d, { ad: 'ASLANLAR AYAKKABI', kod: 'ASL', adres: 'Sefaköy / İstanbul', tel: '0212 555 44 33' });
+    var mod = Core.addCari(d, { ad: 'MODA AYAKKABI', kod: 'MOD', adres: 'İkitelli / İstanbul', tel: '0212 444 22 11', devir: 25000, devirYon: 'BORC' });
+    var yld = Core.addCari(d, { ad: 'YILDIZ SPOR', kod: 'YLD', adres: 'Kadıköy / İstanbul', tel: '0216 333 11 22' });
+
+    function svgImg(bg, label) {
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="' + bg + '"/><path d="M18 76c14-4 24-14 34-26 6-7 14-6 17 2l7 18c2 5 6 8 11 9l6 1v10H24c-6 0-9-8-6-14z" fill="rgba(255,255,255,.28)"/><text x="60" y="106" font-family="Arial" font-size="14" fill="#fff" text-anchor="middle">' + label + '</text></svg>';
+      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
+
+    var t = new Date();
+    function dt(daysAgo) { var x = new Date(t.getFullYear(), t.getMonth(), t.getDate() - daysAgo); return x.toISOString().slice(0, 10); }
+
+    var tanim = [
+      [asl, 'JALEPENO- J5E - BEYAZ', 'BEYAZ', 10, 3000, 75, 'MERDANE', '#0f766e', 'J5E'],
+      [asl, 'JALEPENO SİYAH SİYAH -2 - AÇIK', 'SİYAH SİYAH', 8, 2200, 62, 'MERDANE', '#334155', 'J5S'],
+      [asl, 'CURE GARSON SİYAH', 'SİYAH', 10, 1800, 62, 'MERDANE', '#1e293b', 'CURE'],
+      [asl, 'CURE GARSON BEYAZ - AÇIK ASORTİ', 'BEYAZ', 10, 1500, 62, 'MERDANE', '', ''],
+      [asl, 'MOCHA GARSON BEYAZ', 'BEYAZ', 8, 960, 62, 'GARSON', '', ''],
+      [asl, 'TALKIEN SİYAH HUC', 'SİYAH', 10, 1200, 62, 'MERDANE', '#7c2d12', 'TALK'],
+      [asl, 'BENZEMA FÜME RSZ', 'FÜME', 10, 900, 62, 'SPOR', '', ''],
+      [mod, 'BİRCE BEJ', 'BEJ', 10, 640, 62, 'BATTAL', '', ''],
+      [mod, 'NAIROBI - HUC - SİYAH', 'SİYAH', 10, 5000, 75, 'MERDANE', '#0b4a6f', 'NAIR'],
+      [mod, 'PABLO HUC', 'SİYAH', 10, 10000, 75, 'MERDANE', '', ''],
+      [yld, 'RUNNER GRİ', 'GRİ', 10, 1200, 70, 'SPOR', '#475569', 'RUN'],
+      [yld, 'RUNNER LACİVERT', 'LACİVERT', 10, 800, 70, 'SPOR', '', '']
+    ];
+
+    tanim.forEach(function (x, i) {
+      var o = Core.addOrder(d, {
+        cariId: x[0].id, sipno: 59 + i, tarih: dt(40 - i * 2), model: x[1], renk: x[2],
+        asorti: x[3], adet: x[4], fiyat: x[5], grup: x[6], tur: 'DİĞER'
+      });
+      if (x[7]) d.images[o.id] = svgImg(x[7], x[8]);
+    });
+
+    var o = d.orders;
+    Core.createShipment(d, { cariId: asl.id, tarih: dt(30), fisNo: 242, aciklama: 'Kargo: Aras', lines: [
+      { orderId: o[0].id, cift: 1200 }, { orderId: o[2].id, cift: 600 }
+    ] });
+    Core.createShipment(d, { cariId: asl.id, tarih: dt(18), fisNo: 243, lines: [
+      { orderId: o[0].id, cift: 800 }, { orderId: o[1].id, cift: 900 },
+      { orderId: o[3].id, cift: 640 }, { orderId: o[4].id, cift: 480 }
+    ] });
+    Core.createShipment(d, { cariId: asl.id, tarih: dt(6), fisNo: 244, lines: [
+      { orderId: o[5].id, cift: 500 }, { orderId: o[6].id, cift: 400 }
+    ] });
+    Core.createShipment(d, { cariId: mod.id, tarih: dt(12), fisNo: 245, aciklama: 'Kargo: MNG', lines: [
+      { orderId: o[7].id, cift: 300 }, { orderId: o[8].id, cift: 1500 }
+    ] });
+    Core.createShipment(d, { cariId: yld.id, tarih: dt(4), fisNo: 246, lines: [
+      { orderId: o[10].id, cift: 400 }
+    ] });
+
+    Core.addModel(d, { model: 'JALEPENO- J5E - BEYAZ', fiyat: 75, maliyet: 52, barkod: '8680000000011', sezon: '2026' });
+    Core.addModel(d, { model: 'JALEPENO SİYAH SİYAH -2 - AÇIK', fiyat: 62, maliyet: 44, barkod: '8680000000028', sezon: '2026' });
+    Core.addModel(d, { model: 'CURE GARSON SİYAH', fiyat: 62, maliyet: 41, barkod: '8680000000035', sezon: '2026' });
+    Core.addModel(d, { model: 'TALKIEN SİYAH HUC', fiyat: 62, maliyet: 45, barkod: '8680000000042', sezon: '2026' });
+    Core.addModel(d, { model: 'BENZEMA FÜME RSZ', fiyat: 62, maliyet: 43, barkod: '8680000000059', sezon: '2026' });
+    Core.addModel(d, { model: 'BİRCE BEJ', fiyat: 62, maliyet: 40, sezon: '2025' });
+
+    Core.audit(d, 'Ali Veli', 'SEVK FİŞİ', '#246 · YILDIZ SPOR · 400 çift');
+    Core.audit(d, 'Ali Veli', 'SİPARİŞ EKLE', 'RUNNER LACİVERT · 800 çift · YILDIZ SPOR');
+    Core.audit(d, 'Ayşe Kaya', 'HAREKET EKLE', 'TAHSİLAT · 90.000,00 ₺ · ASLANLAR AYAKKABI');
+    var gecici = Core.addOrder(d, { cariId: yld.id, model: 'SİLİNEN MODEL', renk: 'GRİ', asorti: 10, adet: 120, fiyat: 70 });
+    Core.deleteOrder(d, gecici.id, 'Ali Veli');
+    d.orders = d.orders.filter(function (x) { return x.id !== gecici.id; });
+
+    Core.addLedgerEntry(d, { cariId: asl.id, tarih: dt(28), islem: 'TAHSİLAT', tutar: 120000, aciklama: 'Havale', fisNo: 'T- 41' });
+    Core.addLedgerEntry(d, { cariId: asl.id, tarih: dt(14), islem: 'TAHSİLAT', tutar: 90000, aciklama: 'Nakit tahsilat', fisNo: 'T- 42' });
+    Core.addLedgerEntry(d, { cariId: asl.id, tarih: dt(9), islem: 'ALIŞ', tutar: 45280, aciklama: '18.112 çift bağcık', fisNo: 'T- 43' });
+    Core.addLedgerEntry(d, { cariId: asl.id, tarih: dt(8), islem: 'GELİR', tutar: 1983.72, aciklama: 'İlaç ve silme suyu', fisNo: 'T- 44' });
+    Core.addLedgerEntry(d, { cariId: mod.id, tarih: dt(10), islem: 'TAHSİLAT', tutar: 40000, aciklama: 'Çek tahsilatı', fisNo: 'T- 51' });
+
+    APP.data = d;
+    APP.S.file.name = 'ASLANLAR_VERI.xlsx';
+    APP.S.file.lastSaved = new Date();
+    APP.S.file.dirty = false;
+    APP.S.ui.cariId = asl.id;
+    APP.S.ui.shipCariId = asl.id;
+    APP.S.user = admin;
+    APP.startApp();
+
+    var h = (location.hash || '').slice(1) || 'dashboard';
+    if (h === 'all-dashboard') { APP.S.ui.cariId = 0; APP.updateChrome(); APP.renderView(); }
+    if (h === 'cariler') { APP.S.view = 'cariler'; APP.updateChrome(); APP.renderView(); }
+    if (h === 'settings') { APP.S.view = 'settings'; APP.updateChrome(); APP.renderView(); }
+    if (h === 'ledger') { APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView(); }
+    if (h === 'shipments') { APP.S.view = 'shipments'; APP.updateChrome(); APP.renderView(); }
+    if (h === 'orders') { APP.S.view = 'orders'; APP.updateChrome(); APP.renderView(); }
+    if (h === 'reports') { APP.S.view = 'reports'; APP.updateChrome(); APP.renderView(); }
+    if (h === 'ledger-all') { APP.S.ui.cariId = 0; APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView(); }
+    if (h === 'orders-all') { APP.S.ui.cariId = 0; APP.S.view = 'orders'; APP.updateChrome(); APP.renderView(); }
+    if (h === 'ship-cart') {
+      APP.S.view = 'ship';
+      APP.S.ui.cart = [{ orderId: o[0].id, cift: 600, koli: 60, fiyat: 75 }, { orderId: o[1].id, cift: 400, koli: 50, fiyat: 62 }];
+      APP.updateChrome(); APP.renderView();
+    }
+    if (h === 'flow-create') {
+      APP.S.view = 'ship';
+      APP.S.ui.cart = [{ orderId: o[2].id, cift: 500, koli: 50, fiyat: 62 }, { orderId: o[3].id, cift: 640, koli: 64, fiyat: 62 }];
+      APP.S.ui.shipFisNo = 247;
+      APP.updateChrome(); APP.renderView();
+      setTimeout(function () { document.querySelector('[data-act="ship-create"]').click(); }, 250);
+    }
+    if (h === 'flow-order') {
+      APP.S.view = 'orders'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        document.querySelector('[data-act="order-new"]').click();
+        setTimeout(function () {
+          var f = document.getElementById('orderForm');
+          document.getElementById('ofModel').value = 'TEST MODEL ÇOK CARİ';
+          document.getElementById('ofAdet').value = '120';
+          document.getElementById('ofFiyat').value = '99,50';
+          document.getElementById('ofCari').value = String(mod.id);
+          f.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        }, 200);
+      }, 150);
+    }    if (h === 'modal-order') setTimeout(function () { document.querySelector('[data-act="order-new"]').click(); }, 150);
+    if (h === 'modal-cari') { APP.S.view = 'cariler'; APP.updateChrome(); APP.renderView(); setTimeout(function () { document.querySelector('[data-act="cari-new"]').click(); }, 150); }
+    if (h === 'modal-ship') { APP.previewShipment(3); }
+    if (h === 'upgrade') {
+      var v1 = { sheets: [
+        { name: 'SİPARİŞLER', rows: [['ID', 'SİP. NO', 'TARİH', 'MODEL', 'SİPARİŞ ÇİFT', 'FİYAT'], [1, 1, '2026-01-05', 'ESKİ MODEL', 100, 50]] },
+        { name: 'CARİ HESAP', rows: [['ID', 'TARİH', 'FİŞ NO', 'İŞLEM', 'AÇIKLAMA', 'TUTAR', 'BORÇ', 'ALACAK'], [1, '2026-01-06', 1, 'SATIŞ', 'ESKİ MODEL', 5000, 5000, 0]] },
+        { name: 'SEVK FİŞLERİ', rows: [['ID', 'FİŞ NO', 'TARİH', 'CARİ', 'ÇİFT'], [1, 1, '2026-01-06', 'ASLANLAR AYAKKABI', 100]] },
+        { name: 'AYARLAR', rows: [['AYAR', 'DEĞER'], ['cariAdi', 'ASLANLAR AYAKKABI'], ['firmaAdres', 'Sefaköy']] }
+      ] };
+      var up = Core.readData(v1.sheets);
+      APP.data = up;
+      APP.S.ui.cariId = up.cariler[0].id;
+      APP.S.file.name = 'ASLANLAR_VERI.xlsx';
+      APP.startApp();
+    }
+    if (h === 'brand') {
+      APP.data.settings.markaAdi = 'EFE AYAKKABI';
+      APP.data.settings.markaAlt = 'SEVK & CARİ';
+      APP.data.settings.markaKisa = 'EA';
+      APP.renderShell();
+      APP.updateChrome();
+      APP.renderView();
+    }
+    if (h === 'do-import-cari') {
+      var sh2 = [
+        { name: 'SİPARİŞ TAKİBİ', rows: [
+          ['SİP. NO', 'MODEL BİLGİSİ', 'RENK', 'SİPARİŞ ÇİFT', 'ASORTİ', 'FİYAT', 'GRUP', 'KOD'],
+          [1, 'EFE MODEL', 'BEYAZ', 1000, 10, 75, 'MERDANE', 'EFE - BEYAZ'],
+          [2, 'EFE MODEL 2', 'SİYAH', 500, 10, 80, 'MERDANE', 'EFE - SİYAH']
+        ] },
+        { name: 'CARİ HESAP', rows: [
+          ['TARİH', 'FİŞ NO', 'SİP.NO', 'AÇIKLAMA 1', 'AÇIKLAMA 2', 'KOLİ', 'MİKTAR', 'FİYAT', 'TUTAR', 'BORÇ', 'ALACAK', 'GRUP', 'KOD'],
+          ['01.01.2026', 900, 1, 'EFE MODEL', 'BEYAZ', 30, 300, 75, 22500, 22500, 0, 'MERDANE', 'EFE - BEYAZ']
+        ] },
+        { name: 'SEVK FİŞİ', rows: [[null], [null, 'EFE AYAKKABI'], [null, 'FİRMA :', 'EFE AYAKKABI']] }
+      ];
+      APP.openImportCariModal(Core.importLegacy(sh2), 'EFE AYK.xlsx');
+      setTimeout(function () { var b = document.getElementById('ciBtn'); if (b) b.click(); }, 400);
+    }
+    if (h === 'import-cari') {
+      var sheets = [
+        { name: 'SİPARİŞ TAKİBİ', rows: [
+          ['SİP. NO', 'MODEL BİLGİSİ', 'RENK', 'SİPARİŞ ÇİFT', 'ASORTİ', 'FİYAT', 'GRUP', 'KOD'],
+          [1, 'EFE MODEL', 'BEYAZ', 1000, 10, 75, 'MERDANE', 'EFE - BEYAZ']
+        ] },
+        { name: 'CARİ HESAP', rows: [
+          ['TARİH', 'FİŞ NO', 'SİP.NO', 'AÇIKLAMA 1', 'AÇIKLAMA 2', 'KOLİ', 'MİKTAR', 'FİYAT', 'TUTAR', 'BORÇ', 'ALACAK', 'GRUP', 'KOD'],
+          ['01.01.2026', 1, 1, 'EFE MODEL', 'BEYAZ', 30, 300, 75, 22500, 22500, 0, 'MERDANE', 'EFE - BEYAZ']
+        ] },
+        { name: 'SEVK FİŞİ', rows: [[null], [null, 'EFE AYAKKABI'], [null, 'FİRMA :', 'EFE AYAKKABI']] }
+      ];
+      APP.openImportCariModal(Core.importLegacy(sheets), 'EFE AYK.xlsx');
+    }
+    if (h === 'print-ekstre') {
+      var ca = d.cariler[0];
+      var rows = Core.ledgerWithBalance(d, ca.id);
+      document.getElementById('root').innerHTML = '<div style="background:#fff">' + APP.ekstreDocHtml(rows, '', '', ca) + '</div>';
+    }
+    if (h === 'print-ship') {
+      document.getElementById('root').innerHTML = '<div style="background:#fff">' + APP.shipmentDocHtml(d.shipments[2]) + '</div>';
+    }
+    if (h === 'print-ship-a5') {
+      document.getElementById('root').innerHTML = '<div style="background:#fff">' + APP.shipmentDocHtml(d.shipments[2], 'A5') + '</div>';
+    }
+    if (h === 'modal-ship-a5') {
+      APP.previewShipment(3);
+      setTimeout(function () { var b = document.querySelector('#pvPaper [data-paper="A5"]'); if (b) b.click(); }, 300);
+    }
+    if (h === 'do-login' || h === 'do-login-bad') {
+      APP.S.user = null;
+      APP.startApp();
+      APP.showLogin();
+      setTimeout(function () {
+        document.getElementById('lgUser').value = 'ali';
+        document.getElementById('lgPass').value = h === 'do-login' ? '1234' : 'yanlis';
+        document.getElementById('loginForm').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      }, 300);
+    }
+    if (h === 'login-remember') {
+      try { localStorage.setItem('aslanlar:hatirla', 'ali'); } catch (e) { }
+      APP.S.user = null;
+      APP.startApp();
+      APP.showLogin();
+      setTimeout(function () {
+        var p = document.getElementById('lgPass');
+        if (p) { p.value = '1234'; }
+        var eye = document.getElementById('lgEye');
+        if (eye) eye.click();
+      }, 300);
+    }
+    if (h === 'measure') {
+      APP.S.user = null;
+      APP.startApp();
+      APP.showLogin();
+      setTimeout(function () {
+        var p = document.querySelector('.auth-panel');
+        var a = document.querySelector('.auth-page');
+        var r = p ? p.getBoundingClientRect() : null;
+        var ar = a ? a.getBoundingClientRect() : null;
+        var as = document.querySelector('.auth-aside');
+        var pre = document.createElement('pre');
+        pre.id = 'measure-out';
+        pre.textContent = 'inner=' + innerWidth + ' dpr=' + devicePixelRatio +
+          ' mq860=' + matchMedia('(max-width: 860px)').matches +
+          ' aside=' + (as ? getComputedStyle(as).display : 'yok') +
+          ' page=' + (ar && ar.width) + ' panel=' + (r && r.width) + ' x=' + (r && r.x) +
+          ' bodyScroll=' + document.documentElement.scrollWidth;
+        document.body.appendChild(pre);
+      }, 700);
+    }
+    if (h === 'keytest') {
+      APP.S.view = 'orders'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="order-new"]');
+        if (b) b.click();
+        setTimeout(function () {
+          var inp = document.getElementById('ofModel');
+          if (!inp) { document.title = 'form yok'; return; }
+          inp.focus();
+          inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+          document.title = 'aktif=' + (document.activeElement && document.activeElement.id) + ' modal=' + !!document.querySelector('.modal-backdrop');
+        }, 250);
+      }, 250);
+    }
+    if (h === 'invoice') {
+      APP.S.view = 'shipments'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var b = document.querySelector('[data-act="ship-invoice"]'); if (b) b.click(); }, 300);
+    }
+    if (h === 'restore-test') {
+      APP.openTrash();
+      setTimeout(function () { var b = document.querySelector('[data-act="trash-restore"]'); if (b) b.click(); }, 300);
+      setTimeout(function () {
+        document.title = 'orders=' + APP.data.orders.length + ' trash=' + APP.data.trash.length + ' audit=' + APP.data.audit.length;
+      }, 1000);
+    }
+    if (h === 'savenew-test') {
+      APP.S.view = 'orders'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="order-new"]'); if (b) b.click();
+        setTimeout(function () {
+          var m = document.getElementById('ofModel');
+          var a = document.getElementById('ofAdet');
+          var sv = document.getElementById('ofSaveNew');
+          if (!m || !a || !sv) { document.title = 'form yok'; return; }
+          m.value = 'TEST KAYIT'; a.value = '10';
+          sv.click();
+          setTimeout(function () {
+            var f = document.getElementById('orderForm');
+            document.title = 'orders=' + APP.data.orders.length + ' form=' + !!f + ' sipno=' + (f ? document.getElementById('ofSipno').value : '');
+          }, 500);
+        }, 250);
+      }, 250);
+    }
+    if (h === 'backups') { APP.openBackups(); }
+    if (h === 'orders-copy') {
+      APP.S.view = 'orders'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var b = document.querySelector('[data-act="order-copy"]'); if (b) b.click(); }, 300);
+    }
+    if (h === 'ship-fill') {
+      APP.S.view = 'ship'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var b = document.querySelector('[data-act="cart-fill"]'); if (b) b.click(); }, 300);
+    }
+    if (h === 'model-form') { APP.openModelForm(null, 'TEST MODEL'); }
+    if (h === 'changelog2') { APP.openChangelog(); }
+    if (h === 'models') {
+      APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
+    }
+    if (h === 'palette') { APP.openPalette(); }
+    if (h === 'trash') { APP.openTrash(); }
+    if (h === 'audit') { APP.openAudit(); }
+    if (h === 'changelog') { APP.openChangelog(); }
+    if (h === 'settings-new') {
+      APP.S.view = 'settings'; APP.updateChrome(); APP.renderView();
+    }
+    if (h === 'login') {
+      APP.S.user = null;
+      APP.startApp();
+      APP.showLogin();
+    }
+    if (h === 'settings-user-role') {
+      APP.S.user = d.kullanicilar[1];
+      APP.S.view = 'settings';
+      APP.updateChrome();
+      APP.renderView();
+    }
+    if (h === 'do-first-user') {
+      APP.S.user = null;
+      APP.data = Core.newData();
+      APP.S.file.name = 'ASLANLAR_VERI.xlsx';
+      APP.showFirstUser();
+      setTimeout(function () {
+        document.getElementById('fuAd').value = 'Mehmet Demir';
+        document.getElementById('fuUser').value = 'mehmet';
+        document.getElementById('fuPass').value = '1234';
+        document.getElementById('fuPass2').value = '1234';
+        document.getElementById('firstForm').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      }, 300);
+    }
+    if (h === 'first-user') {
+      APP.S.user = null;
+      APP.data = Core.newData();
+      APP.S.file.name = 'ASLANLAR_VERI.xlsx';
+      APP.showFirstUser();
+    }
+    if (h === 'settings-users') {
+      APP.S.view = 'settings'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { document.querySelector('[data-act="user-new"]').click(); }, 200);
+    }
+
+    window.__demoReady = true;
+  }
+
+  window.addEventListener('load', function () {
+    var tries = 0;
+    var iv = setInterval(function () {
+      tries++;
+      if (window.APP && window.Core && document.getElementById('btnNew')) {
+        clearInterval(iv);
+        demo();
+      } else if (tries > 140) {
+        clearInterval(iv);
+        showErr('APP/Core/karşılama ekranı yüklenemedi');
+      }
+    }, 50);
+  });
+})();
+</script>
+"""
+
+
+def main():
+    with io.open(SRC, encoding="utf-8") as f:
+        html = f.read()
+
+    welcome = os.path.join(ROOT, "tests", "welcome.html")
+    os.makedirs(os.path.dirname(welcome), exist_ok=True)
+    with io.open(welcome, "w", encoding="utf-8", newline="\n") as f:
+        f.write(html)
+
+    html = html.replace("</body>", BOOT + "\n</body>")
+    with io.open(OUT, "w", encoding="utf-8", newline="\n") as f:
+        f.write(html)
+    print("hazır:", OUT)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

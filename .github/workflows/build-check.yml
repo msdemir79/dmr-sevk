@@ -1,0 +1,21 @@
+name: build-check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: HTML dosyasını derle
+        run: python tools/build.py
+
+      - name: Derlenen dosya kaynaklarla aynı mı?
+        run: git diff --exit-code ASLANLAR_SEVK.html

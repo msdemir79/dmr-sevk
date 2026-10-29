@@ -1,0 +1,22 @@
+# Excel / müşteri verileri — depoya girmez
+*.xlsx
+*.xls
+*.xlsm
+*.xlsb
+
+# Geliştirme çıktıları
+tests/
+shot-*.png
+smoke.png
+*.log
+
+# Python
+__pycache__/
+*.pyc
+
+# İşletim sistemi / editör
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
