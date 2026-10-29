@@ -14,6 +14,7 @@
     CARILER: 'CARİLER',
     KULLANICILAR: 'KULLANICILAR',
     MODELLER: 'MODEL KARTLARI',
+    MODEL_IMAGES: 'MODEL RESİMLERİ',
     ORDERS: 'SİPARİŞLER',
     LEDGER: 'CARİ HESAP',
     SHIPMENTS: 'SEVK FİŞLERİ',
@@ -132,7 +133,7 @@
   function emptyData() {
     return {
       cariler: [], kullanicilar: [], modeller: [], orders: [], ledger: [], shipments: [],
-      lines: [], audit: [], trash: [], images: {}, settings: defaultSettings()
+      lines: [], audit: [], trash: [], images: {}, modelImages: {}, settings: defaultSettings()
     };
   }
 
@@ -747,6 +748,7 @@
       model: String(input.model || '').trim(),
       fiyat: input.fiyat === '' || input.fiyat === undefined || input.fiyat === null ? 0 : num(input.fiyat),
       maliyet: input.maliyet === '' || input.maliyet === undefined || input.maliyet === null ? 0 : num(input.maliyet),
+      asorti: input.asorti === '' || input.asorti === undefined || input.asorti === null ? 0 : num(input.asorti),
       barkod: String(input.barkod || '').trim(),
       sezon: String(input.sezon || '').trim(),
       not: String(input.not || '').trim()
@@ -760,15 +762,18 @@
   }
 
   function addModel(data, input) {
+    if (!data.modelImages) data.modelImages = {};
     var m = normalizeModel(input);
     if (!m.model) throw new Error('Model adı zorunlu.');
     if (modelKart(data, m.model)) throw new Error('Bu model kartı zaten var.');
     m.id = nextId(data.modeller || []);
     (data.modeller = data.modeller || []).push(m);
+    if (input.resim) data.modelImages[m.id] = String(input.resim);
     return m;
   }
 
   function updateModel(data, id, input) {
+    if (!data.modelImages) data.modelImages = {};
     var mevcut = (data.modeller || []).filter(function (m) { return m.id === id; })[0];
     if (!mevcut) throw new Error('Model kartı bulunamadı.');
     var next = normalizeModel(Object.assign({}, mevcut, input, { id: id }));
@@ -776,11 +781,14 @@
     var ayni = modelKart(data, next.model);
     if (ayni && ayni.id !== id) throw new Error('Bu model adı başka kartta kullanılıyor.');
     for (var k in next) mevcut[k] = next[k];
+    if (input.resim) data.modelImages[id] = String(input.resim);
+    else if (input.resim === null) delete data.modelImages[id];
     return mevcut;
   }
 
   function deleteModel(data, id) {
     data.modeller = (data.modeller || []).filter(function (m) { return m.id !== id; });
+    if (data.modelImages) delete data.modelImages[id];
   }
 
   /** Model bazlı sipariş / sevk / kalan özeti (cariler arası). */
@@ -1025,8 +1033,10 @@
     });
 
     var modelRows = (data.modeller || []).map(function (m) {
-      return [m.id, m.model, money(m.fiyat), money(m.maliyet), m.barkod || '', m.sezon || '', m.not || ''];
+      return [m.id, m.model, money(m.fiyat), num(m.asorti) || '', money(m.maliyet), m.barkod || '', m.sezon || '', m.not || ''];
     });
+
+    var modelImageRows = Object.keys(data.modelImages || {}).map(function (k) { return [num(k), data.modelImages[k]]; });
 
     var auditRows = (data.audit || []).map(function (a) {
       return [a.id, a.tarih || '', a.kullanici || '', a.islem || '', a.detay || ''];
@@ -1063,8 +1073,8 @@
           name: SHEET.MODELLER,
           columns: [
             { header: 'ID', width: 6 }, { header: 'MODEL', width: 38 }, { header: 'FİYAT', width: 12 },
-            { header: 'MALİYET', width: 12 }, { header: 'BARKOD', width: 18 }, { header: 'SEZON', width: 12 },
-            { header: 'NOT', width: 30 }
+            { header: 'ASORTİ', width: 9 }, { header: 'MALİYET', width: 12 }, { header: 'BARKOD', width: 18 },
+            { header: 'SEZON', width: 12 }, { header: 'NOT', width: 30 }
           ],
           rows: modelRows
         },
@@ -1137,6 +1147,12 @@
           rows: imageRows
         },
         {
+          name: SHEET.MODEL_IMAGES,
+          hidden: true,
+          columns: [{ header: 'MODEL ID', width: 11 }, { header: 'RESİM', width: 40 }],
+          rows: modelImageRows
+        },
+        {
           name: SHEET.SETTINGS,
           columns: [{ header: 'AYAR', width: 22 }, { header: 'DEĞER', width: 60 }],
           rows: settingRows
@@ -1157,7 +1173,7 @@
     TUZ: 'tuz', SIFRE: 'sifre', ROL: 'rol', AKTIF: 'aktif', SONGIRIS: 'sonGiris'
   };
   var MODEL_KEYS = {
-    ID: 'id', MODEL: 'model', MODELBILGISI: 'model', FIYAT: 'fiyat', MALIYET: 'maliyet',
+    ID: 'id', MODEL: 'model', MODELBILGISI: 'model', FIYAT: 'fiyat', ASORTI: 'asorti', MALIYET: 'maliyet',
     BARKOD: 'barkod', SEZON: 'sezon', NOT: 'not'
   };
   var ORDER_KEYS = {
@@ -1300,6 +1316,7 @@
           id: num(pick(mrow, mkm, 'id')) || nextId(data.modeller),
           model: mname,
           fiyat: pick(mrow, mkm, 'fiyat'),
+          asorti: pick(mrow, mkm, 'asorti'),
           maliyet: pick(mrow, mkm, 'maliyet'),
           barkod: pick(mrow, mkm, 'barkod'),
           sezon: pick(mrow, mkm, 'sezon'),
@@ -1430,6 +1447,17 @@
         if (!irow) continue;
         var oid = num(irow[0]);
         if (oid && irow[1]) data.images[oid] = String(irow[1]);
+      }
+    }
+
+    // --- model resimleri
+    var mimg = sheetByName(sheets, SHEET.MODEL_IMAGES);
+    if (mimg) {
+      for (var mi2 = 1; mi2 < mimg.rows.length; mi2++) {
+        var mrow2 = mimg.rows[mi2];
+        if (!mrow2) continue;
+        var mid2 = num(mrow2[0]);
+        if (mid2 && mrow2[1]) data.modelImages[mid2] = String(mrow2[1]);
       }
     }
 

@@ -2,6 +2,14 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v1.7.0 — 30.10.2026
+
+### Eklendi
+- **Model kartlarına resim**: dosyadan seçme, yapıştırma (Ctrl+V) veya sürükleme; model listesinde fotoğraf
+- **Model kartlarına asorti** (çift/koli); siparişte model seçilince asorti otomatik dolar
+- Model resimleri için Excel'de gizli MODEL RESİMLERİ sayfası
+- Model listesinde fotoğraf ve asorti kolonları; fotoğrafa tıklayınca büyük önizleme
+
 ## v1.6.0 — 30.10.2026
 
 ### Eklendi

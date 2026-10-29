@@ -9,7 +9,7 @@ Tek bir HTML dosyası olarak çalışan, verilerini seçtiğiniz **Excel (.xlsx)
 - Sipariş, model, renk, asorti, fiyat ve kalan çift takibi
 - A4 / A5 sevk fişi, fatura no ve tarihi
 - Çoklu cari hesap, cari ekstre, tahsilat ve bakiye
-- Model kartları: fiyat, maliyet, barkod, sezon; model bazlı kalan
+- Model kartları: fiyat, maliyet, asorti, barkod, sezon ve resim; model bazlı kalan
 - Kârlılık raporu (ciro, maliyet, kâr, marj)
 - Kullanıcı girişi, yönetici/kullanıcı rolleri, oturum kilidi
 - İşlem günlüğü, çöp kutusu (30 gün), günlük otomatik yedek (son 7 gün)
@@ -54,7 +54,7 @@ Eski (VBA) dosyalar `Ayarlar → Eski dosyadan yeni veritabanı oluştur` ile ve
 
 ## Sürüm
 
-Güncel sürüm: **v1.6.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `ASLANLAR_SEVK.html` eklenir.
+Güncel sürüm: **v1.7.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `ASLANLAR_SEVK.html` eklenir.
 
 ### Yeni sürüm çıkarma
 

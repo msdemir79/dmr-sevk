@@ -406,6 +406,7 @@
     ['modeller', 'audit', 'trash', 'kullanicilar', 'cariler'].forEach(function (k) {
       if (!Array.isArray(data[k])) data[k] = [];
     });
+    if (!data.modelImages || typeof data.modelImages !== 'object') data.modelImages = {};
     try { Core.trashTemizle(data, 30); } catch (e) { }
     S.file.name = fileName || 'ASLANLAR_VERI.xlsx';
     S.file.handle = handle || null;
@@ -1096,6 +1097,7 @@
         case 'model-new': openModelForm(null, el.dataset.model || ''); break;
         case 'model-edit': openModelForm(modelById(id)); break;
         case 'model-del': removeModel(id); break;
+        case 'model-image': showModelImage(id); break;
         case 'order-copy': copyOrder(id); break;
         case 'cart-fill': fillCart(); break;
         case 'ship-invoice': openInvoiceForm(id); break;
@@ -1873,9 +1875,17 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '1.6.0';
+  var SURUM = '1.7.0';
 
   var YENILIKLER = [
+    {
+      v: '1.7.0', t: '30.10.2026', m: [
+        'Model kartlarına resim ve asorti alanı',
+        'Siparişte model seçilince asorti otomatik dolar',
+        'Model resimleri Excelde ayrı gizli sayfada saklanır',
+        'Model listesinde fotoğraf ve asorti kolonları'
+      ]
+    },
     {
       v: '1.6.0', t: '30.10.2026', m: [
         'Model kartları: fiyat, maliyet, barkod, sezon ve model özeti',
@@ -2243,12 +2253,18 @@ function viewShipments() {
       toplamKalan += r.kalan;
       if (!kart.model) kartsiz++;
       var marj = Core.num(kart.fiyat) > 0 ? (Core.num(kart.fiyat) - Core.num(kart.maliyet)) / Core.num(kart.fiyat) * 100 : 0;
+      var foto = kart.model ? (data.modelImages[kart.id] || '') : '';
+      var thumb = foto
+        ? '<div class="thumb" data-act="model-image" data-id="' + kart.id + '" title="Resmi büyüt" style="background-image:url(&quot;' + esc(foto) + '&quot;);cursor:zoom-in"></div>'
+        : '<div class="thumb" style="color:#cbd5e1">' + ICONS.image + '</div>';
       return '<tr>' +
-        '<td><div class="strong">' + esc(model) + '</div>' + (kart.sezon ? '<div class="sub">' + esc(kart.sezon) + '</div>' : '') + '</td>' +
+        '<td>' + thumb + '</td>' +
+        '<td><div class="strong">' + esc(model) + '</div>' +
+          '<div class="sub">' + esc([kart.barkod, kart.sezon].filter(Boolean).join(' · ') || '—') + '</div></td>' +
         '<td class="right">' + (kart.model ? nf2(kart.fiyat) : '—') + '</td>' +
+        '<td class="right">' + (kart.model && Core.num(kart.asorti) ? nf0(kart.asorti) : '—') + '</td>' +
         '<td class="right">' + (kart.model && Core.num(kart.maliyet) ? nf2(kart.maliyet) : '—') + '</td>' +
         '<td class="right">' + (kart.model && Core.num(kart.fiyat) ? nf1(marj) + '%' : '—') + '</td>' +
-        '<td class="sub">' + esc(kart.barkod || '—') + '</td>' +
         '<td class="right">' + nf0(r.siparis) + '</td>' +
         '<td class="right">' + nf0(r.sevk) + '</td>' +
         '<td class="right strong">' + nf0(r.kalan) + '</td>' +
@@ -2266,39 +2282,84 @@ function viewShipments() {
       '<div class="kpi info"><div class="kpi-label">Toplam kalan</div><div class="kpi-value">' + nf0(toplamKalan) + '<small>çift</small></div><div class="kpi-foot">tüm cariler</div></div>' +
       '</div>' +
       '<div class="card"><div class="table-wrap" style="max-height:none"><table class="data"><thead><tr>' +
-      '<th>Model</th><th class="right">Liste fiyatı</th><th class="right">Maliyet</th><th class="right">Marj</th>' +
-      '<th>Barkod</th><th class="right">Sipariş</th><th class="right">Sevk</th><th class="right">Kalan</th><th></th>' +
+      '<th></th><th>Model</th><th class="right">Liste</th><th class="right">Asorti</th><th class="right">Maliyet</th><th class="right">Marj</th>' +
+      '<th class="right">Sipariş</th><th class="right">Sevk</th><th class="right">Kalan</th><th></th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   }
 
   function openModelForm(model, modelAdi) {
     var isEdit = !!model;
-    var m = model || { model: modelAdi || '', fiyat: '', maliyet: '', barkod: '', sezon: '', not: '' };
+    var m = model || { model: modelAdi || '', fiyat: '', asorti: data.settings.varsayilanAsorti || 10, maliyet: '', barkod: '', sezon: '', not: '' };
+    var currentImage = model ? (data.modelImages[model.id] || null) : null;
     var modal = openModal({
       title: isEdit ? 'Model kartını düzenle' : 'Yeni model kartı',
-      subtitle: 'Fiyat, maliyet ve barkod bilgileri',
+      subtitle: 'Fiyat, asorti, maliyet ve model resmi',
       body:
         '<form id="modelForm" class="form-grid g2" autocomplete="off">' +
         '  <div class="field span2"><label for="mfModel">Model *</label><input id="mfModel" class="input" required value="' + esc(m.model) + '"></div>' +
         '  <div class="field"><label for="mfFiyat">Liste fiyatı</label><input id="mfFiyat" class="input num" type="text" inputmode="decimal" value="' + esc(m.fiyat || '') + '"></div>' +
+        '  <div class="field"><label for="mfAsorti">Asorti <span class="hint">çift/koli</span></label><input id="mfAsorti" class="input num" type="number" min="1" value="' + esc(m.asorti || '') + '"></div>' +
         '  <div class="field"><label for="mfMaliyet">Maliyet</label><input id="mfMaliyet" class="input num" type="text" inputmode="decimal" value="' + esc(m.maliyet || '') + '"></div>' +
         '  <div class="field"><label for="mfBarkod">Barkod</label><input id="mfBarkod" class="input" value="' + esc(m.barkod || '') + '"></div>' +
         '  <div class="field"><label for="mfSezon">Sezon</label><input id="mfSezon" class="input" value="' + esc(m.sezon || '') + '"></div>' +
-        '  <div class="field span2"><label for="mfNot">Not</label><input id="mfNot" class="input" value="' + esc(m.not || '') + '"></div>' +
+        '  <div class="field"><label for="mfNot">Not</label><input id="mfNot" class="input" value="' + esc(m.not || '') + '"></div>' +
+        '  <div class="span2" style="display:flex;gap:14px;align-items:center;padding:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px">' +
+        '    <div class="thumb lg" id="mfThumb" style="' + (currentImage ? 'background-image:url(&quot;' + esc(currentImage) + '&quot;)' : '') + '">' + (currentImage ? '' : 'RESİM') + '</div>' +
+        '    <div style="flex:1;min-width:0">' +
+        '      <div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        '        <button type="button" class="btn btn-sm" data-mimg-pick>' + ICONS.image + ' Resim seç</button>' +
+        '        <button type="button" class="btn btn-sm btn-ghost" data-mimg-clear>Kaldır</button>' +
+        '      </div>' +
+        '      <p class="muted small" style="margin:8px 0 0">Resmi yapıştırabilir (Ctrl+V) veya sürükleyebilirsiniz. Küçük önizleme Excel dosyasına gömülür.</p>' +
+        '    </div>' +
+        '    <input type="file" accept="image/*" id="mfImage" class="hidden">' +
+        '  </div>' +
         '  <div class="auth-err span2" id="mfErr"></div>' +
         '</form>',
       footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
         '<button class="btn btn-primary" type="submit" form="modelForm">' + ICONS.check + ' Kaydet</button>'
     });
-    $('#modelForm', modal.el).addEventListener('submit', function (e) {
+    var wrap = modal.el;
+    function setModelImage(dataUrl) {
+      currentImage = dataUrl;
+      var th = $('#mfThumb', wrap);
+      if (dataUrl) { th.style.backgroundImage = 'url("' + dataUrl + '")'; th.textContent = ''; }
+      else { th.style.backgroundImage = ''; th.textContent = 'RESİM'; }
+    }
+    $('[data-mimg-pick]', wrap).addEventListener('click', function () { $('#mfImage', wrap).click(); });
+    $('[data-mimg-clear]', wrap).addEventListener('click', function () { setModelImage(null); });
+    $('#mfImage', wrap).addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0];
+      if (f) imageToDataUrl(f, function (url) { setModelImage(url); });
+    });
+    wrap.addEventListener('paste', function (e) {
+      var items = (e.clipboardData && e.clipboardData.items) || [];
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') === 0) {
+          e.preventDefault();
+          imageToDataUrl(items[i].getAsFile(), function (url) { setModelImage(url); toast('Resim eklendi', 'ok'); });
+          break;
+        }
+      }
+    });
+    wrap.addEventListener('dragover', function (e) { e.preventDefault(); });
+    wrap.addEventListener('drop', function (e) {
+      e.preventDefault();
+      var f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f && f.type.indexOf('image') === 0) imageToDataUrl(f, function (url) { setModelImage(url); });
+    });
+
+    $('#modelForm', wrap).addEventListener('submit', function (e) {
       e.preventDefault();
       var payload = {
-        model: $('#mfModel', modal.el).value,
-        fiyat: $('#mfFiyat', modal.el).value.replace(',', '.'),
-        maliyet: $('#mfMaliyet', modal.el).value.replace(',', '.'),
-        barkod: $('#mfBarkod', modal.el).value,
-        sezon: $('#mfSezon', modal.el).value,
-        not: $('#mfNot', modal.el).value
+        model: $('#mfModel', wrap).value,
+        fiyat: $('#mfFiyat', wrap).value.replace(',', '.'),
+        asorti: $('#mfAsorti', wrap).value,
+        maliyet: $('#mfMaliyet', wrap).value.replace(',', '.'),
+        barkod: $('#mfBarkod', wrap).value,
+        sezon: $('#mfSezon', wrap).value,
+        not: $('#mfNot', wrap).value,
+        resim: currentImage || null
       };
       try {
         var kayit = isEdit ? Core.updateModel(data, m.id, payload) : Core.addModel(data, payload);
@@ -2307,7 +2368,7 @@ function viewShipments() {
         modal.close();
         renderView();
         toast(isEdit ? 'Model güncellendi' : 'Model eklendi', 'ok');
-      } catch (ex) { $('#mfErr', modal.el).textContent = ex.message; }
+      } catch (ex) { $('#mfErr', wrap).textContent = ex.message; }
     });
   }
 
@@ -2553,7 +2614,7 @@ function viewShipments() {
     });
     refresh();
 
-    function modelHint() {
+    function modelHint(force) {
       var k = Core.modelKart(data, $('#ofModel', wrap).value);
       var el = $('#ofListe', wrap);
       if (!el) return;
@@ -2565,10 +2626,14 @@ function viewShipments() {
         $('#ofFiyat', wrap).value = String(k.fiyat).replace('.', ',');
         refresh();
       }
+      if (Core.num(k.asorti) && (force || !$('#ofAsorti', wrap).value)) {
+        $('#ofAsorti', wrap).value = String(k.asorti);
+        refresh();
+      }
     }
-    $('#ofModel', wrap).addEventListener('change', modelHint);
-    $('#ofModel', wrap).addEventListener('blur', modelHint);
-    modelHint();
+    $('#ofModel', wrap).addEventListener('change', function () { modelHint(true); });
+    $('#ofModel', wrap).addEventListener('blur', function () { modelHint(false); });
+    modelHint(false);
 
     function setImage(dataUrl) {
       currentImage = dataUrl;
@@ -2966,6 +3031,18 @@ function viewShipments() {
 
   function modelById(id) {
     return (data.modeller || []).filter(function (m) { return m.id === id; })[0] || null;
+  }
+
+  function showModelImage(id) {
+    var kart = modelById(id);
+    var src = data.modelImages[id];
+    if (!kart || !src) return;
+    openModal({
+      title: kart.model,
+      subtitle: 'Model resmi',
+      body: '<div style="text-align:center"><img src="' + esc(src) + '" alt="" style="max-width:100%;max-height:62vh;border-radius:10px;border:1px solid var(--line)"></div>',
+      footer: '<button class="btn" data-modal-close>Kapat</button>'
+    });
   }
 
   function removeModel(id) {

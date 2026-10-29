@@ -91,12 +91,12 @@ BOOT = r"""
       { orderId: o[10].id, cift: 400 }
     ] });
 
-    Core.addModel(d, { model: 'JALEPENO- J5E - BEYAZ', fiyat: 75, maliyet: 52, barkod: '8680000000011', sezon: '2026' });
-    Core.addModel(d, { model: 'JALEPENO SİYAH SİYAH -2 - AÇIK', fiyat: 62, maliyet: 44, barkod: '8680000000028', sezon: '2026' });
-    Core.addModel(d, { model: 'CURE GARSON SİYAH', fiyat: 62, maliyet: 41, barkod: '8680000000035', sezon: '2026' });
-    Core.addModel(d, { model: 'TALKIEN SİYAH HUC', fiyat: 62, maliyet: 45, barkod: '8680000000042', sezon: '2026' });
-    Core.addModel(d, { model: 'BENZEMA FÜME RSZ', fiyat: 62, maliyet: 43, barkod: '8680000000059', sezon: '2026' });
-    Core.addModel(d, { model: 'BİRCE BEJ', fiyat: 62, maliyet: 40, sezon: '2025' });
+    Core.addModel(d, { model: 'JALEPENO- J5E - BEYAZ', fiyat: 75, maliyet: 52, asorti: 10, barkod: '8680000000011', sezon: '2026', resim: svgImg('#0f766e', 'J5E') });
+    Core.addModel(d, { model: 'JALEPENO SİYAH SİYAH -2 - AÇIK', fiyat: 62, maliyet: 44, asorti: 8, barkod: '8680000000028', sezon: '2026', resim: svgImg('#334155', 'J5S') });
+    Core.addModel(d, { model: 'CURE GARSON SİYAH', fiyat: 62, maliyet: 41, asorti: 10, barkod: '8680000000035', sezon: '2026' });
+    Core.addModel(d, { model: 'TALKIEN SİYAH HUC', fiyat: 62, maliyet: 45, asorti: 10, barkod: '8680000000042', sezon: '2026', resim: svgImg('#7c2d12', 'TALK') });
+    Core.addModel(d, { model: 'BENZEMA FÜME RSZ', fiyat: 62, maliyet: 43, asorti: 10, barkod: '8680000000059', sezon: '2026' });
+    Core.addModel(d, { model: 'BİRCE BEJ', fiyat: 62, maliyet: 40, asorti: 10, sezon: '2025' });
 
     Core.audit(d, 'Ali Veli', 'SEVK FİŞİ', '#246 · YILDIZ SPOR · 400 çift');
     Core.audit(d, 'Ali Veli', 'SİPARİŞ EKLE', 'RUNNER LACİVERT · 800 çift · YILDIZ SPOR');
@@ -319,6 +319,23 @@ BOOT = r"""
       setTimeout(function () { var b = document.querySelector('[data-act="cart-fill"]'); if (b) b.click(); }, 300);
     }
     if (h === 'model-form') { APP.openModelForm(null, 'TEST MODEL'); }
+    if (h === 'model-form-img') { APP.openModelForm(APP.data.modeller[0]); }
+    if (h === 'asorti-test') {
+      APP.S.view = 'orders'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="order-new"]'); if (b) b.click();
+        setTimeout(function () {
+          var m = document.getElementById('ofModel');
+          if (!m) { document.title = 'form yok'; return; }
+          m.value = 'JALEPENO SİYAH SİYAH -2 - AÇIK';
+          m.dispatchEvent(new Event('change', { bubbles: true }));
+          var a = document.getElementById('ofAsorti');
+          var f = document.getElementById('ofFiyat');
+          var l = document.getElementById('ofListe');
+          document.title = 'asorti=' + a.value + ' fiyat=' + f.value + ' hint=' + (l ? l.textContent : '');
+        }, 300);
+      }, 250);
+    }
     if (h === 'changelog2') { APP.openChangelog(); }
     if (h === 'models') {
       APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
