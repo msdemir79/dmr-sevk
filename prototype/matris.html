@@ -3,177 +3,94 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DMR · Renk–Beden–Asorti Prototipi</title>
+<title>DMR · Renk–Beden–Asorti Prototipi v2</title>
 <style>
-  :root {
-    --bg: #f4f7fa; --ink: #0f1b2d; --ink2: #334155; --muted: #64748b;
-    --line: #e2e8f0; --brand: #0f766e; --brand2: #14b8a6; --soft: #ecfdf5;
-    --danger: #b91c1c; --radius: 12px;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 13px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
-  }
-  .top {
-    display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    padding: 14px 22px; background: #fff; border-bottom: 1px solid var(--line);
-    position: sticky; top: 0; z-index: 5;
-  }
-  .brand { display: flex; align-items: center; gap: 11px; }
-  .mark {
-    width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center;
-    background: linear-gradient(145deg, var(--brand2), var(--brand)); color: #fff;
-    font-weight: 800; font-size: 13px; letter-spacing: .5px;
-  }
-  .brand b { display: block; font-size: 15px; }
-  .brand span { display: block; color: var(--muted); font-size: 11px; }
-  .badge {
-    background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa;
-    padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 650;
-  }
-  .wrap { max-width: 1320px; margin: 0 auto; padding: 18px; display: grid; gap: 16px; }
-  .layout { display: grid; grid-template-columns: 430px minmax(0, 1fr); gap: 16px; align-items: start; }
-  .card {
-    background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
-    box-shadow: 0 1px 2px rgba(15, 27, 45, .04);
-  }
-  .card h2 {
-    margin: 0; padding: 13px 16px; font-size: 13px; letter-spacing: .02em;
-    text-transform: uppercase; color: var(--ink2); border-bottom: 1px solid var(--line);
-    display: flex; align-items: center; gap: 8px;
-  }
-  .card h2 .n {
-    width: 20px; height: 20px; border-radius: 50%; background: var(--soft); color: var(--brand);
-    display: grid; place-items: center; font-size: 11px; font-weight: 700;
-  }
-  .body { padding: 14px 16px; }
-  label.f { display: block; font-size: 11px; font-weight: 650; color: var(--ink2); margin-bottom: 4px; }
-  input, select {
-    width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 9px;
-    font: inherit; background: #fff; color: var(--ink);
-  }
-  input:focus, select:focus { outline: 0; border-color: var(--brand2); box-shadow: 0 0 0 3px rgba(20,184,166,.15); }
-  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .hint { color: var(--muted); font-size: 11px; }
-  .dim { color: #94a3b8; }
-  .sz-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
-    gap: 6px; margin-top: 10px;
-  }
-  .sz {
-    border: 1px solid var(--line); border-radius: 8px; padding: 5px; text-align: center;
-    background: #fbfdff;
-  }
-  .sz span { display: block; font-size: 10.5px; color: var(--muted); margin-bottom: 2px; }
-  .sz input { padding: 3px 2px; text-align: center; font-size: 13px; font-weight: 650; border: 0; background: transparent; }
-  .sz input:focus { box-shadow: none; }
-  .sum {
-    margin-top: 10px; display: flex; align-items: center; justify-content: space-between;
-    background: var(--soft); border: 1px solid #a7f3d0; border-radius: 9px; padding: 8px 10px;
-    font-size: 12px; color: #065f46;
-  }
-  .sum b { font-size: 15px; }
-  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
-  .tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  table { border-collapse: collapse; width: 100%; }
-  .editable th, .editable td { padding: 6px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-  .editable th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 650; }
-  .editable td.right, .editable th.right { text-align: right; }
-  .editable input, .editable select { padding: 5px 6px; font-size: 12.5px; }
-  .x {
-    border: 0; background: none; color: #94a3b8; cursor: pointer; font-size: 16px;
-    width: 26px; height: 26px; border-radius: 6px;
-  }
-  .x:hover { background: #fef2f2; color: var(--danger); }
-  .btn {
-    display: inline-flex; align-items: center; gap: 6px; border: 1px solid #cbd5e1;
-    background: #fff; color: var(--ink2); border-radius: 8px; padding: 7px 11px;
-    font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
-  }
-  .btn:hover { background: #f8fafc; }
-  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
-  .btn.primary:hover { background: #0d5f59; }
-  .btn.sm { padding: 5px 8px; font-size: 11px; }
-  .summary {
-    display: flex; gap: 18px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--line);
-    background: #fbfdff; font-size: 12px; color: var(--ink2);
-  }
-  .summary b { font-size: 15px; color: var(--ink); }
-  .mx-wrap { overflow: auto; padding: 0 16px 16px; }
-  table.mx { min-width: 100%; font-size: 11.5px; }
-  table.mx th, table.mx td {
-    border: 1px solid var(--line); padding: 5px 6px; text-align: center; white-space: nowrap;
-  }
-  table.mx thead th { background: #f8fafc; color: var(--muted); font-size: 10px; font-weight: 700; }
-  table.mx th.sticky { position: sticky; left: 0; background: #fff; text-align: left; z-index: 2; min-width: 150px; }
-  table.mx tbody th.sticky { font-weight: 600; }
-  table.mx td.zero { color: #cbd5e1; }
-  table.mx tr.foot th, table.mx tr.foot td { background: #f0fdfa; font-weight: 700; }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
-  .pill {
-    display: inline-block; background: #eef2ff; color: #3730a3; border-radius: 999px;
-    padding: 1px 6px; font-size: 9.5px; font-weight: 700; margin-left: 4px;
-  }
-  .empty { padding: 26px 16px; text-align: center; color: var(--muted); font-size: 12px; }
-  .notes {
-    background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 14px 16px; font-size: 12px; color: var(--ink2);
-  }
-  .notes h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
-  .notes ul { margin: 4px 0 0; padding-left: 18px; }
-  .notes li { margin: 3px 0; }
-  .doc-card .body { background: #eef2f6; }
-  .doc {
-    width: 210mm; max-width: 100%; min-height: 250mm; background: #fff; margin: 0 auto;
-    padding: 12mm 12mm 10mm; box-shadow: 0 2px 12px rgba(15,27,45,.12);
-    color: #111; font-size: 10.5px;
-  }
-  .doc-top { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 6px; }
-  .doc-brand { font-size: 18px; font-weight: 800; letter-spacing: .02em; }
-  .doc-brand small { display: block; font-size: 9px; font-weight: 500; color: #555; letter-spacing: .12em; }
-  .doc-title { text-align: right; font-size: 15px; font-weight: 800; }
-  .doc-title small { display: block; font-size: 8px; font-weight: 500; color: #777; }
-  .doc-meta { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; margin: 8px 0 10px; font-size: 9.5px; }
-  .doc-meta span { display: block; color: #777; font-size: 8px; text-transform: uppercase; letter-spacing: .05em; }
-  .doc-meta b { font-weight: 600; }
-  table.doc-t { font-size: 9.5px; margin-top: 4px; }
-  table.doc-t th, table.doc-t td { border: 1px solid #333; padding: 3px 5px; }
-  table.doc-t th { background: #eee; font-size: 8.5px; text-transform: uppercase; text-align: left; }
-  table.doc-t .r { text-align: right; }
-  table.doc-t tfoot td { font-weight: 700; background: #f7f7f7; }
-  .doc-sizes { margin-top: 8px; }
-  .doc-sizes h4 { margin: 0 0 3px; font-size: 8.5px; text-transform: uppercase; letter-spacing: .05em; color: #555; }
-  table.doc-mx { font-size: 8px; }
-  table.doc-mx th, table.doc-mx td { border: 1px solid #999; padding: 2px 3px; text-align: center; }
-  table.doc-mx th { background: #f2f2f2; }
-  table.doc-mx th:first-child, table.doc-mx td:first-child { text-align: left; }
-  .doc-note { margin-top: 6px; color: #666; font-size: 8.5px; }
-  .doc-total { margin-top: 6px; text-align: right; font-size: 10px; font-weight: 700; }
-  .doc-sign { display: flex; justify-content: space-between; gap: 60px; margin-top: 34px; }
-  .doc-sign div { flex: 1; border-top: 1px solid #333; padding-top: 4px; text-align: center; font-size: 8.5px; }
-  .doc-foot { margin-top: 18px; border-top: 1px solid #ddd; padding-top: 4px; display: flex; justify-content: space-between; font-size: 7.5px; color: #777; }
-  .check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink2); }
-  .check input { width: auto; }
-  @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
-  @media print {
-    body { background: #fff; }
-    .top, .wrap > .layout, .wrap > .notes, .doc-card h2, .doc-card .tools, .badge { display: none !important; }
-    .wrap { padding: 0; max-width: none; }
-    .doc-card { border: 0; box-shadow: none; }
-    .doc-card .body { background: #fff; padding: 0; }
-    .doc { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
-    @page { size: A4; margin: 12mm; }
+  :root{--bg:#f4f7fa;--ink:#0f1b2d;--ink2:#334155;--muted:#64748b;--line:#e2e8f0;--brand:#0f766e;--soft:#ecfdf5;--danger:#b91c1c;--r:12px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 "Segoe UI",system-ui,sans-serif}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 22px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+  .brand{display:flex;align-items:center;gap:11px}
+  .mark{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(145deg,#14b8a6,#0f766e);color:#fff;font-weight:800;font-size:13px;letter-spacing:.5px}
+  .brand b{display:block;font-size:15px}.brand span{display:block;color:var(--muted);font-size:11px}
+  .badge{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:650}
+  .wrap{max-width:1360px;margin:0 auto;padding:18px;display:grid;gap:16px}
+  .layout{display:grid;grid-template-columns:420px minmax(0,1fr);gap:16px;align-items:start}
+  .card{background:#fff;border:1px solid var(--line);border-radius:var(--r);box-shadow:0 1px 2px rgba(15,27,45,.04)}
+  .card h2{margin:0;padding:13px 16px;font-size:13px;text-transform:uppercase;letter-spacing:.02em;color:var(--ink2);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .card h2 .n{width:20px;height:20px;border-radius:50%;background:var(--soft);color:var(--brand);display:grid;place-items:center;font-size:11px;font-weight:700}
+  .body{padding:14px 16px}
+  label.f{display:block;font-size:11px;font-weight:650;color:var(--ink2);margin-bottom:4px}
+  input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:7px 9px;font:inherit;background:#fff;color:var(--ink);resize:vertical}
+  input:focus,select:focus{outline:0;border-color:#14b8a6;box-shadow:0 0 0 3px rgba(20,184,166,.15)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .hint{color:var(--muted);font-size:11px}.dim{color:#94a3b8}
+  .sz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px;margin-top:10px}
+  .sz{border:1px solid var(--line);border-radius:8px;padding:5px;text-align:center;background:#fbfdff}
+  .sz span{display:block;font-size:10.5px;color:var(--muted);margin-bottom:2px}
+  .sz input{padding:3px 2px;text-align:center;font-size:13px;font-weight:650;border:0;background:transparent}
+  .sz input:focus{box-shadow:none}
+  .sum{margin-top:10px;display:flex;align-items:center;justify-content:space-between;background:var(--soft);border:1px solid #a7f3d0;border-radius:9px;padding:8px 10px;font-size:12px;color:#065f46}
+  .sum b{font-size:15px}
+  .presets{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+  table{border-collapse:collapse;width:100%}
+  .editable{table-layout:fixed}.editable th,.editable td{padding:4px;border-bottom:1px solid var(--line);vertical-align:middle;overflow:hidden}.editable input,.editable select{min-width:0}
+  .editable th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.02em;color:var(--muted);font-weight:700;white-space:nowrap}
+  .editable td.right,.editable th.right{text-align:right}
+  .editable input,.editable select{padding:5px;font-size:12px}
+  .editable td{font-size:12px}
+  .x{border:0;background:none;color:#94a3b8;cursor:pointer;font-size:16px;width:26px;height:26px;border-radius:6px}
+  .x:hover{background:#fef2f2;color:var(--danger)}
+  .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid #cbd5e1;background:#fff;color:var(--ink2);border-radius:8px;padding:7px 11px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+  .btn:hover{background:#f8fafc}.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}.btn.primary:hover{background:#0d5f59}
+  .btn.sm{padding:5px 8px;font-size:11px}
+  .seg{display:inline-flex;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;margin-left:auto}
+  .seg button{border:0;background:#fff;padding:5px 10px;font:inherit;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer}
+  .seg button.active{background:var(--brand);color:#fff}
+  .summary{display:flex;gap:16px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--line);background:#fbfdff;font-size:12px;color:var(--ink2);border-radius:0 0 var(--r) var(--r)}
+  .summary b{font-size:15px;color:var(--ink)}
+  .mx-wrap{overflow:auto;padding:0 16px 16px}
+  table.mx{min-width:100%;font-size:11.5px}
+  table.mx th,table.mx td{border:1px solid var(--line);padding:5px 6px;text-align:center;white-space:nowrap}
+  table.mx thead th{background:#f8fafc;color:var(--muted);font-size:10px;font-weight:700}
+  table.mx th.sticky{position:sticky;left:0;background:#fff;text-align:left;z-index:2;min-width:160px}
+  table.mx tbody th.sticky{font-weight:600}
+  table.mx tr.foot th,table.mx tr.foot td{background:#f0fdfa;font-weight:700}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:1px}
+  .pill{display:inline-block;background:#eef2ff;color:#3730a3;border-radius:999px;padding:1px 6px;font-size:9.5px;font-weight:700;margin-left:4px}
+  .empty{padding:26px 16px;text-align:center;color:var(--muted);font-size:12px}
+  .notes{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;font-size:12px;color:var(--ink2)}
+  .notes h3{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  .notes ul{margin:4px 0 0;padding-left:18px}.notes li{margin:3px 0}
+  .doc-card .body{background:#eef2f6}
+  .doc{width:210mm;max-width:100%;min-height:240mm;background:#fff;margin:0 auto;padding:12mm 12mm 10mm;box-shadow:0 2px 12px rgba(15,27,45,.12);color:#111;font-size:10.5px}
+  .doc-top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:6px}
+  .doc-brand{font-size:18px;font-weight:800}.doc-brand small{display:block;font-size:9px;font-weight:500;color:#555;letter-spacing:.12em}
+  .doc-title{text-align:right;font-size:15px;font-weight:800}.doc-title small{display:block;font-size:8px;font-weight:500;color:#777}
+  .doc-meta{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin:8px 0 10px;font-size:9.5px}
+  .doc-meta span{display:block;color:#777;font-size:8px;text-transform:uppercase;letter-spacing:.05em}.doc-meta b{font-weight:600}
+  table.doc-t{font-size:9.5px;margin-top:4px}
+  table.doc-t th,table.doc-t td{border:1px solid #333;padding:3px 5px}
+  table.doc-t th{background:#eee;font-size:8.5px;text-transform:uppercase;text-align:left}
+  table.doc-t .r{text-align:right}table.doc-t tfoot td{font-weight:700;background:#f7f7f7}
+  .doc-sizes{margin-top:8px}.doc-sizes h4{margin:0 0 3px;font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;color:#555}
+  table.doc-mx{font-size:8px}table.doc-mx th,table.doc-mx td{border:1px solid #999;padding:2px 3px;text-align:center}
+  table.doc-mx th{background:#f2f2f2}table.doc-mx th:first-child,table.doc-mx td:first-child{text-align:left}
+  .doc-total{margin-top:6px;text-align:right;font-size:10px;font-weight:700}
+  .doc-sign{display:flex;justify-content:space-between;gap:60px;margin-top:30px}
+  .doc-sign div{flex:1;border-top:1px solid #333;padding-top:4px;text-align:center;font-size:8.5px}
+  .doc-foot{margin-top:16px;border-top:1px solid #ddd;padding-top:4px;display:flex;justify-content:space-between;font-size:7.5px;color:#777}
+  .check{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2)}.check input{width:auto}
+  @media(max-width:1050px){.layout{grid-template-columns:1fr}}
+  @media print{
+    body{background:#fff}.top,.wrap>.layout,.wrap>.notes,.doc-card h2,.doc-card .tools,.badge{display:none!important}
+    .wrap{padding:0;max-width:none}.doc-card{border:0;box-shadow:none}.doc-card .body{background:#fff;padding:0}
+    .doc{width:auto;min-height:0;margin:0;padding:0;box-shadow:none}@page{size:A4;margin:12mm}
   }
 </style>
 </head>
 <body>
-
 <header class="top">
-  <div class="brand">
-    <div class="mark">DMR</div>
-    <div><b>DMR AYAKKABI</b><span>Renk–beden–asorti prototipi · deneme ekranı</span></div>
-  </div>
+  <div class="brand"><div class="mark">DMR</div><div><b>DMR AYAKKABI</b><span>Renk–beden–asorti prototipi · v2</span></div></div>
   <div class="badge">PROTOTİP · veri kaydedilmez</div>
 </header>
 
@@ -183,78 +100,73 @@
       <h2><span class="n">1</span> Model kartı</h2>
       <div class="body">
         <div class="row2">
-          <div>
-            <label class="f" for="mKod">Model kodu</label>
-            <input id="mKod" value="6049" spellcheck="false">
-          </div>
-          <div>
-            <label class="f" for="mKat">Kategori</label>
-            <select id="mKat"></select>
-          </div>
+          <div><label class="f" for="mKod">Model kodu</label><input id="mKod" value="6049" spellcheck="false"></div>
+          <div><label class="f" for="mKat">Kategori</label><select id="mKat"></select></div>
+        </div>
+        <div style="display:grid;grid-template-columns:.65fr 1.35fr;gap:10px;margin-top:10px">
+          <div><label class="f" for="mFiyat">Liste fiyatı</label><input id="mFiyat" type="number" min="0" step="0.01" value="75"></div>
+          <div><label class="f" for="mRenkler">Renkler <span class="hint">(virgülle)</span></label><textarea id="mRenkler" rows="2" spellcheck="false">SİYAH, BEYAZ, LACİVERT, TURUNCU BEYAZ, BEYAZ KIRMIZI</textarea></div>
         </div>
         <p class="hint" id="mRange" style="margin:8px 0 0"></p>
         <p class="hint" style="margin:10px 0 2px">Koli içi asorti — her numaradan kaç çift</p>
         <div class="sz-grid" id="asortiGrid"></div>
         <div class="sum"><span>Koli içi toplam</span><span><b id="mToplam">10</b> çift</span></div>
         <div class="presets">
-          <button class="btn sm" id="p6049">6049 örneği</button>
-          <button class="btn sm" id="p1001">1001 açık örneği</button>
+          <button class="btn sm" id="p6049">6049 · kısmi sevk</button>
+          <button class="btn sm" id="p1001">1001 · açık</button>
           <button class="btn sm" id="pMix">Karışık örnek</button>
         </div>
       </div>
     </section>
 
     <section class="card">
-      <h2><span class="n">2</span> Sipariş</h2>
+      <h2><span class="n">2</span> Sipariş ve sevk</h2>
       <div class="body" style="padding-bottom:0">
         <div class="row2">
-          <div>
-            <label class="f" for="oMusteri">Müşteri</label>
-            <input id="oMusteri" value="ÖRNEK MÜŞTERİ">
-          </div>
-          <div>
-            <label class="f" for="oTarih">Tarih</label>
-            <input id="oTarih" type="date">
-          </div>
+          <div><label class="f" for="oMusteri">Müşteri</label><input id="oMusteri" value="ÖRNEK MÜŞTERİ"></div>
+          <div><label class="f" for="oTarih">Tarih</label><input id="oTarih" type="date"></div>
         </div>
-        <p class="hint" style="margin:10px 0 6px">Renk satırları · asortili veya açık (tek numara)</p>
+        <p class="hint" style="margin:10px 0 6px">Renk satırları · asortili veya açık · sevk koli ile kısmi sevk</p>
       </div>
       <div style="overflow:auto">
         <table class="editable">
-          <thead>
-            <tr>
-              <th style="min-width:130px">Renk</th>
-              <th style="min-width:105px">Mod</th>
-              <th style="min-width:70px">Beden</th>
-              <th style="width:74px">Koli</th>
-              <th style="width:86px">Koli içi</th>
-              <th class="right" style="width:74px">Çift</th>
-              <th style="width:34px"></th>
-            </tr>
-          </thead>
+          <colgroup>
+            <col style="width:24%"><col style="width:17%"><col style="width:9%"><col style="width:10%">
+            <col style="width:10%"><col style="width:10%"><col style="width:8%"><col style="width:8%"><col style="width:4%">
+          </colgroup>
+          <thead><tr>
+            <th>Renk</th><th>Mod</th><th>Beden</th>
+            <th>Koli</th><th>Koli içi</th><th>Sevk</th>
+            <th class="right">Sip. çift</th><th class="right">Sevk çift</th><th></th>
+          </tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
-      <div class="summary" style="border-top:1px solid var(--line); border-radius:0 0 var(--radius) var(--radius)">
-        <span><b id="sKoli">0</b> koli</span>
-        <span><b id="sCift">0</b> çift</span>
-        <span class="hint" id="sInfo" style="margin-left:auto"></span>
-        <button class="btn sm" id="addRow">+ Renk ekle</button>
+      <div class="summary">
+        <span>Sipariş: <b id="sKoli">0</b> koli · <b id="sCift">0</b> çift</span>
+        <span>Sevk: <b id="sSevkKoli">0</b> koli · <b id="sSevkCift">0</b> çift</span>
+        <span><b id="sTutar">0,00 ₺</b></span>
+        <span style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn sm" id="allShip">Tümünü sevk et</button>
+          <button class="btn sm" id="addRow">+ Renk ekle</button>
+        </span>
       </div>
     </section>
   </div>
 
   <section class="card">
-    <h2><span class="n">3</span> Renk × beden matrisi</h2>
+    <h2><span class="n">3</span> Renk × beden matrisi
+      <span class="seg"><button id="mxSip" class="active">Sipariş</button><button id="mxSevk">Sevk edilen</button></span>
+    </h2>
     <div class="mx-wrap" id="matrix"></div>
   </section>
 
   <section class="card doc-card">
-    <h2><span class="n">4</span> Fiş önizleme</h2>
+    <h2><span class="n">4</span> Sevk fişi önizleme</h2>
     <div class="body">
-      <div class="tools" style="margin-bottom:10px">
+      <div class="tools" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
         <label class="check"><input type="checkbox" id="fisBeden" checked> Beden dökümünü fişe ekle</label>
-        <span class="hint" style="margin-left:auto">Kısmi sevklerde tablo, siparişin tamamını gösterir (bilgi amaçlı).</span>
+        <span class="hint" style="margin-left:auto">Fiş yalnızca sevk edilen koli/çiftleri gösterir; boş bedenler tabloya girmez.</span>
         <button class="btn primary" id="printBtn">Yazdır</button>
       </div>
       <div id="fisDoc"></div>
@@ -264,333 +176,248 @@
   <div class="notes">
     <h3>Bu prototipte ne deneniyor?</h3>
     <ul>
-      <li><b>Asorti model kartında:</b> her numaradan koli içi kaç çift; toplam koli içi çift otomatik.</li>
-      <li><b>Asortili satır:</b> koli × asorti → numara bazlı çift dağılımı.</li>
-      <li><b>Açık satır:</b> tek numara, koli × koli içi çift (ör. 10 koli × 10 = 100 çift 40 numara).</li>
-      <li><b>Matris:</b> renk satırları × beden kolonları; toplamlar otomatik.</li>
-      <li><b>Fiş:</b> beden dökümü isteğe bağlı; kapatınca sadece renk/koli/çift.</li>
+      <li><b>Modelde birden çok renk:</b> 6049 için Siyah, Beyaz, Lacivert… Siparişte bu renklerden satır açılır.</li>
+      <li><b>Asorti model kartında:</b> koli içi numara dağılımı; farklı asorti = yeni model kodu (6049-1).</li>
+      <li><b>Açık satır:</b> tek numara; koli içi çift <b>elle</b> (6, 9, 10, 12…).</li>
+      <li><b>Kısmi sevk:</b> sevk koli, sipariş kolisinden az olabilir; fiş sevk edilen rakamı gösterir.</li>
+      <li><b>Fiyat:</b> toplam = sevk edilen çift × liste fiyatı; beden bazlı fiyat yok.</li>
+      <li><b>Fiş:</b> boş bedenler gösterilmez; beden dökümü isteğe bağlı.</li>
     </ul>
-    <p class="hint" style="margin:8px 0 0">Kategoriler Türkiye sektör terimleridir: Bebe 22–26, Patik 26–30, Filet 31–35, Garson 36–40, Zenne 36–40, Merdane 36–48. Numaralar EU (Paris) numaralarıdır; kategori adları uluslararası standart değildir.</p>
+    <p class="hint" style="margin:8px 0 0">Bebe 22–26, Patik 26–30, Filet 31–35, Garson 36–40, Zenne 36–40, Merdane 36–48. Numaralar EU (Paris).</p>
   </div>
 </div>
+
+<datalist id="renkList"></datalist>
 
 <script>
 (function () {
   "use strict";
-
   var CATS = {
-    BEBE:    { ad: "Bebe",    min: 22, max: 26 },
-    PATIK:   { ad: "Patik",   min: 26, max: 30 },
-    FILET:   { ad: "Filet",   min: 31, max: 35 },
-    GARSON:  { ad: "Garson",  min: 36, max: 40 },
-    ZENNE:   { ad: "Zenne",   min: 36, max: 40 },
-    MERDANE: { ad: "Merdane", min: 36, max: 48 }
+    BEBE: { ad: "Bebe", min: 22, max: 26 }, PATIK: { ad: "Patik", min: 26, max: 30 },
+    FILET: { ad: "Filet", min: 31, max: 35 }, GARSON: { ad: "Garson", min: 36, max: 40 },
+    ZENNE: { ad: "Zenne", min: 36, max: 40 }, MERDANE: { ad: "Merdane", min: 36, max: 48 }
   };
-  var RENKLER = ["#0f766e", "#b45309", "#1d4ed8", "#7c3aed", "#be123c", "#475569", "#047857"];
-
+  var RENKLER = ["#0f766e", "#b45309", "#1d4ed8", "#7c3aed", "#be123c", "#475569"];
   var state = {
-    model: { kod: "6049", kat: "MERDANE", asorti: { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 } },
-    musteri: "ÖRNEK MÜŞTERİ",
-    tarih: "",
-    rows: [{ id: 1, renk: "SİYAH", mod: "ASORTILI", beden: 40, koli: 5, koliIci: 10 }]
+    model: {
+      kod: "6049", kat: "MERDANE", fiyat: 75,
+      renkler: ["SİYAH", "BEYAZ", "LACİVERT", "TURUNCU BEYAZ", "BEYAZ KIRMIZI"],
+      asorti: { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 }
+    },
+    musteri: "ÖRNEK MÜŞTERİ", tarih: "", mx: "siparis",
+    rows: [
+      { id: 1, renk: "SİYAH", mod: "ASORTILI", beden: 40, koli: 5, koliIci: 10, sevkKoli: 3 },
+      { id: 2, renk: "BEYAZ", mod: "ASORTILI", beden: 40, koli: 3, koliIci: 10, sevkKoli: 3 }
+    ]
   };
-
   var $ = function (id) { return document.getElementById(id); };
-  function esc(v) {
-    return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-    });
-  }
-  function num(v) {
-    if (v === null || v === undefined || v === "") return 0;
-    var n = Number(String(v).replace(",", "."));
-    return isFinite(n) ? n : 0;
-  }
-  function fmt(n) {
-    n = Number(n) || 0;
-    return n.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
-  }
-  function dateTR(iso) {
-    if (!iso) return "—";
-    var p = String(iso).split("-");
-    return p.length === 3 ? p[2] + "." + p[1] + "." + p[0] : iso;
-  }
+  function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function num(v) { if (v === null || v === undefined || v === "") return 0; var n = Number(String(v).replace(",", ".")); return isFinite(n) ? n : 0; }
+  function fmt(n) { return (Number(n) || 0).toLocaleString("tr-TR", { maximumFractionDigits: 2 }); }
+  function money(n) { return (Number(n) || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ₺"; }
+  function dateTR(iso) { if (!iso) return "—"; var p = String(iso).split("-"); return p.length === 3 ? p[2] + "." + p[1] + "." + p[0] : iso; }
   function cat() { return CATS[state.model.kat] || CATS.MERDANE; }
-  function sizes() {
-    var c = cat(), out = [];
-    for (var s = c.min; s <= c.max; s++) out.push(s);
-    return out;
-  }
-  function ensureAsorti() {
-    sizes().forEach(function (s) {
-      if (state.model.asorti[s] === undefined) state.model.asorti[s] = 0;
-    });
-  }
-  function perBox() {
-    var t = 0;
-    sizes().forEach(function (s) { t += num(state.model.asorti[s]); });
-    return t;
-  }
-  function calcRow(r) {
-    var map = {}, total = 0, pb = perBox();
+  function sizes() { var c = cat(), o = []; for (var s = c.min; s <= c.max; s++) o.push(s); return o; }
+  function perBox() { var t = 0; sizes().forEach(function (s) { t += num(state.model.asorti[s]); }); return t; }
+
+  function buildMap(r, boxes) {
+    var map = {}, total = 0;
     if (r.mod === "ACIK") {
-      pb = num(r.koliIci) || perBox();
-      var t = num(r.koli) * pb;
-      if (r.beden) map[r.beden] = t;
-      total = t;
+      var per = num(r.koliIci) || perBox();
+      total = num(boxes) * per;
+      if (r.beden) map[r.beden] = total;
     } else {
-      sizes().forEach(function (s) {
-        var q = num(r.koli) * num(state.model.asorti[s]);
-        if (q) { map[s] = q; total += q; }
-      });
-      pb = perBox();
+      sizes().forEach(function (s) { var q = num(boxes) * num(state.model.asorti[s]); if (q) { map[s] = q; total += q; } });
     }
-    return { map: map, total: total, perBox: pb };
+    return { map: map, total: total };
   }
-  function totals() {
-    var koli = 0, cift = 0;
-    state.rows.forEach(function (r) { var c = calcRow(r); koli += num(r.koli); cift += c.total; });
-    return { koli: koli, cift: cift };
-  }
-
-  function fillCats() {
-    $("mKat").innerHTML = Object.keys(CATS).map(function (k) {
-      return '<option value="' + k + '"' + (k === state.model.kat ? " selected" : "") + ">" + CATS[k].ad + "</option>";
-    }).join("");
+  function calcRow(r) { return { sip: buildMap(r, r.koli), sevk: buildMap(r, r.sevkKoli) }; }
+  function calcAll() {
+    var o = { koli: 0, cift: 0, sevkKoli: 0, sevkCift: 0 };
+    state.rows.forEach(function (r) { var c = calcRow(r); o.koli += num(r.koli); o.cift += c.sip.total; o.sevkKoli += num(r.sevkKoli); o.sevkCift += c.sevk.total; });
+    return o;
   }
 
+  function fillCats() { $("mKat").innerHTML = Object.keys(CATS).map(function (k) { return '<option value="' + k + '"' + (k === state.model.kat ? " selected" : "") + ">" + CATS[k].ad + "</option>"; }).join(""); }
+  function renderColors() { $("renkList").innerHTML = state.model.renkler.map(function (c) { return '<option value="' + esc(c) + '">'; }).join(""); }
   function renderModel() {
-    $("mKod").value = state.model.kod;
-    var c = cat();
-    $("mRange").textContent = c.ad + " · " + c.min + "–" + c.max + " (" + sizes().length + " numara)";
-    $("asortiGrid").innerHTML = sizes().map(function (s) {
-      var v = num(state.model.asorti[s]);
-      return '<label class="sz"><span>' + s + '</span><input type="number" min="0" step="1" data-size="' + s + '" value="' + (v ? v : "") + '" placeholder="0"></label>';
-    }).join("");
-    $("mToplam").textContent = fmt(perBox());
+    $("mKod").value = state.model.kod; $("mFiyat").value = state.model.fiyat; $("mRenkler").value = state.model.renkler.join(", ");
+    var c = cat(); $("mRange").textContent = c.ad + " · " + c.min + "–" + c.max + " (" + sizes().length + " numara)";
+    $("asortiGrid").innerHTML = sizes().map(function (s) { var v = num(state.model.asorti[s]); return '<label class="sz"><span>' + s + '</span><input type="number" min="0" step="1" data-size="' + s + '" value="' + (v ? v : "") + '" placeholder="0"></label>'; }).join("");
+    $("mToplam").textContent = fmt(perBox()); renderColors();
   }
-
   function renderRows() {
-    var opts = sizes().map(function (s) { return '<option value="' + s + '">' + s + "</option>"; }).join("");
-    $("rows").innerHTML = state.rows.map(function (r, i) {
+    $("rows").innerHTML = state.rows.map(function (r) {
       var c = calcRow(r);
-      var bedenCell = r.mod === "ACIK"
-        ? '<select data-f="beden" data-id="' + r.id + '">' + sizes().map(function (s) {
-            return '<option value="' + s + '"' + (s === num(r.beden) ? " selected" : "") + ">" + s + "</option>";
-          }).join("") + "</select>"
+      var beden = r.mod === "ACIK"
+        ? '<select data-f="beden" data-id="' + r.id + '">' + sizes().map(function (s) { return '<option value="' + s + '"' + (s === num(r.beden) ? " selected" : "") + ">" + s + "</option>"; }).join("") + "</select>"
         : '<span class="dim">—</span>';
       var koliIci = r.mod === "ACIK"
-        ? '<input type="number" min="1" step="1" data-f="koliIci" data-id="' + r.id + '" value="' + num(r.koliIci || perBox()) + '">'
+        ? '<input type="number" min="1" step="1" data-f="koliIci" data-id="' + r.id + '" value="' + num(r.koliIci || 10) + '">'
         : '<span class="dim">' + fmt(perBox()) + "</span>";
       return "<tr>" +
-        '<td><input data-f="renk" data-id="' + r.id + '" value="' + esc(r.renk) + '"></td>' +
-        '<td><select data-f="mod" data-id="' + r.id + '">' +
-          '<option value="ASORTILI"' + (r.mod === "ASORTILI" ? " selected" : "") + ">Asortili</option>" +
-          '<option value="ACIK"' + (r.mod === "ACIK" ? " selected" : "") + ">Açık (tek numara)</option>" +
-        "</select></td>" +
-        "<td>" + bedenCell + "</td>" +
+        '<td><input data-f="renk" data-id="' + r.id + '" list="renkList" value="' + esc(r.renk) + '"></td>' +
+        '<td><select data-f="mod" data-id="' + r.id + '"><option value="ASORTILI"' + (r.mod === "ASORTILI" ? " selected" : "") + '>Asortili</option><option value="ACIK"' + (r.mod === "ACIK" ? " selected" : "") + '>Açık</option></select></td>' +
+        "<td>" + beden + "</td>" +
         '<td><input type="number" min="0" step="0.5" data-f="koli" data-id="' + r.id + '" value="' + num(r.koli) + '"></td>' +
         "<td>" + koliIci + "</td>" +
-        '<td class="right strong" data-total="' + r.id + '">' + fmt(c.total) + "</td>" +
-        '<td><button class="x" data-del="' + r.id + '" title="Kaldır">×</button></td>' +
-        "</tr>";
+        '<td><input type="number" min="0" step="0.5" data-f="sevk" data-id="' + r.id + '" value="' + num(r.sevkKoli) + '"></td>' +
+        '<td class="right strong" data-sip="' + r.id + '">' + fmt(c.sip.total) + "</td>" +
+        '<td class="right strong" data-sevk="' + r.id + '">' + fmt(c.sevk.total) + "</td>" +
+        '<td><button class="x" data-del="' + r.id + '" title="Kaldır">×</button></td></tr>';
     }).join("");
-    updateTotals();
+    updateSummary();
   }
-
-  function updateTotals() {
-    var t = totals();
-    $("sKoli").textContent = fmt(t.koli);
-    $("sCift").textContent = fmt(t.cift);
-    $("sInfo").textContent = "koli içi " + fmt(perBox()) + " çift";
+  function updateSummary() {
+    var t = calcAll();
+    $("sKoli").textContent = fmt(t.koli); $("sCift").textContent = fmt(t.cift);
+    $("sSevkKoli").textContent = fmt(t.sevkKoli); $("sSevkCift").textContent = fmt(t.sevkCift);
+    $("sTutar").textContent = money(t.sevkCift * num(state.model.fiyat));
     state.rows.forEach(function (r) {
-      var el = document.querySelector('[data-total="' + r.id + '"]');
-      if (el) el.textContent = fmt(calcRow(r).total);
+      var c = calcRow(r);
+      var a = document.querySelector('[data-sip="' + r.id + '"]');
+      var b = document.querySelector('[data-sevk="' + r.id + '"]');
+      if (a) a.textContent = fmt(c.sip.total);
+      if (b) b.textContent = fmt(c.sevk.total);
     });
   }
 
-  function renderMatrix() {
-    var list = sizes();
-    if (!state.rows.length) {
-      $("matrix").innerHTML = '<div class="empty">Henüz renk satırı yok. “Renk ekle” ile başlayın.</div>';
-      return;
-    }
-    var html = '<table class="mx"><thead><tr><th class="sticky">Renk</th>' +
-      list.map(function (s) { return "<th>" + s + "</th>"; }).join("") +
-      "<th>Toplam</th></tr></thead><tbody>";
-    var colTotals = {};
-    var grand = 0;
-    state.rows.forEach(function (r, i) {
+  function matrixData(mode) {
+    var list = sizes(), col = {}, rows = [];
+    state.rows.forEach(function (r) {
       var c = calcRow(r);
-      var color = RENKLER[i % RENKLER.length];
-      html += "<tr><th class=\"sticky\"><span class=\"dot\" style=\"background:" + color + "\"></span>" +
-        esc(r.renk || "—") + (r.mod === "ACIK" ? '<span class="pill">Açık ' + r.beden + "</span>" : "") + "</th>";
-      list.forEach(function (s) {
-        var v = c.map[s] || 0;
-        colTotals[s] = (colTotals[s] || 0) + v;
-        html += '<td class="' + (v ? "" : "zero") + '">' + (v ? fmt(v) : "·") + "</td>";
-      });
-      grand += c.total;
-      html += '<td class="strong">' + fmt(c.total) + "</td></tr>";
+      var map = mode === "sevk" ? c.sevk.map : c.sip.map;
+      rows.push({ r: r, map: map, total: mode === "sevk" ? c.sevk.total : c.sip.total });
+      list.forEach(function (s) { col[s] = (col[s] || 0) + num(map[s]); });
     });
-    html += '</tbody><tfoot><tr class="foot"><th class="sticky">Toplam</th>' +
-      list.map(function (s) { return "<td>" + (colTotals[s] ? fmt(colTotals[s]) : "·") + "</td>"; }).join("") +
-      "<td>" + fmt(grand) + "</td></tr></tfoot></table>";
+    return { rows: rows, sizes: list.filter(function (s) { return col[s] > 0; }), col: col };
+  }
+  function renderMatrix() {
+    if (!state.rows.length) { $("matrix").innerHTML = '<div class="empty">Henüz renk satırı yok.</div>'; return; }
+    var d = matrixData(state.mx);
+    if (!d.sizes.length) { $("matrix").innerHTML = '<div class="empty">Bu görünümde sevk edilen beden yok.</div>'; return; }
+    var grand = 0, html = '<table class="mx"><thead><tr><th class="sticky">Renk</th>' + d.sizes.map(function (s) { return "<th>" + s + "</th>"; }).join("") + "<th>Toplam</th></tr></thead><tbody>";
+    d.rows.forEach(function (x, i) {
+      var v = d.sizes.reduce(function (a, s) { return a + num(x.map[s]); }, 0);
+      if (!v) return;
+      html += '<tr><th class="sticky"><span class="dot" style="background:' + RENKLER[i % RENKLER.length] + '"></span>' + esc(x.r.renk || "—") + (x.r.mod === "ACIK" ? '<span class="pill">Açık ' + x.r.beden + "</span>" : "") + "</th>";
+      d.sizes.forEach(function (s) { var q = num(x.map[s]); html += '<td class="' + (q ? "" : "zero") + '">' + (q ? fmt(q) : "·") + "</td>"; });
+      grand += x.total;
+      html += '<td class="strong">' + fmt(x.total) + "</td></tr>";
+    });
+    html += '</tbody><tfoot><tr class="foot"><th class="sticky">Toplam</th>' + d.sizes.map(function (s) { return "<td>" + fmt(d.col[s]) + "</td>"; }).join("") + "<td>" + fmt(grand) + "</td></tr></tfoot></table>";
     $("matrix").innerHTML = html;
   }
 
   function renderFis() {
-    var t = totals();
-    var beden = $("fisBeden").checked;
-    var list = sizes();
-    var rowsHtml = state.rows.map(function (r) {
-      var c = calcRow(r);
-      var tip = r.mod === "ACIK" ? ("Açık · " + r.beden + " numara") : "Asortili";
-      return "<tr><td>" + esc(r.renk) + "</td><td>" + esc(tip) + "</td>" +
-        '<td class="r">' + fmt(r.koli) + "</td><td class=\"r\">" + fmt(c.total) + "</td></tr>";
+    var t = calcAll();
+    var rows = state.rows.map(function (r) { return { r: r, c: calcRow(r) }; }).filter(function (x) { return num(x.r.sevkKoli) > 0 && x.c.sevk.total > 0; });
+    var rowsHtml = rows.map(function (x) {
+      var tip = x.r.mod === "ACIK" ? "Açık · " + x.r.beden + " numara" : "Asortili";
+      return "<tr><td>" + esc(x.r.renk) + "</td><td>" + esc(tip) + '</td><td class="r">' + fmt(x.r.sevkKoli) + '</td><td class="r">' + fmt(x.c.sevk.total) + "</td></tr>";
     }).join("");
-
     var sizeTable = "";
-    if (beden && state.rows.length) {
-      var colTotals = {};
-      sizeTable = '<div class="doc-sizes"><h4>Beden dökümü</h4><table class="doc-mx"><thead><tr><th>Renk</th>' +
-        list.map(function (s) { return "<th>" + s + "</th>"; }).join("") + "<th>Toplam</th></tr></thead><tbody>" +
-        state.rows.map(function (r) {
-          var c = calcRow(r);
-          return "<tr><td>" + esc(r.renk) + "</td>" + list.map(function (s) {
-            var v = c.map[s] || 0;
-            colTotals[s] = (colTotals[s] || 0) + v;
-            return "<td>" + (v ? fmt(v) : "·") + "</td>";
-          }).join("") + "<td>" + fmt(c.total) + "</td></tr>";
-        }).join("") +
-        '</tbody><tfoot><tr><td>Toplam</td>' + list.map(function (s) {
-          return "<td>" + (colTotals[s] ? fmt(colTotals[s]) : "·") + "</td>";
-        }).join("") + "<td>" + fmt(t.cift) + "</td></tr></tfoot></table>" +
-        '<div class="doc-note">Beden dökümü siparişin tamamı içindir; kısmi sevklerde bilgi amaçlıdır.</div></div>';
+    if ($("fisBeden").checked && rows.length) {
+      var list = sizes(), col = {};
+      rows.forEach(function (x) { list.forEach(function (s) { col[s] = (col[s] || 0) + num(x.c.sevk.map[s]); }); });
+      var used = list.filter(function (s) { return col[s] > 0; });
+      if (used.length) {
+        sizeTable = '<div class="doc-sizes"><h4>Beden dökümü · sevk edilen</h4><table class="doc-mx"><thead><tr><th>Renk</th>' + used.map(function (s) { return "<th>" + s + "</th>"; }).join("") + "<th>Toplam</th></tr></thead><tbody>" +
+          rows.map(function (x) { return "<tr><td>" + esc(x.r.renk) + "</td>" + used.map(function (s) { var q = num(x.c.sevk.map[s]); return "<td>" + (q ? fmt(q) : "·") + "</td>"; }).join("") + "<td>" + fmt(x.c.sevk.total) + "</td></tr>"; }).join("") +
+          '</tbody><tfoot><tr><td>Toplam</td>' + used.map(function (s) { return "<td>" + fmt(col[s]) + "</td>"; }).join("") + "<td>" + fmt(t.sevkCift) + "</td></tr></tfoot></table></div>";
+      }
     }
-
-    $("fisDoc").innerHTML =
-      '<div class="doc">' +
-      '<div class="doc-top"><div class="doc-brand">DMR<small>AYAKKABI</small></div>' +
-      '<div class="doc-title">SEVK FİŞİ<small>PROTOTİP</small></div></div>' +
-      '<div class="doc-meta">' +
-      '<div><span>Müşteri</span><b>' + esc(state.musteri || "—") + "</b></div>" +
-      '<div><span>Model</span><b>' + esc(state.model.kod || "—") + "</b></div>" +
-      "<div><span>Tarih</span><b>" + esc(dateTR($("oTarih").value)) + "</b></div>" +
-      "</div>" +
-      '<table class="doc-t"><thead><tr><th>Renk</th><th>Asorti</th><th class="r">Koli</th><th class="r">Çift</th></tr></thead><tbody>' +
-      (rowsHtml || '<tr><td colspan="4">—</td></tr>') +
-      '</tbody><tfoot><tr><td colspan="2">GENEL TOPLAM</td><td class="r">' + fmt(t.koli) + '</td><td class="r">' + fmt(t.cift) + "</td></tr></tfoot></table>" +
-      sizeTable +
-      '<div class="doc-total">Toplam: ' + fmt(t.cift) + " çift · " + fmt(t.koli) + " koli</div>" +
+    $("fisDoc").innerHTML = '<div class="doc">' +
+      '<div class="doc-top"><div class="doc-brand">DMR<small>AYAKKABI</small></div><div class="doc-title">SEVK FİŞİ<small>PROTOTİP</small></div></div>' +
+      '<div class="doc-meta"><div><span>Müşteri</span><b>' + esc(state.musteri || "—") + '</b></div><div><span>Model</span><b>' + esc(state.model.kod || "—") + '</b></div><div><span>Tarih</span><b>' + esc(dateTR($("oTarih").value)) + "</b></div></div>" +
+      '<table class="doc-t"><thead><tr><th>Renk</th><th>Asorti</th><th class="r">Koli</th><th class="r">Çift</th></tr></thead><tbody>' + (rowsHtml || '<tr><td colspan="4">Sevk edilen satır yok</td></tr>') +
+      '</tbody><tfoot><tr><td colspan="2">GENEL TOPLAM</td><td class="r">' + fmt(t.sevkKoli) + '</td><td class="r">' + fmt(t.sevkCift) + "</td></tr></tfoot></table>" + sizeTable +
+      '<div class="doc-total">Tutar: ' + money(t.sevkCift * num(state.model.fiyat)) + " (" + fmt(t.sevkCift) + " çift × " + money(num(state.model.fiyat)) + ")</div>" +
       '<div class="doc-sign"><div>TESLİM EDEN</div><div>TESLİM ALAN</div></div>' +
-      '<div class="doc-foot"><span>DMR AYAKKABI</span><span>' + esc(state.musteri || "") + " · " + esc(state.model.kod || "") + "</span></div>" +
-      "</div>";
+      '<div class="doc-foot"><span>DMR AYAKKABI</span><span>' + esc(state.musteri || "") + " · " + esc(state.model.kod || "") + "</span></div></div>";
   }
 
   function renderAll() {
-    ensureAsorti();
-    fillCats();
     $("oMusteri").value = state.musteri;
     if (state.tarih) $("oTarih").value = state.tarih;
-    renderModel();
-    renderRows();
-    renderMatrix();
-    renderFis();
+    fillCats(); renderModel(); renderRows(); renderMatrix(); renderFis();
   }
 
-  // ---- olaylar ----
   $("mKod").addEventListener("input", function () { state.model.kod = this.value; renderFis(); });
-  $("mKat").addEventListener("change", function () {
-    state.model.kat = this.value;
-    state.rows.forEach(function (r) { r.beden = sizes()[0]; });
-    renderAll();
-  });
+  $("mFiyat").addEventListener("input", function () { state.model.fiyat = num(this.value); updateSummary(); renderFis(); });
+  $("mRenkler").addEventListener("input", function () { state.model.renkler = this.value.split(",").map(function (x) { return x.trim(); }).filter(Boolean); renderColors(); });
+  $("mKat").addEventListener("change", function () { state.model.kat = this.value; state.rows.forEach(function (r) { r.beden = sizes()[0]; }); renderAll(); });
   $("asortiGrid").addEventListener("input", function (e) {
-    var inp = e.target.closest("input[data-size]");
-    if (!inp) return;
+    var inp = e.target.closest("input[data-size]"); if (!inp) return;
     state.model.asorti[inp.getAttribute("data-size")] = num(inp.value);
-    $("mToplam").textContent = fmt(perBox());
-    updateTotals();
-    renderMatrix();
-    renderFis();
+    $("mToplam").textContent = fmt(perBox()); updateSummary(); renderMatrix(); renderFis();
   });
   $("oMusteri").addEventListener("input", function () { state.musteri = this.value; renderFis(); });
   $("oTarih").addEventListener("input", function () { state.tarih = this.value; renderFis(); });
 
   $("rows").addEventListener("input", function (e) {
-    var el = e.target.closest("[data-f]");
-    if (!el) return;
+    var el = e.target.closest("[data-f]"); if (!el) return;
     var id = num(el.getAttribute("data-id"));
-    var r = state.rows.filter(function (x) { return x.id === id; })[0];
-    if (!r) return;
+    var r = state.rows.filter(function (x) { return x.id === id; })[0]; if (!r) return;
     var f = el.getAttribute("data-f");
     if (f === "renk") r.renk = el.value;
-    if (f === "koli") r.koli = num(el.value);
+    if (f === "koli") {
+      var eski = num(r.koli); r.koli = num(el.value);
+      if (r.sevkKoli === eski || r.sevkKoli > r.koli) r.sevkKoli = r.koli;
+      var sev = document.querySelector('[data-f="sevk"][data-id="' + id + '"]'); if (sev) sev.value = r.sevkKoli;
+    }
     if (f === "koliIci") r.koliIci = num(el.value);
-    updateTotals();
-    renderMatrix();
-    renderFis();
+    if (f === "sevk") { r.sevkKoli = Math.min(num(el.value), num(r.koli)); if (num(el.value) !== r.sevkKoli) el.value = r.sevkKoli; }
+    updateSummary(); renderMatrix(); renderFis();
   });
   $("rows").addEventListener("change", function (e) {
-    var el = e.target.closest("[data-f]");
-    if (!el) return;
+    var el = e.target.closest("[data-f]"); if (!el) return;
     var id = num(el.getAttribute("data-id"));
-    var r = state.rows.filter(function (x) { return x.id === id; })[0];
-    if (!r) return;
+    var r = state.rows.filter(function (x) { return x.id === id; })[0]; if (!r) return;
     var f = el.getAttribute("data-f");
     if (f === "mod") {
       r.mod = el.value;
-      if (r.mod === "ACIK") { r.koliIci = perBox(); r.beden = sizes()[0]; }
-      renderRows();
-      renderMatrix();
-      renderFis();
+      if (r.mod === "ACIK") { r.koliIci = r.koliIci || perBox(); r.beden = num(r.beden) || sizes()[0]; }
+      renderRows(); renderMatrix(); renderFis();
     }
-    if (f === "beden") {
-      r.beden = num(el.value);
-      renderMatrix();
-      renderFis();
-    }
+    if (f === "beden") { r.beden = num(el.value); renderMatrix(); renderFis(); }
   });
   $("rows").addEventListener("click", function (e) {
-    var b = e.target.closest("[data-del]");
-    if (!b) return;
+    var b = e.target.closest("[data-del]"); if (!b) return;
     var id = num(b.getAttribute("data-del"));
     state.rows = state.rows.filter(function (x) { return x.id !== id; });
-    renderRows();
-    renderMatrix();
-    renderFis();
+    renderRows(); renderMatrix(); renderFis();
   });
   $("addRow").addEventListener("click", function () {
     var id = Date.now();
-    state.rows.push({ id: id, renk: "RENK " + (state.rows.length + 1), mod: "ASORTILI", beden: sizes()[0], koli: 1, koliIci: perBox() });
-    renderRows();
-    renderMatrix();
-    renderFis();
+    state.rows.push({ id: id, renk: state.model.renkler[state.rows.length] || "RENK " + (state.rows.length + 1), mod: "ASORTILI", beden: sizes()[0], koli: 1, koliIci: perBox(), sevkKoli: 1 });
+    renderRows(); renderMatrix(); renderFis();
   });
+  $("allShip").addEventListener("click", function () { state.rows.forEach(function (r) { r.sevkKoli = num(r.koli); }); renderRows(); renderMatrix(); renderFis(); });
   $("fisBeden").addEventListener("change", renderFis);
   $("printBtn").addEventListener("click", function () { window.print(); });
+  $("mxSip").addEventListener("click", function () { state.mx = "siparis"; this.classList.add("active"); $("mxSevk").classList.remove("active"); renderMatrix(); });
+  $("mxSevk").addEventListener("click", function () { state.mx = "sevk"; this.classList.add("active"); $("mxSip").classList.remove("active"); renderMatrix(); });
 
-  // ---- hazır örnekler ----
   function preset6049() {
-    state.model = { kod: "6049", kat: "MERDANE", asorti: { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 } };
+    state.model = { kod: "6049", kat: "MERDANE", fiyat: 75, renkler: ["SİYAH", "BEYAZ", "LACİVERT", "TURUNCU BEYAZ", "BEYAZ KIRMIZI"], asorti: { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 } };
     state.musteri = "ÖRNEK MÜŞTERİ";
-    state.rows = [{ id: 1, renk: "SİYAH", mod: "ASORTILI", beden: 40, koli: 5, koliIci: 10 }];
+    state.rows = [{ id: 1, renk: "SİYAH", mod: "ASORTILI", beden: 40, koli: 5, koliIci: 10, sevkKoli: 3 }, { id: 2, renk: "BEYAZ", mod: "ASORTILI", beden: 40, koli: 3, koliIci: 10, sevkKoli: 3 }];
     renderAll();
   }
   function preset1001() {
-    state.model = { kod: "1001", kat: "GARSON", asorti: { 36: 1, 37: 2, 38: 3, 39: 2, 40: 2 } };
+    state.model = { kod: "1001", kat: "GARSON", fiyat: 62, renkler: ["SİYAH", "BEYAZ"], asorti: { 36: 1, 37: 2, 38: 3, 39: 2, 40: 2 } };
     state.musteri = "AÇIK ASORTİ MÜŞTERİSİ";
-    state.rows = [{ id: 1, renk: "SİYAH", mod: "ACIK", beden: 40, koli: 10, koliIci: 10 }];
+    state.rows = [{ id: 1, renk: "SİYAH", mod: "ACIK", beden: 40, koli: 10, koliIci: 10, sevkKoli: 10 }];
     renderAll();
   }
   function presetMix() {
-    state.model = { kod: "6049", kat: "MERDANE", asorti: { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 } };
+    state.model = { kod: "6049", kat: "MERDANE", fiyat: 75, renkler: ["SİYAH", "BEYAZ", "LACİVERT", "KAHVE"], asorti: { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 } };
     state.musteri = "KARIŞIK SİPARİŞ";
     state.rows = [
-      { id: 1, renk: "SİYAH", mod: "ASORTILI", beden: 40, koli: 3, koliIci: 10 },
-      { id: 2, renk: "KAHVE", mod: "ASORTILI", beden: 40, koli: 2, koliIci: 10 },
-      { id: 3, renk: "BEYAZ", mod: "ACIK", beden: 42, koli: 4, koliIci: 10 }
+      { id: 1, renk: "SİYAH", mod: "ASORTILI", beden: 40, koli: 3, koliIci: 10, sevkKoli: 3 },
+      { id: 2, renk: "KAHVE", mod: "ASORTILI", beden: 40, koli: 2, koliIci: 10, sevkKoli: 1 },
+      { id: 3, renk: "BEYAZ", mod: "ACIK", beden: 42, koli: 4, koliIci: 9, sevkKoli: 4 }
     ];
     renderAll();
   }
@@ -601,9 +428,7 @@
   $("p6049").addEventListener("click", preset6049);
   $("p1001").addEventListener("click", preset1001);
   $("pMix").addEventListener("click", presetMix);
-
   renderAll();
-
   if (location.hash === "#1001") preset1001();
   else if (location.hash === "#mix") presetMix();
   else if (location.hash === "#6049") preset6049();
