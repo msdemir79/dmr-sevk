@@ -46,7 +46,7 @@ Bu dosya, henüz uygulanmayan ama değerlendirilen geliştirmeleri tutar. Uygula
 1. ✅ Kağıt tasarım — kategori, asorti, açık sipariş, fiş kararları.
 2. ✅ HTML prototip v3 — çoklu renk, açıkta çok beden, kısmi sevk, 9’lu, fiyat.
 3. ✅ Geri bildirim — açık giriş yöntemi: her beden ayrı satır.
-4. ⏳ Çekirdek — veri modeli, Excel şeması (`SİPARİŞ SATIRLARI`), migration, testler.
+4. 🟡 Çekirdek — eature/matris dalında tamamlandı (veri modeli, Excel, migration, testler); arayüz bekliyor.
 5. ⏳ Arayüz — mevcut uygulamaya sipariş matrisi + fiş seçeneği.
 6. ⏳ Rapor + kabul testi → sürüm.
 

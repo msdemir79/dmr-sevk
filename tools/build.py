@@ -18,6 +18,7 @@ def main():
     parts = {
         "{{STYLES}}": read("styles.css"),
         "{{XLSX}}": read("xlsx.js"),
+        "{{MATRIS}}": read("matris.js"),
         "{{CORE}}": read("core.js"),
         "{{UI}}": read("ui.js"),
     }
