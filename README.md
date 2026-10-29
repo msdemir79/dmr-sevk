@@ -1,4 +1,4 @@
-# ASLANLAR FABRİKA — Sevk ve Cari Yönetimi
+# DMR AYAKKABI — Sevk ve Cari Yönetimi
 
 ![build-check](https://github.com/msdemir79/aslanlar-sevk/actions/workflows/build-check.yml/badge.svg)
 
