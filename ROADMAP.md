@@ -2,37 +2,47 @@
 
 Bu dosya, henüz uygulanmayan ama değerlendirilen geliştirmeleri tutar. Uygulanan işler `CHANGELOG.md` ve GitHub sürümlerine taşınır.
 
-## Renk–beden–asorti matrisi (planlanıyor)
+## Renk–beden–asorti matrisi (tasarım + prototip)
 
-**Durum:** Fikir / tasarım aşaması — henüz kod yok. Takip: [#1](https://github.com/msdemir79/dmr-sevk/issues/1)
+**Durum:** Tasarım netleşti, prototip hazır — üretim koduna **henüz alınmadı**. Takip: [#1](https://github.com/msdemir79/dmr-sevk/issues/1)
 
-**Amaç:** Sipariş ve sevkiyatı renk × beden kırılımında tutmak; asorti şablonlarıyla (koli içi beden dağılımı) hızlı ve hatasız giriş yapmak.
+**Deneme ekranı:** [`prototype/matris.html`](../prototype/matris.html) — veri kaydetmez; 6049, 1001 açık ve karışık örnekleri içerir.
 
-**Neden:**
+**Amaç:** Siparişi renk × beden kırılımında girmek; asorti şablonuyla koli içi dağılımı otomatik hesaplamak; fişte isteğe bağlı beden dökümü göstermek. Sevkiyat ve stok takibi **toplam koli/çift** üzerinden devam eder.
 
-- Kısmi sevkte “hangi beden kaldı” sorusunu yanıtlamak
-- Fişte beden dökümü göstermek
-- Model / renk / beden bazlı kalan ve satış raporu
-- Asorti koli dağılımını standartlaştırmak
+### Netleşen kararlar (30.10.2026)
 
-**Tasarım kararları (verilecek):**
+- **Beden setleri ayrı:** Bebe 22–26, Patik 26–30, Filet 31–35, Garson 36–40, Zenne 36–40, Merdane 36–48. Numaralar EU (Paris); kategori adları Türkiye sektör terimidir.
+- **Asorti model başına tek:** Her modelin tek asortisi olur. Farklı asorti gerektiğinde yeni model kodu açılır (ör. `6049` → `6049-1`).
+- **Asorti örneği:** 40–45 için 40-1, 41-2, 42-3, 43-2, 44-1, 45-1 = koli içi 10 çift.
+- **Kısmi sevk beden bazında değil:** Sevk ve kalan takibi toplam koli/çift üzerinden yürür.
+- **Açık (tek numara) sipariş:** Müşteri aynı modeli tek numara isteyebilir. Ör. 100 çift 40 numara = 10 koli × 10 çift 40 numara.
+- **Fişte beden tablosu:** Zorunlu değil; seçenek olarak eklenip çıkarılabilir.
 
-1. Beden seti ve sırası: 35–46 mı, kadın/erkek/çocuk ayrı mı?
-2. Asorti: modelde sabit şablon mu, sipariş bazında değişebilir mi? Birden çok şablon olacak mı?
-3. Sipariş girişi: renk × beden matrisi; “koli sayısı × asorti” ile hızlı doldurma; hücre düzeltme.
-4. Sevk: beden bazlı kalan; koli/çift otomatik; kısmi sevk.
-5. Fiş: beden tablosu A4/A5’e nasıl sığar; hangi toplamlar gösterilir?
-6. Excel: yeni `MATRİS` sayfası (sipariş / renk / beden / çift) mı, mevcut satırlara JSON kolon mu? Öneri: ayrı sayfa + satır bazlı.
-7. Eski veri: beden kırılımı olmayan siparişler “toplam” olarak kalır; migration ve geriye uyum.
-8. Rapor: model / renk / beden toplamları, kalanlar, sevk edilen.
+### Prototipin gösterdikleri
 
-**Aşamalar:**
+1. Model kartında kategori + beden aralığı + koli içi asorti ızgarası.
+2. Siparişte renk satırları; her satır **Asortili** veya **Açık (tek numara)**.
+3. Asortili satırda koli × asorti → numara bazlı çift dağılımı.
+4. Açık satırda tek numara × koli × koli içi çift.
+5. Renk × beden matrisi ve toplamlar.
+6. Fiş önizlemesi; beden dökümü aç/kapat.
 
-1. **Kağıt prototip** — gerçek 2–3 sipariş ve fiş üzerinden tasarım; kararlar.
-2. **HTML prototip** — ayrı dosyada matris girişi + fiş; gerçek veriyle deneme.
-3. **Çekirdek** — veri modeli, Excel şeması, migration ve birim testleri.
-4. **Arayüz** — sipariş matrisi, sevk beden seçimi, fiş.
-5. **Rapor + kabul testi** — sürüm ve GitHub release.
+### Kalan sorular (prototip üzerinde netleşecek)
+
+1. **Renk satırları:** Bir siparişte birden çok renk tek fişte mi toplanacak, yoksa her renk ayrı sipariş mi olacak?
+2. **Açık asorti:** Koli içi çift her zaman modelin asorti toplamı mı (ör. 10), yoksa ayrıca mı girilecek?
+3. **Kısmi sevk:** Fişte beden tablosu siparişin tamamını mı göstermeli, yoksa kısmi sevk için oransal mı hesaplanmalı?
+4. **Fiyat:** Matris/tutar hesabı sipariş ekranına dahil edilsin mi, yoksa ayrı mı kalsın?
+
+### Aşamalar
+
+1. ✅ Kağıt tasarım — kategori, asorti, açık sipariş, fiş kararları.
+2. ✅ HTML prototip — matris girişi, açık/asortili, fiş.
+3. ⏳ Geri bildirim — prototip üzerinde kalan soruların netleşmesi.
+4. ⏳ Çekirdek — veri modeli, Excel şeması (`MATRİS` sayfası), migration, testler.
+5. ⏳ Arayüz — mevcut uygulamaya sipariş matrisi + fiş seçeneği.
+6. ⏳ Rapor + kabul testi → sürüm.
 
 **Neden önce prototip?** Veri modeli ve fiş yerleşimi değişiyor; mevcut dosyalarla uyumluluk riski var. Gerçek siparişlerle denemeden üretime almamak gerekiyor.
 

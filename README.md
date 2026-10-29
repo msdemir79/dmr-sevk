@@ -54,7 +54,7 @@ Eski (VBA) dosyalar `Ayarlar → Eski dosyadan yeni veritabanı oluştur` ile ve
 
 ## Yol haritası
 
-Planlanan geliştirmeler ve tasarım notları: [ROADMAP.md](ROADMAP.md). Örnek: **renk–beden–asorti matrisi** (planlama aşamasında, henüz kod yok).
+Planlanan geliştirmeler ve tasarım notları: [ROADMAP.md](ROADMAP.md). Örnek: **renk–beden–asorti matrisi** — tasarım netleşti, [prototip](prototype/matris.html) denemeye hazır (üretim kodu değil).
 
 ## Sürüm
 
