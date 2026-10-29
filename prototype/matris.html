@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DMR · Renk–Beden–Asorti Prototipi v2</title>
+<title>DMR · Renk–Beden–Asorti Prototipi v3</title>
 <style>
   :root{--bg:#f4f7fa;--ink:#0f1b2d;--ink2:#334155;--muted:#64748b;--line:#e2e8f0;--brand:#0f766e;--soft:#ecfdf5;--danger:#b91c1c;--r:12px}
   *{box-sizing:border-box}
@@ -90,7 +90,7 @@
 </head>
 <body>
 <header class="top">
-  <div class="brand"><div class="mark">DMR</div><div><b>DMR AYAKKABI</b><span>Renk–beden–asorti prototipi · v2</span></div></div>
+  <div class="brand"><div class="mark">DMR</div><div><b>DMR AYAKKABI</b><span>Renk–beden–asorti prototipi · v3</span></div></div>
   <div class="badge">PROTOTİP · veri kaydedilmez</div>
 </header>
 
@@ -126,7 +126,7 @@
           <div><label class="f" for="oMusteri">Müşteri</label><input id="oMusteri" value="ÖRNEK MÜŞTERİ"></div>
           <div><label class="f" for="oTarih">Tarih</label><input id="oTarih" type="date"></div>
         </div>
-        <p class="hint" style="margin:10px 0 6px">Renk satırları · asortili veya açık · sevk koli ile kısmi sevk</p>
+        <p class="hint" style="margin:10px 0 6px">Renk satırları · asortili veya açık · sevk koli ile kısmi sevk · <b>açıkta her beden için ayrı satır</b></p>
       </div>
       <div style="overflow:auto">
         <table class="editable">
@@ -180,6 +180,7 @@
       <li><b>Asorti model kartında:</b> koli içi numara dağılımı; farklı asorti = yeni model kodu (6049-1).</li>
       <li><b>Açık satır:</b> tek numara; koli içi çift <b>elle</b> (6, 9, 10, 12…).</li>
       <li><b>Kısmi sevk:</b> sevk koli, sipariş kolisinden az olabilir; fiş sevk edilen rakamı gösterir.</li>
+      <li><b>Açık çok beden:</b> aynı renkte her beden için ayrı satır; fişte “Açık · 9'lu” olarak görünür.</li>
       <li><b>Fiyat:</b> toplam = sevk edilen çift × liste fiyatı; beden bazlı fiyat yok.</li>
       <li><b>Fiş:</b> boş bedenler gösterilmez; beden dökümü isteğe bağlı.</li>
     </ul>
@@ -253,15 +254,15 @@
         ? '<select data-f="beden" data-id="' + r.id + '">' + sizes().map(function (s) { return '<option value="' + s + '"' + (s === num(r.beden) ? " selected" : "") + ">" + s + "</option>"; }).join("") + "</select>"
         : '<span class="dim">—</span>';
       var koliIci = r.mod === "ACIK"
-        ? '<input type="number" min="1" step="1" data-f="koliIci" data-id="' + r.id + '" value="' + num(r.koliIci || 10) + '">'
+        ? '<input type="number" min="1" step="1" data-f="koliIci" data-id="' + r.id + '" step="1" value="' + num(r.koliIci || 10) + '">'
         : '<span class="dim">' + fmt(perBox()) + "</span>";
       return "<tr>" +
         '<td><input data-f="renk" data-id="' + r.id + '" list="renkList" value="' + esc(r.renk) + '"></td>' +
         '<td><select data-f="mod" data-id="' + r.id + '"><option value="ASORTILI"' + (r.mod === "ASORTILI" ? " selected" : "") + '>Asortili</option><option value="ACIK"' + (r.mod === "ACIK" ? " selected" : "") + '>Açık</option></select></td>' +
         "<td>" + beden + "</td>" +
-        '<td><input type="number" min="0" step="0.5" data-f="koli" data-id="' + r.id + '" value="' + num(r.koli) + '"></td>' +
+        '<td><input type="number" min="0" step="0.5" data-f="koli" data-id="' + r.id + '" step="1" value="' + num(r.koli) + '"></td>' +
         "<td>" + koliIci + "</td>" +
-        '<td><input type="number" min="0" step="0.5" data-f="sevk" data-id="' + r.id + '" value="' + num(r.sevkKoli) + '"></td>' +
+        '<td><input type="number" min="0" step="0.5" data-f="sevk" data-id="' + r.id + '" step="1" value="' + num(r.sevkKoli) + '"></td>' +
         '<td class="right strong" data-sip="' + r.id + '">' + fmt(c.sip.total) + "</td>" +
         '<td class="right strong" data-sevk="' + r.id + '">' + fmt(c.sevk.total) + "</td>" +
         '<td><button class="x" data-del="' + r.id + '" title="Kaldır">×</button></td></tr>';
@@ -282,26 +283,37 @@
     });
   }
 
+  function keyOf(r) {
+    return String(r.renk || "").toLocaleUpperCase("tr-TR") + "|" + r.mod;
+  }
+
   function matrixData(mode) {
-    var list = sizes(), col = {}, rows = [];
+    var list = sizes(), col = {}, map = {};
     state.rows.forEach(function (r) {
       var c = calcRow(r);
-      var map = mode === "sevk" ? c.sevk.map : c.sip.map;
-      rows.push({ r: r, map: map, total: mode === "sevk" ? c.sevk.total : c.sip.total });
-      list.forEach(function (s) { col[s] = (col[s] || 0) + num(map[s]); });
+      var m = mode === "sevk" ? c.sevk.map : c.sip.map;
+      var k = keyOf(r);
+      if (!map[k]) map[k] = { renk: r.renk, mod: r.mod, mp: {}, total: 0 };
+      Object.keys(m).forEach(function (s) {
+        map[k].mp[s] = (map[k].mp[s] || 0) + num(m[s]);
+        col[s] = (col[s] || 0) + num(m[s]);
+      });
+      map[k].total += (mode === "sevk" ? c.sevk.total : c.sip.total);
     });
+    var rows = Object.keys(map).map(function (k) { return map[k]; });
     return { rows: rows, sizes: list.filter(function (s) { return col[s] > 0; }), col: col };
   }
+
   function renderMatrix() {
     if (!state.rows.length) { $("matrix").innerHTML = '<div class="empty">Henüz renk satırı yok.</div>'; return; }
     var d = matrixData(state.mx);
     if (!d.sizes.length) { $("matrix").innerHTML = '<div class="empty">Bu görünümde sevk edilen beden yok.</div>'; return; }
     var grand = 0, html = '<table class="mx"><thead><tr><th class="sticky">Renk</th>' + d.sizes.map(function (s) { return "<th>" + s + "</th>"; }).join("") + "<th>Toplam</th></tr></thead><tbody>";
     d.rows.forEach(function (x, i) {
-      var v = d.sizes.reduce(function (a, s) { return a + num(x.map[s]); }, 0);
+      var v = d.sizes.reduce(function (a, s) { return a + num(x.mp[s]); }, 0);
       if (!v) return;
-      html += '<tr><th class="sticky"><span class="dot" style="background:' + RENKLER[i % RENKLER.length] + '"></span>' + esc(x.r.renk || "—") + (x.r.mod === "ACIK" ? '<span class="pill">Açık ' + x.r.beden + "</span>" : "") + "</th>";
-      d.sizes.forEach(function (s) { var q = num(x.map[s]); html += '<td class="' + (q ? "" : "zero") + '">' + (q ? fmt(q) : "·") + "</td>"; });
+      html += '<tr><th class="sticky"><span class="dot" style="background:' + RENKLER[i % RENKLER.length] + '"></span>' + esc(x.renk || "—") + (x.mod === "ACIK" ? '<span class="pill">Açık</span>' : "") + "</th>";
+      d.sizes.forEach(function (s) { var q = num(x.mp[s]); html += '<td class="' + (q ? "" : "zero") + '">' + (q ? fmt(q) : "·") + "</td>"; });
       grand += x.total;
       html += '<td class="strong">' + fmt(x.total) + "</td></tr>";
     });
@@ -311,22 +323,46 @@
 
   function renderFis() {
     var t = calcAll();
-    var rows = state.rows.map(function (r) { return { r: r, c: calcRow(r) }; }).filter(function (x) { return num(x.r.sevkKoli) > 0 && x.c.sevk.total > 0; });
-    var rowsHtml = rows.map(function (x) {
-      var tip = x.r.mod === "ACIK" ? "Açık · " + x.r.beden + " numara" : "Asortili";
-      return "<tr><td>" + esc(x.r.renk) + "</td><td>" + esc(tip) + '</td><td class="r">' + fmt(x.r.sevkKoli) + '</td><td class="r">' + fmt(x.c.sevk.total) + "</td></tr>";
+    var rows = state.rows.map(function (r) { return { r: r, c: calcRow(r) }; })
+      .filter(function (x) { return num(x.r.sevkKoli) > 0 && x.c.sevk.total > 0; });
+
+    var groups = {};
+    rows.forEach(function (x) {
+      var k = keyOf(x.r);
+      if (!groups[k]) groups[k] = { renk: x.r.renk, mod: x.r.mod, koli: 0, cift: 0, mp: {}, adet: {} };
+      var g = groups[k];
+      g.koli += num(x.r.sevkKoli);
+      g.cift += x.c.sevk.total;
+      if (x.r.mod === "ACIK") g.adet[num(x.r.koliIci)] = 1;
+      Object.keys(x.c.sevk.map).forEach(function (s) { g.mp[s] = (g.mp[s] || 0) + num(x.c.sevk.map[s]); });
+    });
+    var glist = Object.keys(groups).map(function (k) { return groups[k]; });
+
+    function etiket(g) {
+      if (g.mod !== "ACIK") return "Asortili";
+      var arr = Object.keys(g.adet).filter(function (x) { return num(x) > 0; }).sort(function (a, b) { return num(a) - num(b); });
+      return "Açık · " + (arr.length ? arr.join("/") : "?") + "'lu";
+    }
+
+    var rowsHtml = glist.map(function (g) {
+      return "<tr><td>" + esc(g.renk) + "</td><td>" + esc(etiket(g)) + '</td><td class="r">' + fmt(g.koli) + '</td><td class="r">' + fmt(g.cift) + "</td></tr>";
     }).join("");
+
     var sizeTable = "";
-    if ($("fisBeden").checked && rows.length) {
+    if ($("fisBeden").checked && glist.length) {
       var list = sizes(), col = {};
-      rows.forEach(function (x) { list.forEach(function (s) { col[s] = (col[s] || 0) + num(x.c.sevk.map[s]); }); });
+      glist.forEach(function (g) { list.forEach(function (s) { col[s] = (col[s] || 0) + num(g.mp[s]); }); });
       var used = list.filter(function (s) { return col[s] > 0; });
       if (used.length) {
-        sizeTable = '<div class="doc-sizes"><h4>Beden dökümü · sevk edilen</h4><table class="doc-mx"><thead><tr><th>Renk</th>' + used.map(function (s) { return "<th>" + s + "</th>"; }).join("") + "<th>Toplam</th></tr></thead><tbody>" +
-          rows.map(function (x) { return "<tr><td>" + esc(x.r.renk) + "</td>" + used.map(function (s) { var q = num(x.c.sevk.map[s]); return "<td>" + (q ? fmt(q) : "·") + "</td>"; }).join("") + "<td>" + fmt(x.c.sevk.total) + "</td></tr>"; }).join("") +
+        sizeTable = '<div class="doc-sizes"><h4>Beden dökümü · sevk edilen</h4><table class="doc-mx"><thead><tr><th>Renk</th>' +
+          used.map(function (s) { return "<th>" + s + "</th>"; }).join("") + "<th>Toplam</th></tr></thead><tbody>" +
+          glist.map(function (g) {
+            return "<tr><td>" + esc(g.renk) + "</td>" + used.map(function (s) { var q = num(g.mp[s]); return "<td>" + (q ? fmt(q) : "·") + "</td>"; }).join("") + "<td>" + fmt(g.cift) + "</td></tr>";
+          }).join("") +
           '</tbody><tfoot><tr><td>Toplam</td>' + used.map(function (s) { return "<td>" + fmt(col[s]) + "</td>"; }).join("") + "<td>" + fmt(t.sevkCift) + "</td></tr></tfoot></table></div>";
       }
     }
+
     $("fisDoc").innerHTML = '<div class="doc">' +
       '<div class="doc-top"><div class="doc-brand">DMR<small>AYAKKABI</small></div><div class="doc-title">SEVK FİŞİ<small>PROTOTİP</small></div></div>' +
       '<div class="doc-meta"><div><span>Müşteri</span><b>' + esc(state.musteri || "—") + '</b></div><div><span>Model</span><b>' + esc(state.model.kod || "—") + '</b></div><div><span>Tarih</span><b>' + esc(dateTR($("oTarih").value)) + "</b></div></div>" +
@@ -362,12 +398,17 @@
     var f = el.getAttribute("data-f");
     if (f === "renk") r.renk = el.value;
     if (f === "koli") {
-      var eski = num(r.koli); r.koli = num(el.value);
+      var eski = num(r.koli);
+      r.koli = Math.max(0, Math.round(num(el.value)));
+      el.value = r.koli;
       if (r.sevkKoli === eski || r.sevkKoli > r.koli) r.sevkKoli = r.koli;
       var sev = document.querySelector('[data-f="sevk"][data-id="' + id + '"]'); if (sev) sev.value = r.sevkKoli;
     }
-    if (f === "koliIci") r.koliIci = num(el.value);
-    if (f === "sevk") { r.sevkKoli = Math.min(num(el.value), num(r.koli)); if (num(el.value) !== r.sevkKoli) el.value = r.sevkKoli; }
+    if (f === "koliIci") { r.koliIci = Math.max(1, Math.round(num(el.value))); el.value = r.koliIci; }
+    if (f === "sevk") {
+      r.sevkKoli = Math.min(Math.max(0, Math.round(num(el.value))), Math.max(0, Math.round(num(r.koli))));
+      if (num(el.value) !== r.sevkKoli) el.value = r.sevkKoli;
+    }
     updateSummary(); renderMatrix(); renderFis();
   });
   $("rows").addEventListener("change", function (e) {
@@ -390,7 +431,16 @@
   });
   $("addRow").addEventListener("click", function () {
     var id = Date.now();
-    state.rows.push({ id: id, renk: state.model.renkler[state.rows.length] || "RENK " + (state.rows.length + 1), mod: "ASORTILI", beden: sizes()[0], koli: 1, koliIci: perBox(), sevkKoli: 1 });
+    var son = state.rows[state.rows.length - 1];
+    var yeni = { id: id, renk: state.model.renkler[state.rows.length % Math.max(1, state.model.renkler.length)] || "RENK " + (state.rows.length + 1), mod: "ASORTILI", beden: sizes()[0], koli: 1, koliIci: perBox(), sevkKoli: 1 };
+    if (son && son.mod === "ACIK") {
+      var idx = sizes().indexOf(num(son.beden));
+      yeni.renk = son.renk;
+      yeni.mod = "ACIK";
+      yeni.beden = sizes()[Math.min(sizes().length - 1, idx + 1)];
+      yeni.koliIci = num(son.koliIci) || 10;
+    }
+    state.rows.push(yeni);
     renderRows(); renderMatrix(); renderFis();
   });
   $("allShip").addEventListener("click", function () { state.rows.forEach(function (r) { r.sevkKoli = num(r.koli); }); renderRows(); renderMatrix(); renderFis(); });
@@ -417,7 +467,11 @@
     state.rows = [
       { id: 1, renk: "SİYAH", mod: "ASORTILI", beden: 40, koli: 3, koliIci: 10, sevkKoli: 3 },
       { id: 2, renk: "KAHVE", mod: "ASORTILI", beden: 40, koli: 2, koliIci: 10, sevkKoli: 1 },
-      { id: 3, renk: "BEYAZ", mod: "ACIK", beden: 42, koli: 4, koliIci: 9, sevkKoli: 4 }
+      { id: 3, renk: "BEYAZ", mod: "ACIK", beden: 40, koli: 2, koliIci: 9, sevkKoli: 2 },
+      { id: 4, renk: "BEYAZ", mod: "ACIK", beden: 41, koli: 2, koliIci: 9, sevkKoli: 2 },
+      { id: 5, renk: "BEYAZ", mod: "ACIK", beden: 42, koli: 2, koliIci: 9, sevkKoli: 2 },
+      { id: 6, renk: "BEYAZ", mod: "ACIK", beden: 43, koli: 1, koliIci: 9, sevkKoli: 1 },
+      { id: 7, renk: "BEYAZ", mod: "ACIK", beden: 44, koli: 1, koliIci: 9, sevkKoli: 1 }
     ];
     renderAll();
   }

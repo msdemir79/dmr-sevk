@@ -2,9 +2,9 @@
 
 Bu dosya, henüz uygulanmayan ama değerlendirilen geliştirmeleri tutar. Uygulanan işler `CHANGELOG.md` ve GitHub sürümlerine taşınır.
 
-## Renk–beden–asorti matrisi (tasarım + prototip v2)
+## Renk–beden–asorti matrisi (prototip v3)
 
-**Durum:** Tasarım netleşti, prototip v2 hazır — üretim koduna **henüz alınmadı**. Takip: [#1](https://github.com/msdemir79/dmr-sevk/issues/1)
+**Durum:** Tasarım netleşti, prototip v3 hazır — üretim koduna **henüz alınmadı**. Takip: [#1](https://github.com/msdemir79/dmr-sevk/issues/1)
 
 **Deneme ekranı:** [`prototype/matris.html`](prototype/matris.html) — veri kaydetmez; 6049 kısmi sevk, 1001 açık ve karışık örnekleri içerir.
 
@@ -19,32 +19,34 @@ Bu dosya, henüz uygulanmayan ama değerlendirilen geliştirmeleri tutar. Uygula
 - **Asorti model başına tek:** Her modelin tek asortisi olur. Farklı asorti gerektiğinde yeni model kodu açılır (ör. `6049` → `6049-1`).
 - **Asorti örneği:** 40–45 için 40-1, 41-2, 42-3, 43-2, 44-1, 45-1 = koli içi 10 çift.
 - **Kısmi sevk beden bazında değil:** Sevk ve kalan takibi toplam koli/çift üzerinden yürür.
-- **Açık (tek numara) sipariş:** Müşteri aynı modeli tek numara isteyebilir. Koli içi çift **elle** girilir (6, 9, 10, 12…). Ör. 10 koli × 10 çift = 100 çift 40 numara.
-- **Fişte sevk edilen görünür:** Kısmi sevk varsa fiş, siparişin tamamını değil **sevk edilen koli/çifti** gösterir.
+- **Sevk girişi koli:** Tam koli; ondalıklı koli yok.
+- **Açık (tek numara) sipariş:** Koli içi çift **elle** girilir (6, 9, 10, 12…). **Aynı renkte her beden** ayrı satır olarak girilebilir (40, 41, 42…); matris ve fiş renk bazında gruplar.
+- **Renk fiyatı:** Aynı modelde renkler arasında fiyat farkı yok; tek liste fiyatı.
 - **Fiyat toplam mantığı:** Tutar = sevk edilen çift × liste fiyatı; beden bazlı fiyat yok.
+- **Fişte sevk edilen görünür:** Kısmi sevk varsa fiş, siparişin tamamını değil **sevk edilen koli/çifti** gösterir.
 - **Fişte boş bedenler gizlenir:** Yalnızca sevk edilen bedenler tabloya girer.
+- **Fişte koli içi:** Açık satırlarda “Açık · 9’lu” gibi koli içi bilgisi görünür.
 
-### Prototip v2’nin gösterdikleri
+### Prototip v3’ün gösterdikleri
 
 1. Model kartında kategori + beden aralığı + çoklu renk listesi + liste fiyatı + koli içi asorti ızgarası.
-2. Siparişte renk satırları; her satır **Asortili** veya **Açık**.
-3. Asortili satırda sipariş koli / sevk koli × asorti → numara dağılımı.
-4. Açık satırda tek numara, elle koli içi çift.
-5. Renk × beden matrisi; **Sipariş / Sevk edilen** görünümü.
-6. Fiş: yalnızca sevk edilen satırlar; boş bedenler gizli; tutar = çift × fiyat.
+2. Siparişte renk satırları; asortili veya açık (açıkta her beden ayrı satır).
+3. Asortili satırda sipariş/sevk koli × asorti → numara dağılımı.
+4. Açık satırda tek numara, elle koli içi çift; aynı renk altında çok beden.
+5. Renk × beden matrisi; sipariş ve sevk görünümü; renk+mod gruplaması.
+6. Fiş: yalnızca sevk edilenler; boş beden yok; “Açık · 9’lu”; tutar.
 
-### Kalan küçük sorular
+### Kalan tek UX sorusu
 
-1. **Sevk girişi:** Koli mi, çift mi girilecek? (Prototip koli üzerinden çalışıyor; çift girişi de eklenebilir.)
-2. **Renk bazlı fiyat:** Aynı modelde renkler arasında fiyat farkı oluyor mu? (Prototip tek liste fiyatı kullanıyor.)
-3. **Açık siparişte koli içi:** 6/9/12 gibi değerler için fişte “koli içi” bilgisi görünsün mü?
-4. **Kısmi sevk:** Sevk koli ondalıklı olabilir mi (ör. 5,5 koli), yoksa tam koli mi?
+- **Açık çok beden girişi:** Her beden için ayrı satır mı (prototip böyle), yoksa tek renk satırında **beden ızgarası** mı olsun?
+  - Ayrı satır: basit, mevcut tablo yapısı, çok satır.
+  - Beden ızgarası: tek satırda 40–48 kutuları, daha kompakt ama yeni arayüz.
 
 ### Aşamalar
 
 1. ✅ Kağıt tasarım — kategori, asorti, açık sipariş, fiş kararları.
-2. ✅ HTML prototip v2 — çoklu renk, kısmi sevk, fiyat, boş beden gizleme.
-3. ⏳ Geri bildirim — prototip üzerinde son küçük sorular.
+2. ✅ HTML prototip v3 — çoklu renk, açıkta çok beden, kısmi sevk, 9’lu, fiyat.
+3. ⏳ Geri bildirim / onay — açık giriş tercihi ve üretim onayı.
 4. ⏳ Çekirdek — veri modeli, Excel şeması (`MATRİS` sayfası), migration, testler.
 5. ⏳ Arayüz — mevcut uygulamaya sipariş matrisi + fiş seçeneği.
 6. ⏳ Rapor + kabul testi → sürüm.
