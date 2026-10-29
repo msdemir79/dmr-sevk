@@ -1,5 +1,7 @@
 # ASLANLAR FABRİKA — Sevk ve Cari Yönetimi
 
+![build-check](https://github.com/msdemir79/aslanlar-sevk/actions/workflows/build-check.yml/badge.svg)
+
 Tek bir HTML dosyası olarak çalışan, verilerini seçtiğiniz **Excel (.xlsx)** dosyasında tutan sipariş, sevk fişi ve cari hesap uygulaması. Kurulum, sunucu ve internet bağlantısı gerektirmez; Chrome veya Edge ile açılır.
 
 ## Özellikler
@@ -52,7 +54,19 @@ Eski (VBA) dosyalar `Ayarlar → Eski dosyadan yeni veritabanı oluştur` ile ve
 
 ## Sürüm
 
-Güncel sürüm: **v1.6.0**. Ayrıntılar için `CHANGELOG.md`.
+Güncel sürüm: **v1.6.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `ASLANLAR_SEVK.html` eklenir.
+
+### Yeni sürüm çıkarma
+
+```bash
+python tools/build.py
+git add -A
+git commit -m "v1.6.1: kısa açıklama"
+git tag -a v1.6.1 -m "Sürüm 1.6.1"
+git push origin main --tags
+```
+
+Ardından GitHub'da **Releases → Draft a new release** ile `v1.6.1` etiketini seçip `ASLANLAR_SEVK.html` dosyasını ekleyin. CI, HTML'in kaynaklarla aynı olduğunu otomatik doğrular.
 
 ## Gizlilik
 
