@@ -188,6 +188,27 @@ BOOT = r"""
     }
     if (h === 'ledger') { APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView(); }
     if (h === 'shipments') { APP.S.view = 'shipments'; APP.updateChrome(); APP.renderView(); }
+    if (h === 'cari-edit' || h === 'cari-delete') {
+      APP.S.view = 'cariler'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="' + (h === 'cari-delete' ? 'cari-del' : 'cari-edit') + '"]');
+        if (b) b.click();
+      }, 250);
+    }
+    if (h === 'user-edit') {
+      APP.S.view = 'settings'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="user-edit"]');
+        if (b) b.click();
+      }, 250);
+    }
+    if (h === 'change-pass') {
+      APP.S.view = 'settings'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="change-pass"]');
+        if (b) b.click();
+      }, 250);
+    }
     if (h === 'orders') { APP.S.view = 'orders'; APP.updateChrome(); APP.renderView(); }
     if (h === 'reports') { APP.S.view = 'reports'; APP.updateChrome(); APP.renderView(); }
     if (h === 'ledger-all') { APP.S.ui.cariId = 0; APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView(); }

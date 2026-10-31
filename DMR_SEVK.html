@@ -6201,9 +6201,17 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '2.6.0';
+  var SURUM = '2.6.1';
 
   var YENILIKLER = [
+    {
+      v: '2.6.1', t: '31.10.2026', m: [
+        'Cari hesap Düzenle ve Sil butonları düzeltildi',
+        'Kullanıcı düzenleme, şifre sıfırlama ve kullanıcı silme geri geldi',
+        'Yedek/çöp kutusu sonrası pencereleri kapatan closeModals geri eklendi',
+        'Tüm proje taraması: 59 aksiyon handler’lı, 18 ekran/modalda 0 runtime hatası'
+      ]
+    },
     {
       v: '2.6.0', t: '31.10.2026', m: [
         'Sevk fişi önizlemesinde Tam ekran / Normal düğmesi',
@@ -7010,6 +7018,247 @@ function viewShipments() {
         toast(isEdit ? 'Model güncellendi' : 'Model eklendi', 'ok');
       } catch (ex) { err.textContent = ex.message; }
     });
+  }
+
+  function openCariForm(cari) {
+    var isEdit = !!cari;
+    var c = cari || { ad: '', kod: '', tel: '', adres: '', vergiDairesi: '', vergiNo: '', not: '', aktif: true };
+    var sonKod = 'C' + (data.cariler.length + 1);
+
+    var body =
+      '<form id="cariForm" class="form-grid g2" autocomplete="off">' +
+      '  <div class="field span2"><label for="cfAd">Cari adı *</label><input id="cfAd" name="ad" class="input" required value="' + esc(c.ad) + '" placeholder="Örn. MÜŞTERİ AYAKKABI"></div>' +
+      '  <div class="field"><label for="cfKod">Kısa kod</label><input id="cfKod" name="kod" class="input" value="' + esc(c.kod) + '" placeholder="' + esc(sonKod) + '"></div>' +
+      '  <div class="field"><label for="cfTel">Telefon</label><input id="cfTel" name="tel" class="input" value="' + esc(c.tel) + '"></div>' +
+      '  <div class="field span2"><label for="cfAdres">Adres</label><input id="cfAdres" name="adres" class="input" value="' + esc(c.adres) + '"></div>' +
+      '  <div class="field"><label for="cfVd">Vergi dairesi</label><input id="cfVd" name="vergiDairesi" class="input" value="' + esc(c.vergiDairesi) + '"></div>' +
+      '  <div class="field"><label for="cfVn">Vergi no</label><input id="cfVn" name="vergiNo" class="input" value="' + esc(c.vergiNo) + '"></div>' +
+      '  <div class="field span2"><label for="cfNot">Not</label><input id="cfNot" name="not" class="input" value="' + esc(c.not) + '"></div>' +
+      '  <div class="field span2"><label class="switch"><input type="checkbox" id="cfAktif"' + (c.aktif === false ? '' : ' checked') + '><span class="track"></span><span>Aktif cari (listelerde görünsün)</span></label></div>' +
+      (isEdit ? '' :
+        '  <div class="field span2" style="border-top:1px solid var(--line);padding-top:12px">' +
+        '    <label for="cfDevir">Devir bakiyesi <span class="hint">(isteğe bağlı)</span></label>' +
+        '    <div style="display:grid;grid-template-columns:1fr 140px;gap:8px">' +
+        '      <input id="cfDevir" name="devir" class="input num" type="text" inputmode="decimal" placeholder="0,00">' +
+        '      <select id="cfDevirYon" name="devirYon" class="select"><option value="BORC">Borç</option><option value="ALACAK">Alacak</option></select>' +
+        '    </div>' +
+        '  </div>') +
+      '</form>';
+
+    var m = openModal({
+      title: isEdit ? 'Cari hesabı düzenle' : 'Yeni cari hesap',
+      subtitle: isEdit ? c.ad : 'Müşteri kartı ve açılış bakiyesi',
+      body: body,
+      footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
+        '<button class="btn btn-primary" type="submit" form="cariForm">' + ICONS.check + ' ' + (isEdit ? 'Kaydet' : 'Cari ekle') + '</button>'
+    });
+    var wrap = m.el;
+
+    $('#cariForm', wrap).addEventListener('submit', function (e) {
+      e.preventDefault();
+      var payload = {
+        ad: $('#cfAd', wrap).value,
+        kod: $('#cfKod', wrap).value || sonKod,
+        tel: $('#cfTel', wrap).value,
+        adres: $('#cfAdres', wrap).value,
+        vergiDairesi: $('#cfVd', wrap).value,
+        vergiNo: $('#cfVn', wrap).value,
+        not: $('#cfNot', wrap).value,
+        aktif: $('#cfAktif', wrap).checked
+      };
+      if (!isEdit) {
+        payload.devir = $('#cfDevir', wrap).value;
+        payload.devirYon = $('#cfDevirYon', wrap).value;
+      }
+      try {
+        var c2 = isEdit ? Core.updateCari(data, c.id, payload) : Core.addCari(data, payload);
+        log(isEdit ? 'CARİ DÜZENLE' : 'CARİ EKLE', c2.ad);
+        setDirty(true);
+        m.close();
+        if (!isEdit) setActiveCari(c2.id);
+        else { renderView(); updateChrome(); }
+        toast(isEdit ? 'Cari güncellendi' : 'Cari eklendi', 'ok');
+      } catch (err) { toast(err.message, 'err'); }
+    });
+  }
+
+  function removeCari(id) {
+    var c = Core.cariById(data, id);
+    if (!c) return;
+    confirmDialog({
+      title: 'Cari silinsin mi?',
+      message: c.ad + ' cari hesabı silinecek. Kaydı olan cariler silinemez.',
+      confirmText: 'Cariyi sil', danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      try {
+        Core.deleteCari(data, id, S.user ? (S.user.ad || S.user.kullanici) : '');
+        log('CARİ SİL', c.ad);
+        if (S.ui.cariId === id) S.ui.cariId = Core.defaultCariId(data);
+        setDirty(true);
+        updateChrome();
+        renderView();
+        toast('Cari silindi (çöp kutusundan geri alınabilir)', 'ok');
+      } catch (e) { toast(e.message, 'err'); }
+    });
+  }
+
+  function imageToDataUrl(file, cb) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var max = 340;
+        var w = img.width, h = img.height;
+        var scale = Math.min(1, max / Math.max(w, h));
+        w = Math.max(1, Math.round(w * scale)); h = Math.max(1, Math.round(h * scale));
+        var c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        var ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        var q = 0.74, out = c.toDataURL('image/jpeg', q);
+        while (out.length > 30000 && q > 0.32) { q -= 0.08; out = c.toDataURL('image/jpeg', q); }
+        while (out.length > 31000 && w > 90) {
+          w = Math.round(w * 0.8); h = Math.round(h * 0.8);
+          var c2 = document.createElement('canvas');
+          c2.width = w; c2.height = h;
+          c2.getContext('2d').drawImage(c, 0, 0, w, h);
+          c = c2;
+          out = c.toDataURL('image/jpeg', 0.6);
+        }
+        cb(out);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Cari hareket formu                                                  */
+  /* ------------------------------------------------------------------ */
+  var YON_DEFAULT = { 'SATIŞ': 'BORC', 'TAHSİLAT': 'ALACAK', 'ALIŞ': 'ALACAK', 'GELİR': 'ALACAK', 'DEVRİ': 'BORC', 'DİĞER': 'BORC' };
+
+  function openUserForm(user, sifreOdak) {
+    var isEdit = !!user;
+    var u = user || { ad: '', kullanici: '', rol: 'KULLANICI', aktif: true };
+
+    var body =
+      '<form id="userForm" class="form-grid g2" autocomplete="off">' +
+      '  <div class="field span2"><label for="ufAd">Ad soyad *</label><input id="ufAd" class="input" required value="' + esc(u.ad) + '"></div>' +
+      '  <div class="field"><label for="ufKullanici">Kullanıcı adı *</label><input id="ufKullanici" class="input" required autocomplete="username" value="' + esc(u.kullanici) + '"></div>' +
+      '  <div class="field"><label for="ufRol">Yetki</label><select id="ufRol" class="select">' +
+      '<option value="KULLANICI"' + (u.rol !== 'YÖNETİCİ' ? ' selected' : '') + '>Kullanıcı</option>' +
+      '<option value="YÖNETİCİ"' + (u.rol === 'YÖNETİCİ' ? ' selected' : '') + '>Yönetici</option>' +
+      '</select></div>' +
+      '  <div class="field span2"><label for="ufSifre">' + (isEdit ? 'Yeni şifre <span class="hint">(boş bırakılırsa değişmez)</span>' : 'Şifre *') + '</label>' +
+      '    <input id="ufSifre" type="password" class="input" autocomplete="new-password" placeholder="' + (isEdit ? '••••••' : '') + '"></div>' +
+      '  <div class="field span2"><label class="switch"><input type="checkbox" id="ufAktif"' + (u.aktif === false ? '' : ' checked') + '><span class="track"></span><span>Aktif (giriş yapabilir)</span></label></div>' +
+      '  <div class="auth-err span2" id="ufErr"></div>' +
+      '</form>';
+
+    var m = openModal({
+      title: isEdit ? 'Kullanıcıyı düzenle' : 'Yeni kullanıcı',
+      subtitle: isEdit ? u.kullanici : 'Uygulamaya giriş için hesap oluşturun',
+      body: body,
+      footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
+        '<button class="btn btn-primary" type="submit" form="userForm">' + ICONS.check + ' Kaydet</button>'
+    });
+    var wrap = m.el;
+    if (sifreOdak) setTimeout(function () { var f = $('#ufSifre', wrap); if (f) f.focus(); }, 80);
+
+    $('#userForm', wrap).addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var kadi = $('#ufKullanici', wrap).value.trim();
+      var sifre = $('#ufSifre', wrap).value;
+      var payload = {
+        ad: $('#ufAd', wrap).value,
+        kullanici: kadi,
+        rol: $('#ufRol', wrap).value,
+        aktif: $('#ufAktif', wrap).checked
+      };
+      var err = $('#ufErr', wrap);
+      if (sifre) {
+        if (sifre.length < 4) { err.textContent = 'Şifre en az 4 karakter olmalı.'; return; }
+        var tuz = randomHex(16);
+        payload.tuz = tuz;
+        payload.sifre = await sifreHash(kadi, sifre, tuz);
+      } else if (!isEdit) {
+        err.textContent = 'Şifre zorunlu.';
+        return;
+      }
+      try {
+        var ku = isEdit ? Core.updateKullanici(data, u.id, payload) : Core.addKullanici(data, payload);
+        log(isEdit ? 'KULLANICI DÜZENLE' : 'KULLANICI EKLE', ku.kullanici + ' · ' + ku.rol);
+        setDirty(true);
+        m.close();
+        renderView();
+        toast(isEdit ? 'Kullanıcı güncellendi' : 'Kullanıcı eklendi', 'ok');
+      } catch (ex) { err.textContent = ex.message; }
+    });
+  }
+
+  function openPasswordForm() {
+    var body =
+      '<form id="passForm" class="form-grid g2" autocomplete="off">' +
+      '  <div class="field span2"><label for="pf1">Yeni şifre</label><input id="pf1" type="password" class="input" required autocomplete="new-password"></div>' +
+      '  <div class="field span2"><label for="pf2">Yeni şifre (tekrar)</label><input id="pf2" type="password" class="input" required autocomplete="new-password"></div>' +
+      '  <div class="auth-err span2" id="pfErr"></div>' +
+      '</form>';
+    var m = openModal({
+      title: 'Şifremi değiştir',
+      subtitle: S.user ? S.user.kullanici : '',
+      body: body,
+      footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
+        '<button class="btn btn-primary" type="submit" form="passForm">' + ICONS.check + ' Şifreyi kaydet</button>'
+    });
+    var wrap = m.el;
+    $('#passForm', wrap).addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var p1 = $('#pf1', wrap).value, p2 = $('#pf2', wrap).value;
+      var err = $('#pfErr', wrap);
+      if (p1.length < 4) { err.textContent = 'Şifre en az 4 karakter olmalı.'; return; }
+      if (p1 !== p2) { err.textContent = 'Şifreler uyuşmuyor.'; return; }
+      var tuz = randomHex(16);
+      var hash = await sifreHash(S.user.kullanici, p1, tuz);
+      try {
+        Core.updateKullanici(data, S.user.id, { tuz: tuz, sifre: hash });
+        log('ŞİFRE DEĞİŞTİ', S.user.kullanici);
+        setDirty(true);
+        m.close();
+        toast('Şifreniz güncellendi', 'ok');
+      } catch (ex) { err.textContent = ex.message; }
+    });
+  }
+
+  function removeKullanici(id) {
+    var u = Core.kullaniciById(data, id);
+    if (!u) return;
+    if (S.user && S.user.id === id) { toast('Kendi hesabınızı silemezsiniz.', 'err'); return; }
+    confirmDialog({
+      title: 'Kullanıcı silinsin mi?',
+      message: u.ad + ' (' + u.kullanici + ') hesabı silinecek.',
+      confirmText: 'Sil', danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      try {
+        Core.deleteKullanici(data, id);
+        log('KULLANICI SİL', u.kullanici);
+        setDirty(true);
+        renderView();
+        toast('Kullanıcı silindi', 'ok');
+      } catch (e) { toast(e.message, 'err'); }
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Silme işlemleri                                                     */
+  /* ------------------------------------------------------------------ */
+  function closeModals() {
+    var kapali = $$('#modalRoot [data-modal-close]');
+    kapali.forEach(function (b) { b.click(); });
+    var r = $('#modalRoot');
+    if (r) r.innerHTML = '';
   }
 
   function modelById(id) {

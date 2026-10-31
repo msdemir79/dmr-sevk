@@ -2,6 +2,20 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v2.6.1 — 31.10.2026
+
+### Düzeltildi
+- **Cari hesaplar → Düzenle / Sil** butonları çalışmıyordu; eksik fonksiyonlar geri eklendi.
+- **Kullanıcı düzenleme, şifre sıfırlama ve kullanıcı silme** geri geldi.
+- **closeModals** geri eklendi (yedek geri yükleme ve çöp kutusu sonrası pencereler).
+- Eksik fonksiyonlar: `openCariForm`, `removeCari`, `openUserForm`, `openPasswordForm`, `removeKullanici`, `closeModals`.
+
+### Denetim
+- 59 `data-act` aksiyonunun tamamı handler’lı.
+- 9 `data-role` alanının tamamı handler’lı.
+- 18 ekran/modalda runtime hatası: **0**.
+- v1.8’e göre eksik üst düzey fonksiyon: **0**.
+
 ## v2.6.0 — 31.10.2026
 
 ### Eklendi
