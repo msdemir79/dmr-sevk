@@ -10,6 +10,7 @@ Tek bir HTML dosyası olarak çalışan, verilerini seçtiğiniz **Excel (.xlsx)
 - Renk–beden–asorti matrisi; çok renkli sipariş, asortili/açık satır, satır bazlı sevk
 - Fişte sevk edilen beden dökümü; “Açık · 9’lu”; A4/A5; beden raporu
 - A4 / A5 sevk fişi; model adı ve renk ayrı kolonlarda, büyük/belirgin yazı
+- Fiş önizlemesinde tam ekran / normal görünüm
 - Çoklu cari hesap, cari ekstre, tahsilat ve bakiye
 - Cari Hesap’ta hızlı Tahsilat ve Gider girişi; GİDER işlem türü
 - Model kartları: kategori, renk seçimi, asorti şablonu, fiyat, maliyet, barkod, sezon ve resim
@@ -63,7 +64,7 @@ Planlanan geliştirmeler ve tasarım notları: [ROADMAP.md](ROADMAP.md). Örnek:
 
 ## Sürüm
 
-Güncel sürüm: **v2.5.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
+Güncel sürüm: **v2.6.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
 
 ### Yeni sürüm çıkarma
 

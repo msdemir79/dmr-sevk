@@ -231,6 +231,22 @@ BOOT = r"""
       APP.S.view = 'ship'; APP.renderView();
       setTimeout(function () { APP.printShipment(res4.shipment.id, h === 'print-fis-a5' ? 'A5' : 'A4'); }, 250);
     }
+    if (h === 'fis-full') {
+      var omf = d.orders.filter(function (o) { return o.sipno === 72; })[0];
+      var lsf = Matris.orderLinesOf(d, omf.id);
+      APP.S.ui.shipCariId = omf.cariId;
+      APP.S.ui.cart = lsf.map(function (l) {
+        return { lineId: l.id, orderId: omf.id, cift: Matris.lineCift(l, Core.modelKart(d, omf.model)), koli: l.koli, fiyat: omf.fiyat };
+      });
+      APP.S.view = 'ship'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        document.querySelector('[data-act="ship-create"]').click();
+        setTimeout(function () {
+          var b = document.getElementById('btnPvFull');
+          if (b) b.click();
+        }, 500);
+      }, 350);
+    }
     if (h === 'ship-matris') {
       var om2 = d.orders.filter(function (o) { return o.sipno === 72; })[0];
       var ls2 = Matris.orderLinesOf(d, om2.id);

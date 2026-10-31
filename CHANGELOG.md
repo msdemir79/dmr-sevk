@@ -2,6 +2,13 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v2.6.0 — 31.10.2026
+
+### Eklendi
+- Sevk fişi önizlemesinde **Tam ekran / Normal** düğmesi.
+- Tam ekranda modal uygulama penceresini kaplar; fiş A4/A5 oranını korur.
+- A4/A5 geçişi ve yazdırma tam ekranda da çalışır.
+
 ## v2.5.0 — 31.10.2026
 
 ### Değişti

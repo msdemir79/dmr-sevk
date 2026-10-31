@@ -796,3 +796,13 @@ table.pf-main td.n { font-weight: 700; }
 @media print {
   table.pf-main th, table.pf-main td { padding: 6px 8px; font-size: 13px; }
 }
+
+
+/* --- fiş önizleme tam ekran --- */
+.modal-backdrop.screen { padding: 0; overflow: hidden; }
+.modal-backdrop.screen .modal { width: 100vw; height: 100vh; max-width: none; max-height: none; margin: 0; border-radius: 0; }
+.modal-backdrop.screen .modal-head { padding: 12px 18px; }
+.modal-backdrop.screen .modal-body { flex: 1; overflow: auto; padding: 10px 18px; background: #eef2f6; }
+.modal-backdrop.screen .preview-wrap { max-height: none; min-height: 100%; background: #eef2f6; }
+.modal-backdrop.screen .print-doc { width: 210mm; max-width: 100%; margin: 0 auto; }
+.modal-backdrop.screen .print-doc.a5 { width: 148mm; }

@@ -16,6 +16,7 @@
   }
   var ICONS = {
     grid: ic('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
+  expand: ic('<path d="M8 3H3v5"/><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M16 21h5v-5"/>'),
     box: ic('<path d="M21 8.5v7a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 15.5v-7a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8.5z"/><path d="m3.3 7.2 8.7 5 8.7-5"/><path d="M12 22V12"/>'),
     truck: ic('<path d="M14 17V5a1 1 0 0 0-1-1H2v12h12z"/><path d="M14 9h4l4 4v4h-8"/><circle cx="6" cy="18.5" r="1.8"/><circle cx="17.5" cy="18.5" r="1.8"/>'),
     wallet: ic('<path d="M20 7H5a2 2 0 0 1 0-4h13v4"/><path d="M3 5v14a2 2 0 0 0 2 2h15V7H5a2 2 0 0 0-2 2z"/><path d="M17 13h.01"/>'),
@@ -1965,9 +1966,16 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '2.5.0';
+  var SURUM = '2.6.0';
 
   var YENILIKLER = [
+    {
+      v: '2.6.0', t: '31.10.2026', m: [
+        'Sevk fişi önizlemesinde Tam ekran / Normal düğmesi',
+        'Tam ekranda modal uygulama penceresini kaplar; fiş A4 oranını korur',
+        'A4/A5 geçişi ve yazdırma tam ekranda da çalışır'
+      ]
+    },
     {
       v: '2.5.0', t: '31.10.2026', m: [
         'Sevk fişi 5 kolon: RESİM · MODEL İSMİ · RENK · KOLİ · ÇİFT',
@@ -4006,6 +4014,7 @@ function viewShipments() {
         '  <button type="button" data-paper="A4"' + (kagit === 'A4' ? ' class="active"' : '') + '>A4</button>' +
         '  <button type="button" data-paper="A5"' + (kagit === 'A5' ? ' class="active"' : '') + '>A5</button>' +
         '</div>' +
+        '<button class="btn" id="btnPvFull" aria-pressed="false">' + ICONS.expand + ' Tam ekran</button>' +
         '<button class="btn" data-modal-close>Kapat</button>' +
         '<button class="btn btn-primary" id="btnPrintDoc">' + ICONS.print + ' Yazdır</button>'
     });
@@ -4023,6 +4032,16 @@ function viewShipments() {
         setDirty(true);
       });
     });
+    var pvFull = false;
+    var btnFull = $('#btnPvFull', m.el);
+    if (btnFull) {
+      btnFull.addEventListener('click', function () {
+        pvFull = !pvFull;
+        m.el.classList.toggle('screen', pvFull);
+        btnFull.setAttribute('aria-pressed', pvFull ? 'true' : 'false');
+        btnFull.innerHTML = pvFull ? (ICONS.expand + ' Normal') : (ICONS.expand + ' Tam ekran');
+      });
+    }
     $('#btnPrintDoc', m.el).addEventListener('click', function () { m.close(); printShipment(id, kagit); });
   }
 
