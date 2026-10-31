@@ -1965,9 +1965,17 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '2.4.0';
+  var SURUM = '2.5.0';
 
   var YENILIKLER = [
+    {
+      v: '2.5.0', t: '31.10.2026', m: [
+        'Sevk fişi 5 kolon: RESİM · MODEL İSMİ · RENK · KOLİ · ÇİFT',
+        'Model adı ve renk ayrı kolonlarda, kalın ve daha büyük yazı',
+        'Fiş başlığı, firma adı ve tablo yazıları belirginleştirildi',
+        'A4 ve A5 fiş tek sayfa'
+      ]
+    },
     {
       v: '2.4.0', t: '31.10.2026', m: [
         'Sol menüde “Güncelleme kontrol et” düğmesi',
@@ -3858,7 +3866,7 @@ function viewShipments() {
     var a5 = kagit === 'A5';
     var fisCari = Core.cariById(data, s.cariId) || { ad: s.cari || '', adres: '', tel: '' };
     var lines = Core.shipmentLines(data, s.id);
-    var minRows = Math.max(a5 ? 8 : 10, lines.length);
+    var minRows = Math.max(a5 ? 6 : 8, lines.length);
     var rows = '';
     for (var i = 0; i < minRows; i++) {
       var l = lines[i];
@@ -3869,9 +3877,9 @@ function viewShipments() {
         if (src) img = '<img src="' + esc(src) + '" alt="">';
       }
       rows += '<tr><td class="imgcell">' + img + '</td>' +
-        '<td class="model">' + (l ? esc(l.model) : '') +
-        (l && (l.renk || l.mod) ? '<div style="font-weight:400;font-size:9.5px;color:#555">' + esc([l.renk, l.mod ? lineLabel(l) : ''].filter(Boolean).join(' · ')) + '</div>' : '') +
-        '</td>' +
+        '<td class="model">' + (l ? esc(l.model) : '') + '</td>' +
+        '<td class="renk">' + (l ? esc(l.renk || '') : '') +
+        (l && l.mod ? '<div class="pf-sub">' + esc(lineLabel(l)) + '</div>' : '') + '</td>' +
         '<td class="n">' + (l ? nf1(l.koli) : '') + '</td>' +
         '<td class="n">' + (l ? nf0(l.cift) : '') + '</td></tr>';
     }
@@ -3915,9 +3923,9 @@ function viewShipments() {
       '<div class="row"><span class="k">FİŞ NO</span><span class="v">' + esc(s.fisNo) + '</span></div>' +
       (s.faturaNo ? '<div class="row"><span class="k">FATURA</span><span class="v">' + esc(s.faturaNo) + (s.faturaTarih ? ' · ' + dateTR(s.faturaTarih) : '') + '</span></div>' : '') +
       '</div>' +
-      '<table class="pf-table"><thead><tr><th style="width:62px">RESİM</th><th>MODEL BİLGİLERİ</th><th style="width:74px">KOLİ</th><th style="width:74px">ÇİFT</th></tr></thead>' +
+      '<table class="pf-table pf-main"><thead><tr><th style="width:64px">RESİM</th><th style="width:34%">MODEL İSMİ</th><th style="width:18%">RENK</th><th style="width:10%">KOLİ</th><th style="width:10%">ÇİFT</th></tr></thead>' +
       '<tbody>' + rows + '</tbody>' +
-      '<tfoot><tr><td colspan="2">GENEL TOPLAM</td><td class="n">' + nf1(totalKoli) + '</td><td class="n">' + nf0(totalCift) + '</td></tr></tfoot>' +
+      '<tfoot><tr><td colspan="3">GENEL TOPLAM</td><td class="n">' + nf1(totalKoli) + '</td><td class="n">' + nf0(totalCift) + '</td></tr></tfoot>' +
       '</table>' +
       sizeTable +
       '<div class="pf-note">' + (s.aciklama ? 'Not: ' + esc(s.aciklama) : '') + '</div>' +

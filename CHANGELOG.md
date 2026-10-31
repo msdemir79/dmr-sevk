@@ -2,6 +2,16 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v2.5.0 — 31.10.2026
+
+### Değişti
+- Sevk fişi **5 kolon**: RESİM · MODEL İSMİ · RENK · KOLİ · ÇİFT.
+- Model adı ve renk ayrı kolonlarda; ikisi de kalın.
+- Tablo yazısı 13 px’e, başlıklar 11 px’e çıkarıldı; fiş başlığı ve firma adı büyütüldü.
+- A4 ve A5 fiş tek sayfa kalacak şekilde satır sayısı dengelendi.
+
+![Sevk fişi](docs/asama6-fis.png)
+
 ## v2.4.0 — 31.10.2026
 
 ### Eklendi
