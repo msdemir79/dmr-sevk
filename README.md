@@ -17,6 +17,7 @@ Tek bir HTML dosyası olarak çalışan, verilerini seçtiğiniz **Excel (.xlsx)
 - Kârlılık raporu (ciro, maliyet, kâr, marj)
 - Kullanıcı girişi, yönetici/kullanıcı rolleri, oturum kilidi
 - İşlem günlüğü, çöp kutusu (30 gün), günlük otomatik yedek (son 7 gün)
+- GitHub Releases üzerinden güncelleme kontrolü; yeni sürüm rozeti ve indirme bağlantısı
 - Toplu sevk, sipariş kopyalama, `Ctrl+K` hızlı arama, klavye ile hızlı giriş
 - Firma/marka adı ve logo ayarları, Excel'den cari aktarma
 
@@ -62,7 +63,7 @@ Planlanan geliştirmeler ve tasarım notları: [ROADMAP.md](ROADMAP.md). Örnek:
 
 ## Sürüm
 
-Güncel sürüm: **v2.3.1**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
+Güncel sürüm: **v2.4.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
 
 ### Yeni sürüm çıkarma
 

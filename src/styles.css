@@ -772,3 +772,16 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
 .color-pick-item small { color: var(--muted); font-size: 9px; }
 .color-pick-item:has(input:checked) { border-color: var(--brand); background: var(--soft); }
 .data.mini th, .data.mini td { padding: 4px 6px; font-size: 11px; }
+
+/* --- güncelleme kontrolü --- */
+.update-link { display: flex; align-items: center; gap: 6px; }
+.update-badge { background: #f59e0b; color: #fff; border-radius: 999px; padding: 1px 6px; font-size: 9px; font-weight: 800; letter-spacing: .03em; }
+.upd-state { padding: 4px 0 2px; }
+.upd-state b { font-size: 15px; }
+.upd-notes { white-space: pre-line; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 10px 0; font-size: 12px; max-height: 220px; overflow: auto; }
+.upd-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.upd-spin { width: 22px; height: 22px; border: 2px solid var(--line); border-top-color: var(--brand); border-radius: 50%; animation: updspin .9s linear infinite; margin-bottom: 8px; }
+@keyframes updspin { to { transform: rotate(360deg); } }
+
+.update-link { display: flex !important; align-items: center; gap: 6px; }
+.update-link svg { width: 13px; height: 13px; flex: 0 0 auto; }

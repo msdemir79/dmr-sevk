@@ -176,6 +176,7 @@
     user: null,
     onReady: null,
     file: { handle: null, name: '', dirty: false, lastSaved: null },
+    update: null,
     autosave: true,
     readOnly: false,
     ui: {
@@ -957,7 +958,9 @@
       '<div class="fstat muted" style="margin-top:2px">' + esc(mode) + '</div>' +
       '<button class="fsave" data-act="save">' + (S.file.dirty ? 'Kaydet' : 'Excel\'e kaydet') + '</button>' +
       '<button class="fhelp" data-act="help">Kullanım kılavuzu</button>' +
-      '<button class="fhelp" data-act="open-changelog" style="opacity:.7">Sürüm ' + SURUM + ' · yenilikler</button>';
+      '<button class="fhelp" data-act="open-changelog" style="opacity:.7">Sürüm ' + SURUM + ' · yenilikler</button>' +
+      '<button class="fhelp update-link" data-act="check-update">' + ICONS.refresh + ' Güncelleme kontrol et' +
+      (S.update && S.update.isNew ? ' <span class="update-badge">YENİ</span>' : '') + '</button>';
   }
 
   function updateChrome() {
@@ -1124,6 +1127,7 @@
         case 'open-backups': openBackups(); break;
         case 'open-health': openHealth(false); break;
         case 'open-changelog': openChangelog(); break;
+        case 'check-update': checkUpdates(true); break;
         case 'go-models': go('models'); break;
         case 'backup-now':
           try { backupSnapshot(writeBytes(), true).then(function (ok) { toast(ok ? 'Yedek alındı' : 'Yedek alınamadı', ok ? 'ok' : 'err'); }); }
@@ -1172,6 +1176,7 @@
     } else {
       setTimeout(function () { try { openHealth(true); } catch (e) { } }, 1100);
     }
+    setTimeout(initUpdateCheck, 1600);
   }
 
   function showUpgradeNotice() {
@@ -1960,9 +1965,18 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '2.3.1';
+  var SURUM = '2.4.0';
 
   var YENILIKLER = [
+    {
+      v: '2.4.0', t: '31.10.2026', m: [
+        'Sol menüde “Güncelleme kontrol et” düğmesi',
+        'GitHub Releases üzerinden son sürüm kontrolü; token gerekmez',
+        'Yeni sürüm rozeti, sürüm notları ve DMR_SEVK.html indirme bağlantısı',
+        'Günde bir otomatik sessiz kontrol; çevrimdışıyken uygulama etkilenmez',
+        'Depo public; otomatik indirme/çalıştırma yok'
+      ]
+    },
     {
       v: '2.3.1', t: '31.10.2026', m: [
         'Model kartına resim ekleme düzeltildi (imageToDataUrl geri eklendi)',
@@ -2272,6 +2286,130 @@ function viewShipments() {
         (issues.length > 40 ? '<p class="muted small">… ve ' + (issues.length - 40) + ' uyarı daha</p>' : ''),
       footer: '<button class="btn" data-modal-close>Kapat</button>' +
         '<button class="btn btn-primary" data-act="backup-file">' + ICONS.shield + ' Yedek indir</button>'
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Güncelleme kontrolü (public GitHub Releases)                        */
+  /* ------------------------------------------------------------------ */
+  var UPDATE_REPO = 'msdemir79/dmr-sevk';
+  var UPDATE_API = 'https://api.github.com/repos/' + UPDATE_REPO + '/releases/latest';
+  var UPDATE_KEY = 'dmr:update';
+
+  function verParts(v) {
+    return String(v || '').replace(/^v/i, '').split('.').map(function (x) { return parseInt(x, 10) || 0; });
+  }
+
+  function verNewer(latest, current) {
+    var a = verParts(latest), b = verParts(current);
+    for (var i = 0; i < 3; i++) {
+      if ((a[i] || 0) > (b[i] || 0)) return true;
+      if ((a[i] || 0) < (b[i] || 0)) return false;
+    }
+    return false;
+  }
+
+  function loadUpdateCache() {
+    try {
+      var u = JSON.parse(localStorage.getItem(UPDATE_KEY) || 'null');
+      if (u && u.tag) return u;
+    } catch (e) { }
+    return null;
+  }
+
+  function saveUpdateCache(u) {
+    try { localStorage.setItem(UPDATE_KEY, JSON.stringify(u)); } catch (e) { }
+  }
+
+  function safeReleaseUrl(url) {
+    var base = 'https://github.com/' + UPDATE_REPO + '/releases/';
+    return String(url || '').indexOf(base) === 0 ? String(url) : ('https://github.com/' + UPDATE_REPO + '/releases');
+  }
+
+  function initUpdateCheck() {
+    var u = loadUpdateCache();
+    if (u) {
+      u.isNew = verNewer(u.tag, SURUM);
+      S.update = u;
+      try { updateFileChip(); } catch (e) { }
+      if (Date.now() - (u.checked || 0) < 24 * 60 * 60 * 1000) return;
+    }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    checkUpdates(false);
+  }
+
+  function updateResultHtml(u, error, checking) {
+    if (checking) return '<div class="upd-state"><div class="upd-spin"></div><b>Kontrol ediliyor…</b><p class="muted small">GitHub Releases üzerinden son sürüm okunuyor.</p></div>';
+    if (error) {
+      return '<div class="upd-state"><b>Kontrol edilemedi</b><p class="muted small">' + esc(error) + '</p>' +
+        '<p class="muted small">İnternet bağlantınızı kontrol edin veya GitHub Releases sayfasını açın.</p></div>';
+    }
+    if (!u) return '';
+    if (u.isNew) {
+      return '<div class="upd-state ok"><b>Yeni sürüm v' + esc(u.tag) + '</b>' +
+        (u.published ? '<p class="muted small">' + esc(dateTR(String(u.published).slice(0, 10))) + '</p>' : '') +
+        '<div class="upd-notes">' + esc(u.body || 'Sürüm notu yok.') + '</div>' +
+        '<div class="upd-actions">' +
+        (u.asset ? '<a class="btn btn-primary" href="' + esc(u.asset) + '" target="_blank" rel="noopener noreferrer">' + ICONS.download + ' DMR_SEVK.html indir</a>' : '') +
+        '<a class="btn" href="' + esc(safeReleaseUrl(u.url)) + '" target="_blank" rel="noopener noreferrer">GitHub Releases</a>' +
+        '</div></div>';
+    }
+    return '<div class="upd-state ok"><b>Güncel sürümdesiniz</b><p class="muted small">Sürüm ' + esc(SURUM) + ' · son kontrol ' + timeTR(new Date()) + '</p>' +
+      '<div class="upd-actions"><a class="btn" href="https://github.com/' + UPDATE_REPO + '/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a></div></div>';
+  }
+
+  function checkUpdates(manual) {
+    if (S.update && S.update.checking) return;
+    var m = null;
+    if (manual) {
+      m = openModal({
+        title: 'Güncelleme kontrolü',
+        subtitle: 'GitHub Releases · public depo',
+        body: '<div id="updBody">' + updateResultHtml(null, null, true) + '</div>',
+        footer: '<button class="btn" data-modal-close>Kapat</button>' +
+          '<a class="btn" href="https://github.com/' + UPDATE_REPO + '/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a>'
+      });
+    }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      if (m) $('#updBody', m.el).innerHTML = updateResultHtml(null, 'İnternet bağlantısı yok.', false);
+      return;
+    }
+    S.update = Object.assign({}, S.update || {}, { checking: true });
+    var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 7000);
+    fetch(UPDATE_API, {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/vnd.github+json' },
+      signal: ctrl ? ctrl.signal : undefined
+    }).then(function (res) {
+      if (!res.ok) throw new Error('GitHub yanıtı: HTTP ' + res.status);
+      return res.json();
+    }).then(function (j) {
+      clearTimeout(timer);
+      var latest = String(j.tag_name || '').replace(/^v/i, '');
+      if (!latest) throw new Error('Sürüm etiketi okunamadı.');
+      var asset = (j.assets || []).filter(function (a) { return a.name === 'DMR_SEVK.html'; })[0];
+      var assetUrl = asset ? String(asset.browser_download_url || '') : '';
+      if (assetUrl && assetUrl.indexOf('https://github.com/' + UPDATE_REPO + '/releases/download/') !== 0) assetUrl = '';
+      var u = {
+        tag: latest,
+        checked: Date.now(),
+        isNew: verNewer(latest, SURUM),
+        url: safeReleaseUrl(j.html_url),
+        asset: assetUrl,
+        body: String(j.body || ''),
+        published: j.published_at || ''
+      };
+      S.update = u;
+      saveUpdateCache(u);
+      updateFileChip();
+      if (m) $('#updBody', m.el).innerHTML = updateResultHtml(u, null, false);
+      if (!manual && u.isNew) toast('Yeni sürüm v' + u.tag + ' hazır · sol menüden kontrol edin', '');
+    }).catch(function (err) {
+      clearTimeout(timer);
+      var msg = err && err.name === 'AbortError' ? 'GitHub yanıt vermedi (zaman aşımı).' : (err && err.message ? err.message : 'Bağlantı hatası.');
+      S.update = Object.assign({}, S.update || {}, { checking: false });
+      if (m) $('#updBody', m.el).innerHTML = updateResultHtml(null, msg, false);
     });
   }
 

@@ -134,6 +134,36 @@ BOOT = r"""
     if (h === 'all-dashboard') { APP.S.ui.cariId = 0; APP.updateChrome(); APP.renderView(); }
     if (h === 'cariler') { APP.S.view = 'cariler'; APP.updateChrome(); APP.renderView(); }
     if (h === 'settings') { APP.S.view = 'settings'; APP.updateChrome(); APP.renderView(); }
+    if (h === 'check-update-new') {
+      APP.S.view = 'dashboard'; APP.updateChrome(); APP.renderView();
+      var gercekFetch = window.fetch;
+      window.fetch = function () {
+        return Promise.resolve({
+          ok: true,
+          json: function () {
+            return Promise.resolve({
+              tag_name: 'v9.9.9',
+              html_url: 'https://github.com/msdemir79/dmr-sevk/releases/tag/v9.9.9',
+              body: 'Test sürüm notu.\nYeni özellikler burada görünür.',
+              published_at: '2026-10-31T18:00:00Z',
+              assets: [{ name: 'DMR_SEVK.html', browser_download_url: 'https://github.com/msdemir79/dmr-sevk/releases/download/v9.9.9/DMR_SEVK.html' }]
+            });
+          }
+        });
+      };
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="check-update"]');
+        if (b) b.click();
+      }, 250);
+      setTimeout(function () { window.fetch = gercekFetch; }, 3000);
+    }
+    if (h === 'check-update') {
+      APP.S.view = 'dashboard'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="check-update"]');
+        if (b) b.click();
+      }, 250);
+    }
     if (h === 'ledger-gider-save') {
       APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView();
       setTimeout(function () {

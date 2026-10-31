@@ -2,6 +2,15 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v2.4.0 — 31.10.2026
+
+### Eklendi
+- Sol menüde **“Güncelleme kontrol et”** düğmesi.
+- **GitHub Releases** üzerinden son sürüm kontrolü (public depo, token yok).
+- Yeni sürüm rozeti, sürüm notları ve **DMR_SEVK.html indir** bağlantısı.
+- Günde bir otomatik sessiz kontrol; çevrimdışıyken uygulama etkilenmez.
+- Otomatik indirme/çalıştırma yok; kullanıcı dosyayı kendisi indirir.
+
 ## v2.3.1 — 31.10.2026
 
 ### Düzeltildi
