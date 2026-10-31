@@ -290,6 +290,29 @@ BOOT = r"""
         }, 200);
       }, 250);
     }
+    if (h === 'model-image-save') {
+      APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var mm = d.modeller.filter(function (m) { return m.model === '6049'; })[0];
+        var b = mm ? document.querySelector('[data-act="model-edit"][data-id="' + mm.id + '"]') : null;
+        if (b) b.click();
+        setTimeout(function () {
+          var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><rect width="300" height="300" fill="#0f766e"/><circle cx="150" cy="120" r="55" fill="#fbbf24"/><text x="150" y="240" font-size="42" text-anchor="middle" fill="white" font-family="Arial">IMG</text></svg>';
+          var f = new File([svg], 'test.svg', { type: 'image/svg+xml' });
+          var dt = new DataTransfer();
+          dt.items.add(f);
+          var inp = document.getElementById('mfImage');
+          if (inp) {
+            inp.files = dt.files;
+            inp.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          setTimeout(function () {
+            var form = document.getElementById('modelForm');
+            if (form) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+          }, 700);
+        }, 250);
+      }, 160);
+    }
     if (h === 'model-color-shortcut') {
       APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
       setTimeout(function () {

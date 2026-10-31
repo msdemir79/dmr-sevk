@@ -2,6 +2,13 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v2.3.1 — 31.10.2026
+
+### Düzeltildi
+- **Model kartına resim ekleme** çalışmıyordu; eksik `imageToDataUrl` fonksiyonu geri eklendi.
+- Resim seçilince küçük önizleme oluşur; kaydedince model listesinde görünür.
+- Sipariş resmi ve logo yükleme aynı düzeltmeden yararlanır.
+
 ## v2.3.0 — 31.10.2026
 
 ### Eklendi

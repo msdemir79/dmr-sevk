@@ -6161,9 +6161,16 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '2.3.0';
+  var SURUM = '2.3.1';
 
   var YENILIKLER = [
+    {
+      v: '2.3.1', t: '31.10.2026', m: [
+        'Model kartına resim ekleme düzeltildi (imageToDataUrl geri eklendi)',
+        'Resim seçilince küçük önizleme oluşur ve model listesinde görünür',
+        'Sipariş resmi ve logo yükleme de aynı düzeltmeden yararlanır'
+      ]
+    },
     {
       v: '2.3.0', t: '31.10.2026', m: [
         'Cari Hesap ekranında Tahsilat ve Gider hızlı işlem butonları',
@@ -7591,6 +7598,37 @@ function viewShipments() {
         toast('Sipariş silindi (çöp kutusundan geri alınabilir)', 'ok');
       } catch (e) { toast(e.message, 'err'); }
     });
+  }
+
+  function imageToDataUrl(file, cb) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var max = 340;
+        var w = img.width, h = img.height;
+        var scale = Math.min(1, max / Math.max(w, h));
+        w = Math.max(1, Math.round(w * scale)); h = Math.max(1, Math.round(h * scale));
+        var c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        var ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        var q = 0.74, out = c.toDataURL('image/jpeg', q);
+        while (out.length > 30000 && q > 0.32) { q -= 0.08; out = c.toDataURL('image/jpeg', q); }
+        while (out.length > 31000 && w > 90) {
+          w = Math.round(w * 0.8); h = Math.round(h * 0.8);
+          var c2 = document.createElement('canvas');
+          c2.width = w; c2.height = h;
+          c2.getContext('2d').drawImage(c, 0, 0, w, h);
+          c = c2;
+          out = c.toDataURL('image/jpeg', 0.6);
+        }
+        cb(out);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
   }
 
   var YON_DEFAULT = { 'SATIŞ': 'BORC', 'TAHSİLAT': 'ALACAK', 'ALIŞ': 'ALACAK', 'GİDER': 'BORC', 'GELİR': 'ALACAK', 'DEVRİ': 'BORC', 'DİĞER': 'BORC' };
