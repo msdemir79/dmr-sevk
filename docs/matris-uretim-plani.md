@@ -1,8 +1,12 @@
 # Renk–beden–asorti matrisi — üretim planı
 
-**Durum:** Tasarım ve prototip tamam (v3). Üretim kodu henüz yazılmadı.
+**Durum:** Aşama 1–3 tamamlandı; aşama 4 (beden raporu + sürüm) v2.0.0 release candidate olarak hazır. Kullanıcı testi/onayı bekliyor. `main`/v1.8.0 etkilenmedi.
 **Hedef sürüm:** v2.0.0 (veri şeması değişiyor).
 **Prototip:** [`prototype/matris.html`](../prototype/matris.html) · **Issue:** [#1](https://github.com/msdemir79/dmr-sevk/issues/1)
+
+**Aşama 3 çıktısı:** satır bazlı sevk, fişte yalnızca sevk edilen bedenler ve “Açık · 9’lu”.
+
+![Sevk fişi — renk/beden dökümü](asama3-fis.png)
 
 ## 1. Veri modeli
 

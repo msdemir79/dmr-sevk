@@ -8,6 +8,14 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
+  var Matris = null;
+  if (typeof module === 'object' && module.exports && typeof require === 'function') {
+    try { Matris = require('./matris.js'); } catch (e) { Matris = null; }
+  } else {
+    Matris = (typeof globalThis !== 'undefined' && globalThis.Matris) || null;
+  }
+  if (!Matris) throw new Error('matris.js yüklenmedi');
+
   var TYPES = { SATIS: 'SATIŞ', TAHSILAT: 'TAHSİLAT', ALIS: 'ALIŞ', GELIR: 'GELİR', DEVIR: 'DEVRİ', DIGER: 'DİĞER' };
 
   var SHEET = {
@@ -16,6 +24,7 @@
     MODELLER: 'MODEL KARTLARI',
     MODEL_IMAGES: 'MODEL RESİMLERİ',
     ORDERS: 'SİPARİŞLER',
+    ORDER_LINES: 'SİPARİŞ SATIRLARI',
     LEDGER: 'CARİ HESAP',
     SHIPMENTS: 'SEVK FİŞLERİ',
     LINES: 'SEVK SATIRLARI',
@@ -146,7 +155,7 @@
 
   function emptyData() {
     return {
-      cariler: [], kullanicilar: [], modeller: [], orders: [], ledger: [], shipments: [],
+      cariler: [], kullanicilar: [], modeller: [], orders: [], orderLines: [], ledger: [], shipments: [],
       lines: [], audit: [], trash: [], images: {}, modelImages: {}, settings: defaultSettings()
     };
   }
@@ -332,16 +341,34 @@
     return map;
   }
 
+  function lineInfo(data, line, kart) {
+    if (!line) return { toplam: 0, giden: 0, kalan: 0, koli: 0, kalanKoli: 0 };
+    var order = (data.orders || []).filter(function (o) { return o.id === line.orderId; })[0] || null;
+    var k = kart || (order ? modelKart(data, order.model) : null);
+    var toplam = num(line.cift) || Matris.lineCift(line, k);
+    var giden = (data.lines || []).filter(function (l) { return num(l.orderLineId) === line.id; })
+      .reduce(function (a, l) { return a + num(l.cift); }, 0);
+    var kalan = Math.max(0, toplam - giden);
+    var koli = num(line.koli) || (kalan ? toplam / (num(line.koliIci) || 1) : 0);
+    return {
+      line: line, order: order, kart: k, toplam: toplam, giden: giden, kalan: kalan,
+      koli: koli, kalanKoli: toplam ? kalan * (koli / toplam) : 0
+    };
+  }
+
   function orderInfo(data, order, shipped) {
     var giden = (shipped || shippedMap(data))[order.id] || 0;
-    var adet = num(order.adet);
+    var satirlar = (data.orderLines || []).filter(function (l) { return l.orderId === order.id; });
+    var toplam = satirlar.length ? Matris.orderTotals(data, order.id) : null;
+    var adet = toplam && toplam.cift ? toplam.cift : num(order.adet);
+    var koli = toplam && toplam.koli ? toplam.koli : adet / (num(order.asorti) || 1);
     var kalan = Math.max(0, adet - giden);
-    var asorti = num(order.asorti) || 1;
+    var kalanKoli = adet ? kalan * (koli / adet) : 0;
     return {
       giden: giden,
       kalan: kalan,
-      kalanKoli: kalan / asorti,
-      koli: adet / asorti,
+      kalanKoli: kalanKoli,
+      koli: koli,
       tutar: round2(adet * num(order.fiyat)),
       kalanTutar: round2(kalan * num(order.fiyat)),
       durum: kalan <= 0 ? 'TAMAMLANDI' : (giden > 0 ? 'KISMİ' : 'AÇIK')
@@ -471,6 +498,7 @@
     if (!order.sipno) order.sipno = nextOrderNo(data);
     if (order.sipno > num(data.settings.sonSiparisNo)) data.settings.sonSiparisNo = order.sipno;
     data.orders.push(order);
+    Matris.ensureLines(data);
     if (input.resim) data.images[order.id] = String(input.resim);
     return order;
   }
@@ -499,6 +527,7 @@
     if (!order) return;
     trashPush(data, kullanici, 'siparis', order.model + ' · #' + order.sipno, { order: order, image: data.images[id] || '' });
     data.orders = data.orders.filter(function (o) { return o.id !== id; });
+    data.orderLines = (data.orderLines || []).filter(function (l) { return l.orderId !== id; });
     delete data.images[id];
   }
 
@@ -551,17 +580,41 @@
       var fiyat = item.fiyat !== undefined && item.fiyat !== '' ? num(item.fiyat) : num(order.fiyat);
       var tutar = round2(cift * fiyat);
       var koli = num(item.koli) || cift / (num(order.asorti) || 1);
+      var ols2 = (data.orderLines || []).filter(function (x) { return x.orderId === order.id; });
+      if (!item.orderLineId && ols2.length > 1) throw new Error(order.model + ' için renk/beden satırı seçin.');
+      var ol2 = item.orderLineId ? ols2.filter(function (x) { return x.id === item.orderLineId; })[0] : ols2[0];
+      if (ol2 && ol2.mod !== 'ESKI' && Math.abs(koli - Math.round(koli)) > 0.001) throw new Error('Koli tam sayı olmalı.');
+      if (ol2) {
+        var satirToplam = num(ol2.cift) || Matris.lineCift(ol2, modelKart(data, order.model));
+        var satirGiden = data.lines.filter(function (l) { return num(l.orderLineId) === ol2.id; })
+          .concat(lines.filter(function (l) { return num(l.orderLineId) === ol2.id; }))
+          .reduce(function (a, l) { return a + num(l.cift); }, 0);
+        var satirKalan = satirToplam - satirGiden;
+        if (cift > satirKalan + 0.001) {
+          throw new Error((ol2.renk || order.model) + (ol2.mod === 'ACIK' && ol2.beden ? ' / ' + ol2.beden : '') + ' satırında kalan ' + satirKalan + ' çift; ' + cift + ' çift sevk edilemez.');
+        }
+      }
+      var dag2 = {};
+      if (ol2) {
+        var gecici = Object.assign({}, ol2, { koli: koli, cift: cift });
+        dag2 = Matris.lineDagilim(gecici, modelKart(data, order.model));
+      }
 
       lines.push({
         id: 0,
         sevkId: id,
         orderId: order.id,
+        orderLineId: ol2 ? ol2.id : 0,
         model: order.model,
-        renk: order.renk,
+        renk: ol2 ? (ol2.renk || order.renk) : order.renk,
+        beden: ol2 ? num(ol2.beden) : 0,
+        mod: ol2 ? (ol2.mod || 'ESKI') : 'ESKI',
+        koliIci: ol2 ? num(ol2.koliIci) : num(order.asorti),
         koli: Math.round(koli * 1000) / 1000,
         cift: cift,
         fiyat: fiyat,
-        tutar: tutar
+        tutar: tutar,
+        dagilim: dag2
       });
 
       ledger.push({
@@ -571,8 +624,8 @@
         fisNo: String(fisNo),
         sipno: String(order.sipno || ''),
         islem: TYPES.SATIS,
-        aciklama: order.model + (order.renk ? ' / ' + order.renk : ''),
-        renk: order.renk || '',
+        aciklama: order.model + ((ol2 ? ol2.renk : order.renk) ? ' / ' + (ol2 ? ol2.renk : order.renk) : ''),
+        renk: (ol2 ? ol2.renk : order.renk) || '',
         koli: Math.round(koli * 1000) / 1000,
         cift: cift,
         fiyat: fiyat,
@@ -610,8 +663,13 @@
         id: l.id,
         sevkId: l.sevkId,
         orderId: l.orderId,
+        orderLineId: num(l.orderLineId),
         model: l.model || (o && o.model) || '',
         renk: l.renk || (o && o.renk) || '',
+        beden: num(l.beden),
+        mod: l.mod || '',
+        koliIci: num(l.koliIci),
+        dagilim: l.dagilim || {},
         koli: num(l.koli),
         cift: num(l.cift),
         fiyat: num(l.fiyat),
@@ -667,7 +725,20 @@
       var fiyat = item.fiyat !== undefined && item.fiyat !== '' ? num(item.fiyat) : num(order.fiyat);
       var tutar = round2(cift * fiyat);
       var koli = num(item.koli) || cift / (num(order.asorti) || 1);
-      data.lines.push({ id: nextId(data.lines), sevkId: id, orderId: order.id, model: order.model, renk: order.renk, koli: koli, cift: cift, fiyat: fiyat, tutar: tutar });
+      var ols2 = (data.orderLines || []).filter(function (x) { return x.orderId === order.id; });
+      var ol2 = item.orderLineId ? ols2.filter(function (x) { return x.id === item.orderLineId; })[0] : ols2[0];
+      var dag2 = {};
+      if (ol2) {
+        var gecici = Object.assign({}, ol2, { koli: koli, cift: cift });
+        dag2 = Matris.lineDagilim(gecici, modelKart(data, order.model));
+      }
+      data.lines.push({
+        id: nextId(data.lines), sevkId: id, orderId: order.id, orderLineId: ol2 ? ol2.id : 0,
+        model: order.model, renk: ol2 ? (ol2.renk || order.renk) : order.renk,
+        beden: ol2 ? num(ol2.beden) : 0, mod: ol2 ? (ol2.mod || 'ESKI') : 'ESKI',
+        koliIci: ol2 ? num(ol2.koliIci) : num(order.asorti),
+        koli: koli, cift: cift, fiyat: fiyat, tutar: tutar, dagilim: dag2
+      });
       data.ledger.push({
         id: nextId(data.ledger), cariId: shipment.cariId, tarih: shipment.tarih, fisNo: String(shipment.fisNo), sipno: String(order.sipno || ''),
         islem: TYPES.SATIS, aciklama: order.model + (order.renk ? ' / ' + order.renk : ''), renk: order.renk || '',
@@ -757,9 +828,13 @@
   /* Model kartları                                                      */
   /* ------------------------------------------------------------------ */
   function normalizeModel(input) {
+    var m = Matris.normalizeKart(input);
     return {
       id: num(input.id),
       model: String(input.model || '').trim(),
+      kategori: m.kategori,
+      renkler: m.renkler,
+      asortiSablon: m.asortiSablon,
       fiyat: input.fiyat === '' || input.fiyat === undefined || input.fiyat === null ? 0 : num(input.fiyat),
       maliyet: input.maliyet === '' || input.maliyet === undefined || input.maliyet === null ? 0 : num(input.maliyet),
       asorti: input.asorti === '' || input.asorti === undefined || input.asorti === null ? 0 : num(input.asorti),
@@ -828,6 +903,46 @@
   }
 
   /** Aylık ciro / maliyet / kâr (sevk satırlarından). */
+  /**
+   * Sevk edilen beden dökümü: ay + cari filtresi.
+   * Yalnızca dagilim snapshot'ı olan satırlar (matris/renk-beden) girer.
+   */
+  function sizeReport(data, ay, cariId) {
+    var shipIds = {};
+    (data.shipments || []).forEach(function (s) {
+      if (ay && String(s.tarih || '').slice(0, 7) !== ay) return;
+      if (cariId && s.cariId !== cariId) return;
+      shipIds[s.id] = 1;
+    });
+    var groups = {}, sizeSet = {};
+    (data.lines || []).forEach(function (l) {
+      if (!shipIds[l.sevkId]) return;
+      var d = l.dagilim || {};
+      if (!Object.keys(d).length) return;
+      var key = normKey(l.model) + '|' + normKey(l.renk);
+      if (!groups[key]) groups[key] = { model: l.model || '', renk: l.renk || '', map: {}, toplam: 0 };
+      Object.keys(d).forEach(function (sz) {
+        var q = num(d[sz]);
+        if (!q) return;
+        var s2 = String(Math.round(num(sz)));
+        groups[key].map[s2] = round2((groups[key].map[s2] || 0) + q);
+        groups[key].toplam = round2(groups[key].toplam + q);
+        sizeSet[s2] = 1;
+      });
+    });
+    var sizes = Object.keys(sizeSet).map(Number).sort(function (a, b) { return a - b; });
+    var rows = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) {
+      var am = normKey(a.model), bm = normKey(b.model);
+      if (am !== bm) return am < bm ? -1 : 1;
+      return normKey(a.renk) < normKey(b.renk) ? -1 : 1;
+    });
+    var totals = {};
+    rows.forEach(function (r) {
+      sizes.forEach(function (sz) { totals[sz] = round2((totals[sz] || 0) + num(r.map[sz])); });
+    });
+    return { rows: rows, sizes: sizes, totals: totals, toplam: rows.reduce(function (a, r) { return a + r.toplam; }, 0) };
+  }
+
   function profitReport(data, from, to, cariId) {
     var byMonth = {};
     var kartByKey = {};
@@ -999,6 +1114,7 @@
   }
 
   function buildWorkbook(data) {
+    Matris.ensureLines(data);
     var shipped = shippedMap(data);
 
     var cariRows = data.cariler.map(function (c) {
@@ -1037,7 +1153,8 @@
     });
 
     var lineRows = data.lines.map(function (l) {
-      return [l.id, l.sevkId, l.orderId, l.model, l.renk, money(l.koli), money(l.cift), money(l.fiyat), money(l.tutar)];
+      return [l.id, l.sevkId, l.orderId, l.orderLineId || 0, l.model, l.renk, num(l.beden), l.mod || '',
+        money(l.koli), money(l.koliIci), money(l.cift), money(l.fiyat), money(l.tutar), Matris.formatDagilim(l.dagilim)];
     });
 
     var imageRows = Object.keys(data.images).map(function (k) { return [num(k), data.images[k]]; });
@@ -1047,7 +1164,16 @@
     });
 
     var modelRows = (data.modeller || []).map(function (m) {
-      return [m.id, m.model, money(m.fiyat), num(m.asorti) || '', money(m.maliyet), m.barkod || '', m.sezon || '', m.not || ''];
+      return [m.id, m.model, m.kategori || '', Matris.formatRenkler(m.renkler), money(m.fiyat), num(m.asorti) || '',
+        Matris.formatAsorti(m.asortiSablon), money(m.maliyet), m.barkod || '', m.sezon || '', m.not || ''];
+    });
+
+    var orderById = {};
+    data.orders.forEach(function (o) { orderById[o.id] = o; });
+    var orderLineRows = (data.orderLines || []).map(function (l) {
+      var o = orderById[l.orderId];
+      var kart = o ? modelKart(data, o.model) : null;
+      return [l.id, l.orderId, l.renk || '', l.mod || '', num(l.beden), money(l.koli), money(l.koliIci), money(Matris.lineCift(l, kart))];
     });
 
     var modelImageRows = Object.keys(data.modelImages || {}).map(function (k) { return [num(k), data.modelImages[k]]; });
@@ -1086,9 +1212,10 @@
         {
           name: SHEET.MODELLER,
           columns: [
-            { header: 'ID', width: 6 }, { header: 'MODEL', width: 38 }, { header: 'FİYAT', width: 12 },
-            { header: 'ASORTİ', width: 9 }, { header: 'MALİYET', width: 12 }, { header: 'BARKOD', width: 18 },
-            { header: 'SEZON', width: 12 }, { header: 'NOT', width: 30 }
+            { header: 'ID', width: 6 }, { header: 'MODEL', width: 38 }, { header: 'KATEGORİ', width: 11 },
+            { header: 'RENKLER', width: 30 }, { header: 'FİYAT', width: 11 }, { header: 'ASORTİ', width: 8 },
+            { header: 'ASORTİ ŞABLONU', width: 24 }, { header: 'MALİYET', width: 11 },
+            { header: 'BARKOD', width: 18 }, { header: 'SEZON', width: 10 }, { header: 'NOT', width: 26 }
           ],
           rows: modelRows
         },
@@ -1105,6 +1232,15 @@
             { header: 'KOD', width: 18 }, { header: 'NOT', width: 28 }
           ],
           rows: orderRows
+        },
+        {
+          name: SHEET.ORDER_LINES,
+          columns: [
+            { header: 'ID', width: 6 }, { header: 'SİPARİŞ ID', width: 10 }, { header: 'RENK', width: 18 },
+            { header: 'MOD', width: 10 }, { header: 'BEDEN', width: 8 }, { header: 'KOLİ', width: 9 },
+            { header: 'KOLİ İÇİ', width: 9 }, { header: 'ÇİFT', width: 10 }
+          ],
+          rows: orderLineRows
         },
         {
           name: SHEET.LEDGER,
@@ -1133,8 +1269,10 @@
           name: SHEET.LINES,
           columns: [
             { header: 'ID', width: 6 }, { header: 'SEVK ID', width: 8 }, { header: 'SİPARİŞ ID', width: 11 },
-            { header: 'MODEL', width: 38 }, { header: 'RENK', width: 16 }, { header: 'KOLİ', width: 9 },
-            { header: 'ÇİFT', width: 9 }, { header: 'FİYAT', width: 11 }, { header: 'TUTAR', width: 13 }
+            { header: 'SİPARİŞ SATIR ID', width: 12 }, { header: 'MODEL', width: 34 }, { header: 'RENK', width: 16 },
+            { header: 'BEDEN', width: 8 }, { header: 'MOD', width: 10 }, { header: 'KOLİ', width: 8 },
+            { header: 'KOLİ İÇİ', width: 9 }, { header: 'ÇİFT', width: 8 }, { header: 'FİYAT', width: 10 },
+            { header: 'TUTAR', width: 12 }, { header: 'DAĞILIM', width: 30 }
           ],
           rows: lineRows
         },
@@ -1188,6 +1326,7 @@
   };
   var MODEL_KEYS = {
     ID: 'id', MODEL: 'model', MODELBILGISI: 'model', FIYAT: 'fiyat', ASORTI: 'asorti', MALIYET: 'maliyet',
+    KATEGORI: 'kategori', RENKLER: 'renkler', ASORTISABLONU: 'asortiSablon',
     BARKOD: 'barkod', SEZON: 'sezon', NOT: 'not'
   };
   var ORDER_KEYS = {
@@ -1205,7 +1344,8 @@
     KOD: 'kod', SEVKFISNO: 'sevkFisNo'
   };
   var SHIPMENT_KEYS = { ID: 'id', CARIID: 'cariId', CARI: 'cariName', FISNO: 'fisNo', TARIH: 'tarih', ACIKLAMA: 'aciklama', FATURANO: 'faturaNo', FATURATARIH: 'faturaTarih', KOLI: 'koli', CIFT: 'cift', TUTAR: 'tutar' };
-  var LINE_KEYS = { ID: 'id', SEVKID: 'sevkId', SEVKFISNO: 'sevkId', SIPARISID: 'orderId', MODEL: 'model', RENK: 'renk', KOLI: 'koli', CIFT: 'cift', FIYAT: 'fiyat', TUTAR: 'tutar' };
+  var ORDER_LINE_KEYS = { ID: 'id', SIPARISID: 'orderId', RENK: 'renk', MOD: 'mod', BEDEN: 'beden', KOLI: 'koli', KOLIICI: 'koliIci', CIFT: 'cift' };
+  var LINE_KEYS = { ID: 'id', SEVKID: 'sevkId', SEVKFISNO: 'sevkId', SIPARISID: 'orderId', SIPARISSATIRID: 'orderLineId', ORDERLINEID: 'orderLineId', MODEL: 'model', RENK: 'renk', BEDEN: 'beden', MOD: 'mod', KOLI: 'koli', KOLIICI: 'koliIci', CIFT: 'cift', FIYAT: 'fiyat', TUTAR: 'tutar', DAGILIM: 'dagilim' };
 
   function headerMap(row, keys) {
     var map = {};
@@ -1329,6 +1469,9 @@
         data.modeller.push(normalizeModel({
           id: num(pick(mrow, mkm, 'id')) || nextId(data.modeller),
           model: mname,
+          kategori: pick(mrow, mkm, 'kategori'),
+          renkler: pick(mrow, mkm, 'renkler'),
+          asortiSablon: pick(mrow, mkm, 'asortiSablon'),
           fiyat: pick(mrow, mkm, 'fiyat'),
           asorti: pick(mrow, mkm, 'asorti'),
           maliyet: pick(mrow, mkm, 'maliyet'),
@@ -1409,6 +1552,26 @@
       }
     }
 
+    // --- sipariş satırları
+    var ols = sheetByName(sheets, SHEET.ORDER_LINES);
+    if (ols) {
+      var olm = headerMap(ols.rows[0], ORDER_LINE_KEYS);
+      for (var oli = 1; oli < ols.rows.length; oli++) {
+        var olrow = ols.rows[oli];
+        if (!olrow || !num(pick(olrow, olm, 'orderId'))) continue;
+        data.orderLines.push({
+          id: num(pick(olrow, olm, 'id')) || nextId(data.orderLines),
+          orderId: num(pick(olrow, olm, 'orderId')),
+          renk: String(pick(olrow, olm, 'renk') || ''),
+          mod: String(pick(olrow, olm, 'mod') || 'ESKI'),
+          beden: num(pick(olrow, olm, 'beden')),
+          koli: num(pick(olrow, olm, 'koli')),
+          koliIci: num(pick(olrow, olm, 'koliIci')),
+          cift: num(pick(olrow, olm, 'cift'))
+        });
+      }
+    }
+
     // --- sevk fişleri / satırları
     var ss = sheetByName(sheets, SHEET.SHIPMENTS);
     if (ss) {
@@ -1443,8 +1606,13 @@
           id: num(pick(lrow2, lmm, 'id')) || nextId(data.lines),
           sevkId: num(pick(lrow2, lmm, 'sevkId')),
           orderId: num(pick(lrow2, lmm, 'orderId')),
+          orderLineId: num(pick(lrow2, lmm, 'orderLineId')),
           model: String(pick(lrow2, lmm, 'model') || ''),
           renk: String(pick(lrow2, lmm, 'renk') || ''),
+          beden: num(pick(lrow2, lmm, 'beden')),
+          mod: String(pick(lrow2, lmm, 'mod') || ''),
+          koliIci: num(pick(lrow2, lmm, 'koliIci')),
+          dagilim: Matris.parseDagilim(pick(lrow2, lmm, 'dagilim')),
           koli: num(pick(lrow2, lmm, 'koli')),
           cift: num(pick(lrow2, lmm, 'cift')),
           fiyat: num(pick(lrow2, lmm, 'fiyat')),
@@ -1509,6 +1677,8 @@
         });
       }
     }
+
+    Matris.ensureLines(data);
 
     data.settings.sonSiparisNo = Math.max(num(data.settings.sonSiparisNo), data.orders.reduce(function (m, o) { return Math.max(m, num(o.sipno)); }, 0));
     data.settings.sonFisNo = Math.max(num(data.settings.sonFisNo), data.shipments.reduce(function (m, s) { return Math.max(m, num(s.fisNo)); }, 0), data.ledger.reduce(function (m, l) { return Math.max(m, num(l.fisNo) || 0); }, 0));
@@ -1814,6 +1984,7 @@
       hareketSayisi++;
     });
 
+    Matris.ensureLines(data);
     data.settings.sonFisNo = data.shipments.reduce(function (m, s) { return Math.max(m, num(s.fisNo)); }, num(data.settings.sonFisNo));
     data.settings.sonSiparisNo = data.orders.reduce(function (m, o) { return Math.max(m, num(o.sipno)); }, num(data.settings.sonSiparisNo));
 
@@ -1856,6 +2027,7 @@
     deleteModel: deleteModel,
     modelSummary: modelSummary,
     profitReport: profitReport,
+    sizeReport: sizeReport,
     audit: audit,
     trashPush: trashPush,
     trashTemizle: trashTemizle,
@@ -1871,6 +2043,7 @@
     kodUret: kodUret,
     shippedMap: shippedMap,
     orderInfo: orderInfo,
+    lineInfo: lineInfo,
     ledgerSorted: ledgerSorted,
     ledgerWithBalance: ledgerWithBalance,
     balance: balance,

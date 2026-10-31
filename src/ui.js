@@ -408,6 +408,7 @@
     });
     if (!data.modelImages || typeof data.modelImages !== 'object') data.modelImages = {};
     try { Core.markaMigrate(data); } catch (e) { }
+    try { Matris.ensureLines(data); } catch (e) { }
     try { Core.trashTemizle(data, 30); } catch (e) { }
     S.file.name = fileName || 'DMR_VERI.xlsx';
     S.file.handle = handle || null;
@@ -1067,7 +1068,7 @@
         case 'order-new': openOrderForm(null); break;
         case 'order-edit': openOrderForm(findOrder(id)); break;
         case 'order-del': removeOrder(id); break;
-        case 'order-ship': addToCart(id, true); break;
+        case 'order-ship': shipOrder(id); break;
         case 'go-ship': go('ship'); break;
         case 'ledger-new': openLedgerForm(null); break;
         case 'ledger-del': removeLedger(id); break;
@@ -1444,11 +1445,14 @@
       var o = x.o, i = x.i;
       var pct = Math.min(100, Math.round((i.giden / Math.max(1, Core.num(o.adet))) * 100));
       var cariCell = S.ui.cariId ? '' : '<td class="sub nowrap">' + esc(cariAdi(o.cariId)) + '</td>';
+      var ls = Matris.orderLinesOf(data, o.id);
+      var alt = [o.renk, o.grup].filter(Boolean);
+      if (ls.length > 1) alt.push(ls.length + ' satır');
       return '<tr>' +
         cariCell +
         '<td class="strong num">#' + esc(o.sipno) + '<div class="sub">' + dateTR(o.tarih) + '</div></td>' +
         '<td><div class="cell-model">' + thumbHtml(o) + '<div style="min-width:0"><div class="mname">' + esc(o.model) + '</div>' +
-        '<div class="mcolor">' + esc([o.renk, o.grup].filter(Boolean).join(' · ') || '—') + '</div></div></div></td>' +
+        '<div class="mcolor">' + esc(alt.join(' · ') || '—') + '</div></div></div></td>' +
         '<td class="right">' + nf0(o.asorti) + '</td>' +
         '<td class="right strong">' + nf0(o.adet) + '</td>' +
         '<td class="right">' + nf1(i.koli) + '</td>' +
@@ -1497,30 +1501,71 @@
   /* ------------------------------------------------------------------ */
   /* Sevk işlemi                                                         */
   /* ------------------------------------------------------------------ */
+  function lineSub(l) { return [l.renk, lineLabel(l)].filter(Boolean).join(' · ') || '—'; }
+
+  function lineLabel(l) {
+    if (!l) return '';
+    if (l.mod === 'ACIK') return 'Açık' + (Core.num(l.beden) ? ' · ' + l.beden : '') + (Core.num(l.koliIci) ? ' · ' + nf0(l.koliIci) + "'lu" : '');
+    if (l.mod === 'ESKI') return '';
+    return 'Asortili';
+  }
+
+  function findLine(id) {
+    var lid = Core.num(id);
+    return (data.orderLines || []).filter(function (l) { return l.id === lid; })[0] || null;
+  }
+
+  function linePerBox(l) {
+    if (!l) return 1;
+    var p = Core.num(l.koliIci);
+    if (p) return p;
+    var o = findOrder(l.orderId);
+    var k = o ? Core.modelKart(data, o.model) : null;
+    var t = Matris.kartToplam(k);
+    if (t) return t;
+    return Core.num(l.koli) ? Core.num(l.cift) / Core.num(l.koli) : 1;
+  }
+
+  function normalizeCart() {
+    var out = [];
+    S.ui.cart.forEach(function (c) {
+      if (c.lineId) { out.push(c); return; }
+      var ls = Matris.orderLinesOf(data, c.orderId);
+      if (ls.length === 1) out.push({ lineId: ls[0].id, orderId: c.orderId, cift: c.cift, koli: c.koli, fiyat: c.fiyat });
+    });
+    S.ui.cart = out;
+  }
+
   function shipCandidates() {
     var q = S.ui.shipSearch.toLocaleLowerCase('tr-TR').trim();
-    var shipped = Core.shippedMap(data);
     var scid = shipCariId();
-    return data.orders.map(function (o) { return { o: o, i: Core.orderInfo(data, o, shipped) }; })
-      .filter(function (x) { return x.o.cariId === scid && x.i.kalan > 0; })
-      .filter(function (x) {
-        if (!q) return true;
-        return [x.o.model, x.o.renk, x.o.sipno, x.o.kod].join(' ').toLocaleLowerCase('tr-TR').indexOf(q) >= 0;
-      })
-      .sort(function (a, b) { return Core.num(b.i.kalan) - Core.num(a.i.kalan); });
+    var out = [];
+    data.orders.forEach(function (o) {
+      if (o.cariId !== scid) return;
+      Matris.orderLinesOf(data, o.id).forEach(function (l) {
+        var i = Core.lineInfo(data, l);
+        if (i.kalan <= 0) return;
+        if (q) {
+          var arama = [o.model, l.renk, l.beden, o.sipno, o.kod, lineLabel(l)].join(' ').toLocaleLowerCase('tr-TR');
+          if (arama.indexOf(q) < 0) return;
+        }
+        out.push({ o: o, l: l, i: i });
+      });
+    });
+    return out.sort(function (a, b) { return Core.num(b.i.kalan) - Core.num(a.i.kalan); });
   }
 
   function pickListHtml() {
     var list = shipCandidates();
-    if (!list.length) return emptyState('check', 'Sevk bekleyen sipariş yok', 'Bu cari için sevkiyatı bekleyen sipariş bulunmuyor.', '');
+    if (!list.length) return emptyState('check', 'Sevk bekleyen satır yok', 'Bu cari için kalanı olan renk/beden satırı bulunmuyor.', '');
     var inCart = {};
-    S.ui.cart.forEach(function (c) { inCart[c.orderId] = true; });
-    return list.slice(0, 60).map(function (x) {
-      return '<div class="pick-item' + (inCart[x.o.id] ? ' disabled' : '') + '" data-act="cart-add" data-id="' + x.o.id + '">' +
+    S.ui.cart.forEach(function (c) { inCart[c.lineId] = true; });
+    return list.slice(0, 80).map(function (x) {
+      return '<div class="pick-item' + (inCart[x.l.id] ? ' disabled' : '') + '" data-act="cart-add" data-id="' + x.l.id + '">' +
         thumbHtml(x.o) +
         '<div class="info"><b>' + esc(x.o.model) + '</b>' +
-        '<span>' + esc(x.o.renk || '—') + ' · kalan <b>' + nf0(x.i.kalan) + '</b> çift · ' + nf1(x.i.kalanKoli) + ' koli</span></div>' +
-        '<span class="add">' + (inCart[x.o.id] ? ICONS.check : '+') + '</span>' +
+        '<span>' + esc(lineSub(x.l)) + ' · kalan <b>' + nf0(x.i.kalan) + '</b> çift · ' + nf1(x.i.kalanKoli) + ' koli</span></div>' +
+        '<span class="add">' + (inCart[x.l.id] ? ICONS.check : '+') + '</span>' +
         '</div>';
     }).join('');
   }
@@ -1528,12 +1573,14 @@
   function cartTotals() {
     var t = { koli: 0, cift: 0, tutar: 0 };
     S.ui.cart.forEach(function (c) {
-      var o = findOrder(c.orderId);
-      if (!o) return;
+      var l = findLine(c.lineId);
+      if (!l) return;
+      var o = findOrder(c.orderId) || findOrder(l.orderId);
       var cift = Core.num(c.cift);
+      var per = linePerBox(l) || 1;
       t.cift += cift;
-      t.koli += cift / (Core.num(o.asorti) || 1);
-      t.tutar += cift * Core.num(c.fiyat !== undefined && c.fiyat !== '' ? c.fiyat : o.fiyat);
+      t.koli += Core.num(c.koli) || cift / per;
+      t.tutar += cift * Core.num(c.fiyat !== undefined && c.fiyat !== '' ? c.fiyat : (o ? o.fiyat : 0));
     });
     t.koli = Math.round(t.koli * 1000) / 1000;
     t.tutar = Core.round2(t.tutar);
@@ -1542,27 +1589,30 @@
 
   function cartHtml() {
     if (!S.ui.cart.length) {
-      return emptyState('truck', 'Henüz sevk satırı yok', 'Soldaki listeden sipariş seçerek sevk fişine ekleyin.', '');
+      return emptyState('truck', 'Henüz sevk satırı yok', 'Soldaki listeden renk/beden satırı seçerek sevk fişine ekleyin.', '');
     }
-    var shipped = Core.shippedMap(data);
     var rows = S.ui.cart.map(function (c) {
-      var o = findOrder(c.orderId);
+      var l = findLine(c.lineId);
+      if (!l) return '';
+      var o = findOrder(c.orderId) || findOrder(l.orderId);
       if (!o) return '';
-      var info = Core.orderInfo(data, o, shipped);
+      var info = Core.lineInfo(data, l);
+      var per = linePerBox(l) || 1;
       var cift = Core.num(c.cift);
+      var koli = Core.num(c.koli) || cift / per;
       var fiyat = Core.num(c.fiyat !== undefined && c.fiyat !== '' ? c.fiyat : o.fiyat);
       var hatali = cift > info.kalan + 0.001 || cift <= 0;
-      return '<tr data-line="' + o.id + '"' + (hatali ? ' style="background:#fff5f5"' : '') + '>' +
+      return '<tr data-line="' + l.id + '"' + (hatali ? ' style="background:#fff5f5"' : '') + '>' +
         '<td><div class="cell-model">' + thumbHtml(o) + '<div style="min-width:0"><div class="mname">' + esc(o.model) + '</div>' +
-        '<div class="mcolor">' + esc(o.renk || '') + ' · asorti ' + nf0(o.asorti) + '</div></div></div></td>' +
+        '<div class="mcolor">' + esc(lineSub(l)) + '</div></div></div></td>' +
         '<td class="right sub">' + nf0(info.kalan) + '</td>' +
-        '<td class="right"><input class="input sm num" type="text" inputmode="decimal" data-cart="koli" data-id="' + o.id + '" value="' + esc(nf1(cift / (Core.num(o.asorti) || 1)).replace('.', ',')) + '"></td>' +
-        '<td class="right"><input class="input sm num" type="text" inputmode="decimal" data-cart="cift" data-id="' + o.id + '" value="' + esc(nf0(cift)) + '"></td>' +
-        '<td class="right"><input class="input sm num" type="text" inputmode="decimal" data-cart="fiyat" data-id="' + o.id + '" value="' + esc(nf2(fiyat).replace('.', ',')) + '"></td>' +
-        '<td class="right strong" data-line-tutar="' + o.id + '">' + money(cift * fiyat) + '</td>' +
-        '<td class="right"><button class="btn btn-icon danger" data-act="cart-remove" data-id="' + o.id + '" title="Kaldır" aria-label="Kaldır">' + ICONS.x + '</button></td>' +
+        '<td class="right"><input class="input sm num" type="text" inputmode="decimal" data-cart="koli" data-id="' + l.id + '" value="' + esc(nf1(koli).replace('.', ',')) + '"></td>' +
+        '<td class="right"><input class="input sm num" type="text" inputmode="decimal" data-cart="cift" data-id="' + l.id + '" value="' + esc(nf0(cift)) + '"></td>' +
+        '<td class="right"><input class="input sm num" type="text" inputmode="decimal" data-cart="fiyat" data-id="' + l.id + '" value="' + esc(nf2(fiyat).replace('.', ',')) + '"></td>' +
+        '<td class="right strong" data-line-tutar="' + l.id + '">' + money(cift * fiyat) + '</td>' +
+        '<td class="right"><button class="btn btn-icon danger" data-act="cart-remove" data-id="' + l.id + '" title="Kaldır" aria-label="Kaldır">' + ICONS.x + '</button></td>' +
         '</tr>' +
-        (hatali ? '<tr data-line-error="' + o.id + '"><td colspan="7" style="padding-top:0;color:var(--danger);font-size:11.5px;border-bottom:1px solid #eef2f6">' +
+        (hatali ? '<tr data-line-error="' + l.id + '"><td colspan="7" style="padding-top:0;color:var(--danger);font-size:11.5px;border-bottom:1px solid #eef2f6">' +
           (cift <= 0 ? 'Çift adedi sıfırdan büyük olmalı.' : 'Kalandan fazla: en fazla ' + nf0(info.kalan) + ' çift sevk edilebilir.') + '</td></tr>' : '');
     }).join('');
 
@@ -1579,6 +1629,7 @@
   }
 
   function viewShip() {
+    normalizeCart();
     if (!S.ui.shipFisNo) S.ui.shipFisNo = Core.nextFisNo(data);
     if (!S.ui.shipTarih) S.ui.shipTarih = Core.todayISO();
     var scid = shipCariId();
@@ -1853,6 +1904,23 @@ function viewShipments() {
         : '<div class="card-body"><p class="muted small" style="margin:0">Henüz sevk edilmiş satır yok. Sevk yaptıkça ciro ve kâr burada görünür.</p></div>') +
       '<p class="muted small" style="padding:10px 16px 12px;margin:0">Maliyeti girilmemiş modeller kâr hesabında 0 maliyetle görünür; doğru sonuç için <b>Modeller</b> ekranından maliyet girin.</p></div>';
 
+    var beden = Core.sizeReport(data, ay, cid);
+    var bedenCard = '<div class="card" style="margin-top:16px"><div class="card-head"><div><h2>Beden dökümü</h2>' +
+      '<div class="sub">Sevk edilen · ' + monthName(ay) + (cid ? ' · ' + esc(cari.ad) : '') + '</div></div></div>' +
+      (beden.rows.length
+        ? '<div class="table-wrap"><table class="data"><thead><tr><th>Model / renk</th>' +
+          beden.sizes.map(function (sz) { return '<th class="right">' + sz + '</th>'; }).join('') +
+          '<th class="right">Toplam</th></tr></thead><tbody>' +
+          beden.rows.map(function (r) {
+            return '<tr><td><div class="strong">' + esc(r.model) + '</div><div class="sub">' + esc(r.renk || '—') + '</div></td>' +
+              beden.sizes.map(function (sz) { return '<td class="right">' + (Core.num(r.map[sz]) ? nf0(r.map[sz]) : '—') + '</td>'; }).join('') +
+              '<td class="right strong">' + nf0(r.toplam) + '</td></tr>';
+          }).join('') +
+          '</tbody><tfoot><tr><td>TOPLAM</td>' + beden.sizes.map(function (sz) { return '<td class="right">' + nf0(beden.totals[sz] || 0) + '</td>'; }).join('') +
+          '<td class="right">' + nf0(beden.toplam) + '</td></tr></tfoot></table></div>'
+        : '<div class="card-body"><p class="muted small" style="margin:0">Bu dönemde beden dökümü olan sevk yok. Renk/beden satırıyla sevk yapıldığında burada görünür.</p></div>') +
+      '</div>';
+
     return '<div class="card"><div class="toolbar">' +
       '<div class="field" style="max-width:190px"><label for="reportMonth">Dönem</label>' +
       '<input id="reportMonth" type="month" class="input" data-role="report-month" value="' + esc(ay) + '"></div>' +
@@ -1870,15 +1938,25 @@ function viewShipments() {
       '<div class="table-wrap"><table class="data"><thead><tr><th>' + (groupKey === 'model' ? 'Model' : 'Cari') + '</th><th class="right">Koli</th><th class="right">Çift</th><th class="right">Tutar</th></tr></thead><tbody>' + groupTable + '</tbody></table></div></div>' +
       '<div class="card"><div class="card-head"><div><h2>Bekleyen siparişler</h2><div class="sub">Kalan çifte göre ilk 10</div></div></div>' +
       '<div class="table-wrap"><table class="data"><thead><tr><th>Model</th><th class="right">Giden</th><th class="right">Kalan</th><th class="right">Tutar</th></tr></thead><tbody>' + kalanTable + '</tbody></table></div></div>' +
-      '</div>' + karCard;
+      '</div>' + karCard + bedenCard;
   }
 
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '1.8.0';
+  var SURUM = '2.0.0';
 
   var YENILIKLER = [
+    {
+      v: '2.0.0', t: '31.10.2026', m: [
+        'Renk–beden–asorti matrisi: model kartında kategori, renkler ve asorti şablonu',
+        'Siparişte renk/beden satırları; asortili veya açık; çok renkli sipariş',
+        'Satır bazlı sevk, kısmi sevk ve satır kalanı kontrolü',
+        'Fişte yalnızca sevk edilen bedenler; boş beden yok; “Açık · 9’lu”',
+        'Beden dökümü raporu; A4/A5 fiş',
+        'Eski dosyalar ESKI satırına taşınır; bakiye ve sevkler korunur'
+      ]
+    },
     {
       v: '1.8.0', t: '30.10.2026', m: [
         'Proje adı DMR AYAKKABI olarak güncellendi',
@@ -2263,15 +2341,20 @@ function viewShipments() {
       if (!kart.model) kartsiz++;
       var marj = Core.num(kart.fiyat) > 0 ? (Core.num(kart.fiyat) - Core.num(kart.maliyet)) / Core.num(kart.fiyat) * 100 : 0;
       var foto = kart.model ? (data.modelImages[kart.id] || '') : '';
+      var alt = [];
+      if (kart.kategori) alt.push((Matris.kategori(kart.kategori) || {}).ad || kart.kategori);
+      if (kart.renkler && kart.renkler.length) alt.push(kart.renkler.length + ' renk');
+      if (kart.sezon) alt.push(kart.sezon);
+      if (kart.barkod) alt.push(kart.barkod);
       var thumb = foto
         ? '<div class="thumb" data-act="model-image" data-id="' + kart.id + '" title="Resmi büyüt" style="background-image:url(&quot;' + esc(foto) + '&quot;);cursor:zoom-in"></div>'
         : '<div class="thumb" style="color:#cbd5e1">' + ICONS.image + '</div>';
       return '<tr>' +
         '<td>' + thumb + '</td>' +
         '<td><div class="strong">' + esc(model) + '</div>' +
-          '<div class="sub">' + esc([kart.barkod, kart.sezon].filter(Boolean).join(' · ') || '—') + '</div></td>' +
+          '<div class="sub">' + esc(alt.join(' · ') || '—') + '</div></td>' +
         '<td class="right">' + (kart.model ? nf2(kart.fiyat) : '—') + '</td>' +
-        '<td class="right">' + (kart.model && Core.num(kart.asorti) ? nf0(kart.asorti) : '—') + '</td>' +
+        '<td class="right">' + (kart.model && (Matris.asortiToplam(kart.asortiSablon) || Core.num(kart.asorti)) ? nf0(Matris.asortiToplam(kart.asortiSablon) || kart.asorti) : '—') + '</td>' +
         '<td class="right">' + (kart.model && Core.num(kart.maliyet) ? nf2(kart.maliyet) : '—') + '</td>' +
         '<td class="right">' + (kart.model && Core.num(kart.fiyat) ? nf1(marj) + '%' : '—') + '</td>' +
         '<td class="right">' + nf0(r.siparis) + '</td>' +
@@ -2298,16 +2381,28 @@ function viewShipments() {
 
   function openModelForm(model, modelAdi) {
     var isEdit = !!model;
-    var m = model || { model: modelAdi || '', fiyat: '', asorti: data.settings.varsayilanAsorti || 10, maliyet: '', barkod: '', sezon: '', not: '' };
+    var m = model || {
+      model: modelAdi || '', kategori: '', renkler: [], asortiSablon: {},
+      fiyat: '', asorti: '', maliyet: '', barkod: '', sezon: '', not: ''
+    };
     var currentImage = model ? (data.modelImages[model.id] || null) : null;
+    var kategoriOpts = '<option value="">Seçin…</option>' + Object.keys(Matris.KATEGORILER).map(function (k) {
+      return '<option value="' + k + '"' + (m.kategori === k ? ' selected' : '') + '>' + Matris.KATEGORILER[k].ad + ' (' + Matris.KATEGORILER[k].min + '–' + Matris.KATEGORILER[k].max + ')</option>';
+    }).join('');
+
     var modal = openModal({
       title: isEdit ? 'Model kartını düzenle' : 'Yeni model kartı',
-      subtitle: 'Fiyat, asorti, maliyet ve model resmi',
+      subtitle: 'Kategori, renkler, asorti ve fiyat',
+      size: 'wide',
       body:
         '<form id="modelForm" class="form-grid g2" autocomplete="off">' +
         '  <div class="field span2"><label for="mfModel">Model *</label><input id="mfModel" class="input" required value="' + esc(m.model) + '"></div>' +
+        '  <div class="field"><label for="mfKategori">Kategori *</label><select id="mfKategori" class="select" required>' + kategoriOpts + '</select></div>' +
         '  <div class="field"><label for="mfFiyat">Liste fiyatı</label><input id="mfFiyat" class="input num" type="text" inputmode="decimal" value="' + esc(m.fiyat || '') + '"></div>' +
-        '  <div class="field"><label for="mfAsorti">Asorti <span class="hint">çift/koli</span></label><input id="mfAsorti" class="input num" type="number" min="1" value="' + esc(m.asorti || '') + '"></div>' +
+        '  <div class="field span2"><label for="mfRenkler">Renkler <span class="hint">(virgülle ayırın)</span></label><textarea id="mfRenkler" class="input" rows="2" spellcheck="false">' + esc((m.renkler || []).join(', ')) + '</textarea></div>' +
+        '  <div class="span2"><label class="f">Koli içi asorti <span class="hint">(her numaradan kaç çift)</span></label>' +
+        '    <div id="mfAsortiGrid" class="m-sz-grid"></div>' +
+        '    <div class="muted small" id="mfAsortiToplam" style="margin-top:5px"></div></div>' +
         '  <div class="field"><label for="mfMaliyet">Maliyet</label><input id="mfMaliyet" class="input num" type="text" inputmode="decimal" value="' + esc(m.maliyet || '') + '"></div>' +
         '  <div class="field"><label for="mfBarkod">Barkod</label><input id="mfBarkod" class="input" value="' + esc(m.barkod || '') + '"></div>' +
         '  <div class="field"><label for="mfSezon">Sezon</label><input id="mfSezon" class="input" value="' + esc(m.sezon || '') + '"></div>' +
@@ -2328,7 +2423,37 @@ function viewShipments() {
       footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
         '<button class="btn btn-primary" type="submit" form="modelForm">' + ICONS.check + ' Kaydet</button>'
     });
+
     var wrap = modal.el;
+    var sablon = Object.assign({}, m.asortiSablon || {});
+
+    function renderAsorti() {
+      var kat = $('#mfKategori', wrap).value;
+      var list = Matris.bedenler(kat);
+      var grid = $('#mfAsortiGrid', wrap);
+      if (!list.length) {
+        grid.innerHTML = '<span class="muted small">Önce kategori seçin.</span>';
+        $('#mfAsortiToplam', wrap).textContent = '';
+        return;
+      }
+      grid.innerHTML = list.map(function (size) {
+        var q = Core.num(sablon[size]);
+        return '<label class="m-sz"><span>' + size + '</span><input type="number" min="0" step="1" data-size="' + size + '" value="' + (q ? q : '') + '" placeholder="0"></label>';
+      }).join('');
+      updateToplam();
+    }
+
+    function updateToplam() {
+      var t = 0;
+      $$('#mfAsortiGrid [data-size]', wrap).forEach(function (inp) { t += Core.num(inp.value); });
+      $('#mfAsortiToplam', wrap).textContent = 'Koli içi toplam: ' + nf0(t) + ' çift';
+    }
+
+    $('#mfKategori', wrap).addEventListener('change', renderAsorti);
+    $('#mfAsortiGrid', wrap).addEventListener('input', updateToplam);
+    renderAsorti();
+
+    // ---- model resmi ----
     function setModelImage(dataUrl) {
       currentImage = dataUrl;
       var th = $('#mfThumb', wrap);
@@ -2360,10 +2485,22 @@ function viewShipments() {
 
     $('#modelForm', wrap).addEventListener('submit', function (e) {
       e.preventDefault();
+      var err = $('#mfErr', wrap);
+      var kategori = $('#mfKategori', wrap).value;
+      if (!kategori) { err.textContent = 'Kategori seçin.'; return; }
+      var yeniSablon = {};
+      $$('#mfAsortiGrid [data-size]', wrap).forEach(function (inp) {
+        var q = Core.num(inp.value);
+        if (q > 0) yeniSablon[inp.getAttribute('data-size')] = Math.round(q);
+      });
+      var toplam = Matris.asortiToplam(yeniSablon);
       var payload = {
         model: $('#mfModel', wrap).value,
+        kategori: kategori,
+        renkler: $('#mfRenkler', wrap).value,
+        asortiSablon: yeniSablon,
+        asorti: toplam || Core.num(m.asorti),
         fiyat: $('#mfFiyat', wrap).value.replace(',', '.'),
-        asorti: $('#mfAsorti', wrap).value,
         maliyet: $('#mfMaliyet', wrap).value.replace(',', '.'),
         barkod: $('#mfBarkod', wrap).value,
         sezon: $('#mfSezon', wrap).value,
@@ -2372,16 +2509,17 @@ function viewShipments() {
       };
       try {
         var kayit = isEdit ? Core.updateModel(data, m.id, payload) : Core.addModel(data, payload);
-        log(isEdit ? 'MODEL DÜZENLE' : 'MODEL EKLE', kayit.model);
+        log(isEdit ? 'MODEL DÜZENLE' : 'MODEL EKLE', kayit.model + ' · ' + kategori + ' · ' + toplam + ' çift/koli');
         setDirty(true);
         modal.close();
         renderView();
         toast(isEdit ? 'Model güncellendi' : 'Model eklendi', 'ok');
-      } catch (ex) { $('#mfErr', wrap).textContent = ex.message; }
+      } catch (ex) { err.textContent = ex.message; }
     });
   }
 
   /* ------------------------------------------------------------------ */
+  /* Ayarlar  /* ------------------------------------------------------------------ */
   /* Ayarlar                                                             */
   /* ------------------------------------------------------------------ */
   function viewSettings() {
@@ -2543,6 +2681,7 @@ function viewShipments() {
 
   function openOrderForm(order, kopya, sablon) {
     var isEdit = !!order;
+    var kaynak = order || kopya || null;
     var o = order || (kopya ? Object.assign({}, kopya, {
       sipno: Core.nextOrderNo(data), tarih: Core.todayISO()
     }) : {
@@ -2552,31 +2691,49 @@ function viewShipments() {
       tur: 'DİĞER', grup: '', kod: '', not: ''
     });
     var resim = order ? data.images[order.id] : null;
-    var models = uniq(data.orders.map(function (x) { return x.model; }));
-    var renkler = uniq(data.orders.map(function (x) { return x.renk; }));
+    var shippedNow = order ? (Core.shippedMap(data)[order.id] || 0) : 0;
+    var kilit = isEdit && shippedNow > 0;
+    var models = uniq((data.modeller || []).map(function (m) { return m.model; })
+      .concat(data.orders.map(function (x) { return x.model; }))).sort();
+    var renkler = uniq(data.orders.map(function (x) { return x.renk; })
+      .concat((data.modeller || []).reduce(function (a, m) { return a.concat(m.renkler || []); }, []))).sort();
     var gruplar = uniq(data.orders.map(function (x) { return x.grup; }).concat(['MERDANE', 'BATTAL', 'SPOR', 'BOT', 'TERLİK']));
     var turler = uniq(data.orders.map(function (x) { return x.tur; }).concat(['DİĞER', 'MERDANE', 'BOT', 'SPOR', 'TERLİK', 'ÇİZME']));
-    var shippedNow = order ? (Core.shippedMap(data)[order.id] || 0) : 0;
-    var cariKilit = isEdit && shippedNow > 0;
+
+    var lines = [];
+    if (kaynak) {
+      lines = Matris.orderLinesOf(data, kaynak.id).map(function (l) {
+        return { id: isEdit ? l.id : 0, renk: l.renk || '', mod: l.mod || 'ESKI', beden: Core.num(l.beden), koli: Core.num(l.koli), koliIci: Core.num(l.koliIci), cift: Core.num(l.cift) };
+      });
+      if (kopya && lines.length === 1 && lines[0].mod === 'ESKI') lines = [];
+    }
+    if (!lines.length) {
+      lines = [{ id: 0, renk: o.renk || '', mod: 'ASORTILI', beden: 0, koli: 1, koliIci: Core.num(o.asorti) || 10, cift: 0 }];
+    }
 
     var body =
       '<form id="orderForm" class="form-grid g4" autocomplete="off">' +
-      '  <div class="field span2"><label for="ofCari">Cari hesap' + (cariKilit ? ' <span class="hint">(sevk başladı, değiştirilemez)</span>' : '') + '</label>' +
-      '    <select id="ofCari" name="cariId" class="select"' + (cariKilit ? ' disabled' : '') + '>' + cariOptions(o.cariId, false) + '</select></div>' +
-      '  <div class="field span2"><label for="ofSipno">Sipariş no</label><input id="ofSipno" name="sipno" class="input num" type="number" min="1" value="' + esc(o.sipno) + '"></div>' +
-      '  <div class="field span3"><label for="ofModel">Model bilgisi *</label>' +
-      '    <input id="ofModel" name="model" class="input" required value="' + esc(o.model) + '" list="dlModels" placeholder="Örn. JALEPENO- J5E - BEYAZ">' + datalist('dlModels', models) + '</div>' +
-      '  <div class="field"><label for="ofRenk">Renk</label><input id="ofRenk" name="renk" class="input" value="' + esc(o.renk) + '" list="dlRenk">' + datalist('dlRenk', renkler) + '</div>' +
-      '  <div class="field"><label for="ofTarih">Tarih</label><input id="ofTarih" name="tarih" class="input" type="date" value="' + esc(o.tarih) + '"></div>' +
-      '  <div class="field"><label for="ofAsorti">Asorti <span class="hint">çift/koli</span></label><input id="ofAsorti" name="asorti" class="input num" type="number" min="1" value="' + esc(o.asorti) + '"></div>' +
-      '  <div class="field"><label for="ofGrup">Grup</label><input id="ofGrup" name="grup" class="input" value="' + esc(o.grup) + '" list="dlGrup">' + datalist('dlGrup', gruplar) + '</div>' +
-      '  <div class="field"><label for="ofAdet">Sipariş çift *</label><input id="ofAdet" name="adet" class="input num" type="text" inputmode="numeric" required value="' + esc(o.adet) + '"></div>' +
-      '  <div class="field"><label for="ofFiyat">Birim fiyat</label><input id="ofFiyat" name="fiyat" class="input num" type="text" inputmode="decimal" value="' + esc(o.fiyat) + '">' +
-      '    <div class="sub" id="ofListe" style="font-size:10.5px;min-height:14px"></div></div>' +
-      '  <div class="field"><label for="ofTur">Tür</label><select id="ofTur" name="tur" class="select">' +
-      turler.map(function (t) { return '<option' + (o.tur === t ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select></div>' +
-      '  <div class="field span2"><label for="ofKod">Kod <span class="hint">(boşsa otomatik)</span></label><input id="ofKod" name="kod" class="input" value="' + esc(o.kod) + '"></div>' +
-      '  <div class="field span4"><label for="ofNot">Not</label><input id="ofNot" name="not" class="input" value="' + esc(o.not) + '"></div>' +
+      '  <div class="field span2"><label for="ofCari">Cari hesap' + (kilit ? ' <span class="hint">(sevk başladı, değiştirilemez)</span>' : '') + '</label>' +
+      '    <select id="ofCari" class="select"' + (kilit ? ' disabled' : '') + '>' + cariOptions(o.cariId, false) + '</select></div>' +
+      '  <div class="field span2"><label for="ofSipno">Sipariş no</label><input id="ofSipno" class="input num" type="number" min="1" value="' + esc(o.sipno) + '"></div>' +
+      '  <div class="field span3"><label for="ofModel">Model *</label><input id="ofModel" class="input" required value="' + esc(o.model) + '" list="dlOModels" placeholder="Model kartından seçin">' + datalist('dlOModels', models) + '</div>' +
+      '  <div class="field"><label for="ofTarih">Tarih</label><input id="ofTarih" class="input" type="date" value="' + esc(o.tarih) + '"></div>' +
+      '  <div class="field span2"><label for="ofFiyat">Birim fiyat <span class="hint">(tüm renkler)</span></label><input id="ofFiyat" class="input num" type="text" inputmode="decimal" value="' + esc(o.fiyat) + '"><div class="sub" id="ofListe" style="font-size:10.5px;min-height:14px"></div></div>' +
+      '  <div class="field span2"><label for="ofNot">Not</label><input id="ofNot" class="input" value="' + esc(o.not) + '"></div>' +
+      '  <div class="field"><label for="ofTur">Tür</label><select id="ofTur" class="select">' + turler.map(function (t) { return '<option' + (o.tur === t ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select></div>' +
+      '  <div class="field"><label for="ofGrup">Grup</label><input id="ofGrup" class="input" value="' + esc(o.grup) + '" list="dlOGrup">' + datalist('dlOGrup', gruplar) + '</div>' +
+      '  <div class="field span2"><label for="ofKod">Kod <span class="hint">(boşsa otomatik)</span></label><input id="ofKod" class="input" value="' + esc(o.kod) + '"></div>' +
+      '  <div class="span4" style="margin-top:2px">' +
+      '    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">' +
+      '      <label class="f" style="margin:0">Renk / beden satırları <span class="hint">(her beden ayrı satır)</span></label>' +
+      '      <button type="button" class="btn btn-sm" id="ofAddLine"' + (kilit ? ' disabled' : '') + '>' + ICONS.plus + ' Satır ekle</button>' +
+      '    </div>' +
+      '    <div style="overflow:auto;border:1px solid var(--line);border-radius:10px">' +
+      '      <table class="order-lines"><thead><tr><th style="min-width:112px">Renk</th><th style="min-width:96px">Mod</th><th style="width:78px">Beden</th><th style="width:72px">Koli</th><th style="width:78px">Koli içi</th><th class="right" style="width:66px">Çift</th><th style="width:30px"></th></tr></thead><tbody id="ofLines"></tbody></table>' +
+      '    </div>' +
+      '    <datalist id="dlORenk"></datalist>' +
+      '  </div>' +
+      '  <div class="span4" id="ofSummary" style="display:flex;gap:22px;font-size:12.5px;color:var(--ink-2);flex-wrap:wrap"></div>' +
       '  <div class="span4" style="display:flex;gap:14px;align-items:center;padding:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px">' +
       '    <div class="thumb lg" id="ofThumb" style="' + (resim ? 'background-image:url(&quot;' + esc(resim) + '&quot;)' : '') + '">' + (resim ? '' : 'RESİM') + '</div>' +
       '    <div style="flex:1;min-width:0">' +
@@ -2584,73 +2741,170 @@ function viewShipments() {
       '        <button type="button" class="btn btn-sm" data-img-pick>' + ICONS.image + ' Resim seç</button>' +
       '        <button type="button" class="btn btn-sm btn-ghost" data-img-clear>Kaldır</button>' +
       '      </div>' +
-      '      <p class="muted small" style="margin:8px 0 0">Resmi buraya yapıştırabilir (Ctrl+V) veya sürükleyebilirsiniz. Küçük bir önizleme Excel dosyasına gömülür.</p>' +
+      '      <p class="muted small" style="margin:8px 0 0">Resmi yapıştırabilir (Ctrl+V) veya sürükleyebilirsiniz.</p>' +
       '    </div>' +
       '    <input type="file" accept="image/*" id="ofImage" class="hidden">' +
       '  </div>' +
-      '  <div class="span4" id="ofSummary" style="display:flex;gap:22px;font-size:12.5px;color:var(--ink-2)"></div>' +
+      '  <div class="span4 auth-err" id="ofErr"></div>' +
       '</form>';
 
     var m = openModal({
       title: isEdit ? 'Siparişi düzenle' : 'Yeni sipariş',
-      subtitle: isEdit ? '#' + o.sipno + ' · ' + o.model : 'Tek satırda tüm sipariş bilgileri',
+      subtitle: isEdit ? '#' + o.sipno + ' · ' + o.model : 'Renk ve beden satırlarıyla sipariş',
       size: 'wide',
       body: body,
       footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
-        (isEdit ? '' : '<button class="btn" type="button" id="ofSaveNew">' + ICONS.plus + ' Kaydet ve yeni</button>') +
+        (isEdit || kilit ? '' : '<button class="btn" type="button" id="ofSaveNew">' + ICONS.plus + ' Kaydet ve yeni</button>') +
         '<button class="btn btn-primary" type="submit" form="orderForm">' + ICONS.check + ' ' + (isEdit ? 'Değişiklikleri kaydet' : 'Siparişi kaydet') + '</button>'
     });
-
     var wrap = m.el;
     var form = $('#orderForm', wrap);
     var currentImage = resim;
 
+    function kart() { return Core.modelKart(data, $('#ofModel', wrap).value); }
+    function perBox() {
+      var k = kart();
+      return k ? (Matris.asortiToplam(k.asortiSablon) || Core.num(k.asorti)) : 0;
+    }
+    function bedenler() {
+      var k = kart();
+      return k ? Matris.bedenler(k.kategori) : [];
+    }
+    function lineCift(l) {
+      if (l.mod === 'ESKI') return Core.num(l.cift);
+      if (l.mod === 'ACIK') return Core.num(l.koli) * Core.num(l.koliIci);
+      return Core.num(l.koli) * (perBox() || Core.num(l.koliIci));
+    }
+    function refreshColors() {
+      var k = kart();
+      var list = uniq((k && k.renkler ? k.renkler : []).concat(renkler));
+      $('#dlORenk', wrap).innerHTML = list.map(function (r) { return '<option value="' + esc(r) + '">'; }).join('');
+    }
+    function renderLines() {
+      var pb = perBox();
+      var sizes = bedenler();
+      $('#ofLines', wrap).innerHTML = lines.map(function (l, i) {
+        var beden = l.mod === 'ACIK'
+          ? (sizes.length
+            ? '<select data-f="beden" data-i="' + i + '"' + (kilit ? ' disabled' : '') + '>' + sizes.map(function (s) { return '<option value="' + s + '"' + (s === Core.num(l.beden) ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>'
+            : '<input data-f="beden" data-i="' + i + '" type="number" min="16" max="50" value="' + esc(l.beden || '') + '"' + (kilit ? ' disabled' : '') + '>')
+          : '<span class="muted">—</span>';
+        var koliIci = (l.mod === 'ACIK' || l.mod === 'ESKI')
+          ? '<input data-f="koliIci" data-i="' + i + '" type="number" min="1" step="1" value="' + esc(l.koliIci || '') + '"' + (kilit ? ' disabled' : '') + '>'
+          : '<span class="muted">' + (pb || '—') + '</span>';
+        var mod = '<select data-f="mod" data-i="' + i + '"' + (kilit || l.mod === 'ESKI' ? ' disabled' : '') + '>' +
+          '<option value="ASORTILI"' + (l.mod === 'ASORTILI' ? ' selected' : '') + '>Asortili</option>' +
+          '<option value="ACIK"' + (l.mod === 'ACIK' ? ' selected' : '') + '>Açık</option>' +
+          (l.mod === 'ESKI' ? '<option value="ESKI" selected>Eski</option>' : '') + '</select>';
+        return '<tr data-row="' + i + '">' +
+          '<td><input data-f="renk" data-i="' + i + '" list="dlORenk" value="' + esc(l.renk) + '"' + (kilit ? ' disabled' : '') + '></td>' +
+          '<td>' + mod + '</td>' +
+          '<td>' + beden + '</td>' +
+          '<td><input data-f="koli" data-i="' + i + '" type="number" min="0" step="1" value="' + esc(l.koli || '') + '"' + (kilit || l.mod === 'ESKI' ? ' disabled' : '') + '></td>' +
+          '<td>' + koliIci + '</td>' +
+          '<td class="right strong" data-cift="' + i + '">' + nf0(lineCift(l)) + '</td>' +
+          '<td>' + (kilit ? '' : '<button type="button" class="btn btn-icon danger" data-del="' + i + '" title="Satırı kaldır">×</button>') + '</td>' +
+          '</tr>';
+      }).join('');
+      refreshColors();
+      refresh();
+    }
     function refresh() {
-      var adet = Core.num($('#ofAdet', wrap).value);
-      var asorti = Core.num($('#ofAsorti', wrap).value) || 1;
+      var koli = 0, cift = 0;
+      lines.forEach(function (l) { koli += Core.num(l.koli); cift += lineCift(l); });
       var fiyat = Core.num($('#ofFiyat', wrap).value);
       $('#ofSummary', wrap).innerHTML =
-        '<span><b>' + nf1(adet / asorti) + '</b> koli</span>' +
-        '<span><b>' + nf0(adet) + '</b> çift</span>' +
-        '<span><b>' + money(adet * fiyat) + '</b> toplam</span>';
-      if (!$('#ofKod', wrap).value) {
-        var auto = Core.kodUret($('#ofModel', wrap).value, $('#ofRenk', wrap).value);
-        $('#ofKod', wrap).placeholder = auto;
-      }
-    }
-    ['ofAdet', 'ofAsorti', 'ofFiyat', 'ofModel', 'ofRenk'].forEach(function (id) {
-      $('#' + id, wrap).addEventListener('input', refresh);
-    });
-    refresh();
-
-    function modelHint(force) {
-      var k = Core.modelKart(data, $('#ofModel', wrap).value);
+        '<span><b>' + nf1(koli) + '</b> koli</span>' +
+        '<span><b>' + nf0(cift) + '</b> çift</span>' +
+        '<span><b>' + money(cift * fiyat) + '</b> toplam</span>' +
+        '<span class="muted">' + lines.length + ' satır</span>';
+      lines.forEach(function (l, i) {
+        var el = $('[data-cift="' + i + '"]', wrap);
+        if (el) el.textContent = nf0(lineCift(l));
+      });
+      var k = kart();
       var el = $('#ofListe', wrap);
-      if (!el) return;
-      if (!k) { el.textContent = ''; return; }
-      var marj = Core.num(k.fiyat) > 0 ? (Core.num(k.fiyat) - Core.num(k.maliyet)) / Core.num(k.fiyat) * 100 : 0;
-      el.innerHTML = 'Liste: <b>' + money(k.fiyat) + '</b> · Marj %' + nf1(marj);
-      el.title = Core.num(k.maliyet) ? 'Maliyet: ' + money(k.maliyet) : '';
-      if (!$('#ofFiyat', wrap).value && Core.num(k.fiyat)) {
-        $('#ofFiyat', wrap).value = String(k.fiyat).replace('.', ',');
-        refresh();
-      }
-      if (Core.num(k.asorti) && (force || !$('#ofAsorti', wrap).value)) {
-        $('#ofAsorti', wrap).value = String(k.asorti);
-        refresh();
+      if (el) {
+        if (!k) { el.textContent = ''; }
+        else {
+          var marj = Core.num(k.fiyat) > 0 ? (Core.num(k.fiyat) - Core.num(k.maliyet)) / Core.num(k.fiyat) * 100 : 0;
+          el.innerHTML = 'Liste: <b>' + money(k.fiyat) + '</b> · Marj %' + nf1(marj) + (k.renkler && k.renkler.length ? ' · ' + k.renkler.length + ' renk' : '');
+        }
       }
     }
-    $('#ofModel', wrap).addEventListener('change', function () { modelHint(true); });
-    $('#ofModel', wrap).addEventListener('blur', function () { modelHint(false); });
-    modelHint(false);
 
+    function syncFromDom() {
+      lines.forEach(function (l, i) {
+        var row = $('[data-row="' + i + '"]', wrap);
+        if (!row) return;
+        ['renk', 'mod', 'beden', 'koli', 'koliIci'].forEach(function (f) {
+          var el = $('[data-f="' + f + '"][data-i="' + i + '"]', wrap);
+          if (!el) return;
+          if (f === 'renk') l.renk = el.value;
+          else if (f === 'mod') l.mod = el.value;
+          else if (f === 'beden') l.beden = Core.num(el.value);
+          else if (f === 'koli') l.koli = Core.num(el.value);
+          else if (f === 'koliIci') l.koliIci = Core.num(el.value);
+        });
+      });
+    }
+
+    $('#ofLines', wrap).addEventListener('input', function (e) {
+      var el = e.target.closest('[data-f]');
+      if (!el) return;
+      syncFromDom();
+      refresh();
+    });
+    $('#ofLines', wrap).addEventListener('change', function (e) {
+      var el = e.target.closest('[data-f]');
+      if (!el) return;
+      syncFromDom();
+      if (el.getAttribute('data-f') === 'mod') {
+        var i = Core.num(el.getAttribute('data-i'));
+        if (lines[i].mod === 'ACIK' && !lines[i].beden) lines[i].beden = bedenler()[0] || 0;
+        if (lines[i].mod === 'ASORTILI') lines[i].koliIci = perBox();
+        renderLines();
+      } else {
+        refresh();
+      }
+    });
+    $('#ofLines', wrap).addEventListener('click', function (e) {
+      var b = e.target.closest('[data-del]');
+      if (!b || kilit) return;
+      lines.splice(Core.num(b.getAttribute('data-del')), 1);
+      if (!lines.length) lines.push({ id: 0, renk: '', mod: 'ASORTILI', beden: 0, koli: 1, koliIci: perBox(), cift: 0 });
+      renderLines();
+    });
+    $('#ofAddLine', wrap).addEventListener('click', function () {
+      if (kilit) return;
+      var k = kart();
+      var sizes = bedenler();
+      lines.push({
+        id: 0, renk: (k && k.renkler && k.renkler[0]) || '', mod: perBox() ? 'ASORTILI' : 'ACIK',
+        beden: sizes[0] || 0, koli: 1, koliIci: perBox() || 10, cift: 0
+      });
+      renderLines();
+    });
+
+    function modelChanged() {
+      var k = kart();
+      if (k && Core.num(k.fiyat) && !$('#ofFiyat', wrap).value) $('#ofFiyat', wrap).value = String(k.fiyat).replace('.', ',');
+      if (k && lines.length === 1 && !lines[0].renk && k.renkler && k.renkler.length) lines[0].renk = k.renkler[0];
+      if (k && lines.length === 1 && lines[0].mod === 'ASORTILI' && !lines[0].koliIci) lines[0].koliIci = perBox();
+      if (!perBox() && lines.length === 1 && lines[0].mod === 'ASORTILI') { lines[0].mod = 'ACIK'; lines[0].beden = lines[0].beden || 40; lines[0].koliIci = lines[0].koliIci || 10; }
+      renderLines();
+    }
+    $('#ofModel', wrap).addEventListener('change', modelChanged);
+    $('#ofFiyat', wrap).addEventListener('input', refresh);
+    modelChanged();
+
+    // ---- resim ----
     function setImage(dataUrl) {
       currentImage = dataUrl;
       var th = $('#ofThumb', wrap);
       if (dataUrl) { th.style.backgroundImage = 'url("' + dataUrl + '")'; th.textContent = ''; }
       else { th.style.backgroundImage = ''; th.textContent = 'RESİM'; }
     }
-
     $('[data-img-pick]', wrap).addEventListener('click', function () { $('#ofImage', wrap).click(); });
     $('[data-img-clear]', wrap).addEventListener('click', function () { setImage(null); });
     $('#ofImage', wrap).addEventListener('change', function (e) {
@@ -2674,16 +2928,39 @@ function viewShipments() {
       if (f && f.type.indexOf('image') === 0) imageToDataUrl(f, function (url) { setImage(url); });
     });
 
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
+    function kaydet(yeni) {
+      syncFromDom();
+      var err = $('#ofErr', wrap);
+      err.textContent = '';
+      if (kilit) {
+        try {
+          Core.updateOrder(data, o.id, { cariId: o.cariId, sipno: $('#ofSipno', wrap).value, tarih: $('#ofTarih', wrap).value, model: o.model, renk: o.renk, asorti: o.asorti, adet: o.adet, fiyat: $('#ofFiyat', wrap).value, tur: o.tur, grup: o.grup, kod: o.kod, not: $('#ofNot', wrap).value, resim: currentImage || null });
+          log('SİPARİŞ DÜZENLE', o.model + ' · not/fiyat');
+          setDirty(true); m.close(); renderView(); updateChrome(); toast('Sipariş güncellendi', 'ok');
+        } catch (ex) { err.textContent = ex.message; }
+        return;
+      }
+      var pb = perBox();
+      for (var i = 0; i < lines.length; i++) {
+        var l = lines[i];
+        if (!l.renk) l.renk = (kart() && kart().renkler[0]) || o.renk || '';
+        if (l.mod === 'ACIK' && !l.beden) { err.textContent = 'Açık satırda beden seçin.'; return; }
+        if (l.mod === 'AÇIK' || l.mod === 'ACIK') { if (Core.num(l.koliIci) <= 0) { err.textContent = 'Açık satırda koli içi girin.'; return; } }
+        if (l.mod === 'ASORTILI' && !pb) { err.textContent = 'Model kartında asorti tanımlı değil; açık satır kullanın.'; return; }
+        if (Core.num(l.koli) <= 0) { err.textContent = 'Her satırda koli girin.'; return; }
+      }
+      var toplamKoli = 0, toplamCift = 0;
+      lines.forEach(function (l) { toplamKoli += Core.num(l.koli); toplamCift += lineCift(l); });
+      if (!toplamCift) { err.textContent = 'Sipariş çifti sıfır.'; return; }
+      var ilk = lines[0];
       var payload = {
-        cariId: cariKilit ? o.cariId : Core.num($('#ofCari', wrap).value),
+        cariId: Core.num($('#ofCari', wrap).value),
         sipno: $('#ofSipno', wrap).value,
         tarih: $('#ofTarih', wrap).value,
         model: $('#ofModel', wrap).value,
-        renk: $('#ofRenk', wrap).value,
-        asorti: $('#ofAsorti', wrap).value,
-        adet: $('#ofAdet', wrap).value,
+        renk: ilk.renk,
+        asorti: ilk.koliIci || pb || 1,
+        adet: toplamCift,
         fiyat: $('#ofFiyat', wrap).value,
         tur: $('#ofTur', wrap).value,
         grup: $('#ofGrup', wrap).value,
@@ -2693,383 +2970,35 @@ function viewShipments() {
       };
       try {
         var kayit = isEdit ? Core.updateOrder(data, o.id, payload) : Core.addOrder(data, payload);
-        log(isEdit ? 'SİPARİŞ DÜZENLE' : 'SİPARİŞ EKLE', kayit.model + ' · ' + nf0(kayit.adet) + ' çift · ' + cariAdi(kayit.cariId));
+        if (!isEdit) data.orderLines = (data.orderLines || []).filter(function (l) { return l.orderId !== kayit.id; });
+        else data.orderLines = (data.orderLines || []).filter(function (l) { return l.orderId !== kayit.id; });
+        lines.forEach(function (l) {
+          var c = lineCift(l);
+          data.orderLines.push({
+            id: Core.nextId(data.orderLines),
+            orderId: kayit.id,
+            renk: l.renk,
+            mod: l.mod,
+            beden: l.mod === 'ACIK' ? Core.num(l.beden) : 0,
+            koli: Core.num(l.koli),
+            koliIci: l.mod === 'ACIK' ? Core.num(l.koliIci) : (pb || Core.num(l.koliIci)),
+            cift: c
+          });
+        });
+        log(isEdit ? 'SİPARİŞ DÜZENLE' : 'SİPARİŞ EKLE', kayit.model + ' · ' + nf0(toplamKoli) + ' koli · ' + nf0(toplamCift) + ' çift · ' + cariAdi(kayit.cariId));
         setDirty(true);
         m.close();
         renderView();
         updateChrome();
         toast(isEdit ? 'Sipariş güncellendi' : 'Sipariş eklendi', 'ok');
-        if (yeniKaydet) {
-          setTimeout(function () { openOrderForm(null, null, { cariId: payload.cariId }); }, 150);
-        }
-      } catch (err) {
-        toast(err.message, 'err');
-      }
-    });
-
-    var yeniKaydet = false;
-    var saveNew = $('#ofSaveNew', wrap);
-    if (saveNew) {
-      saveNew.addEventListener('click', function () { yeniKaydet = true; form.requestSubmit(); });
+        if (yeni) setTimeout(function () { openOrderForm(null, null, { cariId: payload.cariId }); }, 150);
+      } catch (ex) { err.textContent = ex.message; }
     }
 
-    form.addEventListener('keydown', function (e) {
-      if (e.key !== 'Enter' || e.shiftKey) return;
-      var t = e.target;
-      if (!t || t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON') return;
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-        return;
-      }
-      e.preventDefault();
-      var alanlar = Array.prototype.slice.call(form.querySelectorAll('input, select')).filter(function (el) {
-        return !el.disabled && el.type !== 'hidden' && el.offsetParent !== null;
-      });
-      var i = alanlar.indexOf(t);
-      if (i >= 0 && i < alanlar.length - 1) alanlar[i + 1].focus();
-      else if (i === alanlar.length - 1) form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    });
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* Cari formu                                                          */
-  /* ------------------------------------------------------------------ */
-  function openCariForm(cari) {
-    var isEdit = !!cari;
-    var c = cari || { ad: '', kod: '', tel: '', adres: '', vergiDairesi: '', vergiNo: '', not: '', aktif: true };
-    var sonKod = 'C' + (data.cariler.length + 1);
-
-    var body =
-      '<form id="cariForm" class="form-grid g2" autocomplete="off">' +
-      '  <div class="field span2"><label for="cfAd">Cari adı *</label><input id="cfAd" name="ad" class="input" required value="' + esc(c.ad) + '" placeholder="Örn. MÜŞTERİ AYAKKABI"></div>' +
-      '  <div class="field"><label for="cfKod">Kısa kod</label><input id="cfKod" name="kod" class="input" value="' + esc(c.kod) + '" placeholder="' + esc(sonKod) + '"></div>' +
-      '  <div class="field"><label for="cfTel">Telefon</label><input id="cfTel" name="tel" class="input" value="' + esc(c.tel) + '"></div>' +
-      '  <div class="field span2"><label for="cfAdres">Adres</label><input id="cfAdres" name="adres" class="input" value="' + esc(c.adres) + '"></div>' +
-      '  <div class="field"><label for="cfVd">Vergi dairesi</label><input id="cfVd" name="vergiDairesi" class="input" value="' + esc(c.vergiDairesi) + '"></div>' +
-      '  <div class="field"><label for="cfVn">Vergi no</label><input id="cfVn" name="vergiNo" class="input" value="' + esc(c.vergiNo) + '"></div>' +
-      '  <div class="field span2"><label for="cfNot">Not</label><input id="cfNot" name="not" class="input" value="' + esc(c.not) + '"></div>' +
-      '  <div class="field span2"><label class="switch"><input type="checkbox" id="cfAktif"' + (c.aktif === false ? '' : ' checked') + '><span class="track"></span><span>Aktif cari (listelerde görünsün)</span></label></div>' +
-      (isEdit ? '' :
-        '  <div class="field span2" style="border-top:1px solid var(--line);padding-top:12px">' +
-        '    <label for="cfDevir">Devir bakiyesi <span class="hint">(isteğe bağlı)</span></label>' +
-        '    <div style="display:grid;grid-template-columns:1fr 140px;gap:8px">' +
-        '      <input id="cfDevir" name="devir" class="input num" type="text" inputmode="decimal" placeholder="0,00">' +
-        '      <select id="cfDevirYon" name="devirYon" class="select"><option value="BORC">Borç</option><option value="ALACAK">Alacak</option></select>' +
-        '    </div>' +
-        '  </div>') +
-      '</form>';
-
-    var m = openModal({
-      title: isEdit ? 'Cari hesabı düzenle' : 'Yeni cari hesap',
-      subtitle: isEdit ? c.ad : 'Müşteri kartı ve açılış bakiyesi',
-      body: body,
-      footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
-        '<button class="btn btn-primary" type="submit" form="cariForm">' + ICONS.check + ' ' + (isEdit ? 'Kaydet' : 'Cari ekle') + '</button>'
-    });
-    var wrap = m.el;
-
-    $('#cariForm', wrap).addEventListener('submit', function (e) {
-      e.preventDefault();
-      var payload = {
-        ad: $('#cfAd', wrap).value,
-        kod: $('#cfKod', wrap).value || sonKod,
-        tel: $('#cfTel', wrap).value,
-        adres: $('#cfAdres', wrap).value,
-        vergiDairesi: $('#cfVd', wrap).value,
-        vergiNo: $('#cfVn', wrap).value,
-        not: $('#cfNot', wrap).value,
-        aktif: $('#cfAktif', wrap).checked
-      };
-      if (!isEdit) {
-        payload.devir = $('#cfDevir', wrap).value;
-        payload.devirYon = $('#cfDevirYon', wrap).value;
-      }
-      try {
-        var c2 = isEdit ? Core.updateCari(data, c.id, payload) : Core.addCari(data, payload);
-        log(isEdit ? 'CARİ DÜZENLE' : 'CARİ EKLE', c2.ad);
-        setDirty(true);
-        m.close();
-        if (!isEdit) setActiveCari(c2.id);
-        else { renderView(); updateChrome(); }
-        toast(isEdit ? 'Cari güncellendi' : 'Cari eklendi', 'ok');
-      } catch (err) { toast(err.message, 'err'); }
-    });
-  }
-
-  function removeCari(id) {
-    var c = Core.cariById(data, id);
-    if (!c) return;
-    confirmDialog({
-      title: 'Cari silinsin mi?',
-      message: c.ad + ' cari hesabı silinecek. Kaydı olan cariler silinemez.',
-      confirmText: 'Cariyi sil', danger: true
-    }).then(function (ok) {
-      if (!ok) return;
-      try {
-        Core.deleteCari(data, id, S.user ? (S.user.ad || S.user.kullanici) : '');
-        log('CARİ SİL', c.ad);
-        if (S.ui.cariId === id) S.ui.cariId = Core.defaultCariId(data);
-        setDirty(true);
-        updateChrome();
-        renderView();
-        toast('Cari silindi (çöp kutusundan geri alınabilir)', 'ok');
-      } catch (e) { toast(e.message, 'err'); }
-    });
-  }
-
-  function imageToDataUrl(file, cb) {
-    var reader = new FileReader();
-    reader.onload = function () {
-      var img = new Image();
-      img.onload = function () {
-        var max = 340;
-        var w = img.width, h = img.height;
-        var scale = Math.min(1, max / Math.max(w, h));
-        w = Math.max(1, Math.round(w * scale)); h = Math.max(1, Math.round(h * scale));
-        var c = document.createElement('canvas');
-        c.width = w; c.height = h;
-        var ctx = c.getContext('2d');
-        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-        var q = 0.74, out = c.toDataURL('image/jpeg', q);
-        while (out.length > 30000 && q > 0.32) { q -= 0.08; out = c.toDataURL('image/jpeg', q); }
-        while (out.length > 31000 && w > 90) {
-          w = Math.round(w * 0.8); h = Math.round(h * 0.8);
-          var c2 = document.createElement('canvas');
-          c2.width = w; c2.height = h;
-          c2.getContext('2d').drawImage(c, 0, 0, w, h);
-          c = c2;
-          out = c.toDataURL('image/jpeg', 0.6);
-        }
-        cb(out);
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* Cari hareket formu                                                  */
-  /* ------------------------------------------------------------------ */
-  var YON_DEFAULT = { 'SATIŞ': 'BORC', 'TAHSİLAT': 'ALACAK', 'ALIŞ': 'ALACAK', 'GELİR': 'ALACAK', 'DEVRİ': 'BORC', 'DİĞER': 'BORC' };
-
-  function openLedgerForm(row) {
-    var isEdit = !!row;
-    var r = row || { tarih: Core.todayISO(), islem: 'TAHSİLAT', tutar: '', aciklama: '', fisNo: '', sipno: '', yon: 'ALACAK' };
-    var yon = row ? (Core.num(row.borc) > 0 ? 'BORC' : 'ALACAK') : 'ALACAK';
-
-    var body =
-      '<form id="ledgerForm" class="form-grid g2" autocomplete="off">' +
-      '  <div class="field span2"><label for="lfCari">Cari hesap</label>' +
-      '    <select id="lfCari" class="select"' + (S.ui.cariId ? ' disabled' : '') + '>' + cariOptions(row ? row.cariId : (S.ui.cariId || Core.defaultCariId(data)), false) + '</select></div>' +
-      '  <div class="field"><label for="lfTarih">Tarih</label><input id="lfTarih" name="tarih" type="date" class="input" value="' + esc(r.tarih) + '"></div>' +
-      '  <div class="field"><label for="lfTutar">Tutar</label><input id="lfTutar" name="tutar" class="input num" type="text" inputmode="decimal" required value="' + esc(isEdit ? r.tutar : '') + '" placeholder="0,00"></div>' +
-      '  <div class="field"><label for="lfIslem">İşlem türü</label><select id="lfIslem" name="islem" class="select">' +
-      ['TAHSİLAT', 'SATIŞ', 'ALIŞ', 'GELİR', 'DEVRİ', 'DİĞER'].map(function (t) {
-        return '<option' + (r.islem === t ? ' selected' : '') + '>' + t + '</option>';
-      }).join('') + '</select></div>' +
-      '  <div class="field"><label for="lfYon">Yön</label><select id="lfYon" name="yon" class="select">' +
-      '<option value="ALACAK"' + (yon === 'ALACAK' ? ' selected' : '') + '>Alacak (tahsilat / ödeme)</option>' +
-      '<option value="BORC"' + (yon === 'BORC' ? ' selected' : '') + '>Borç (satış / gelir)</option>' +
-      '</select></div>' +
-      '  <div class="field span2"><label for="lfAciklama">Açıklama</label><input id="lfAciklama" name="aciklama" class="input" value="' + esc(r.aciklama) + '" placeholder="Örn. Nakit tahsilat, havale, kira…"></div>' +
-      '  <div class="field"><label for="lfFisNo">Fiş / belge no</label><input id="lfFisNo" name="fisNo" class="input" value="' + esc(r.fisNo) + '"></div>' +
-      '  <div class="field"><label for="lfSipno">Sipariş no <span class="hint">(isteğe bağlı)</span></label><input id="lfSipno" name="sipno" class="input" value="' + esc(r.sipno) + '"></div>' +
-      '</form>';
-
-    var m = openModal({
-      title: isEdit ? 'Cari hareketi düzenle' : 'Cari hareket ekle',
-      subtitle: 'Tahsilat, ödeme veya manuel satış kaydı',
-      body: body,
-      footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
-        '<button class="btn btn-primary" type="submit" form="ledgerForm">' + ICONS.check + ' Kaydet</button>'
-    });
-    var wrap = m.el;
-    $('#lfIslem', wrap).addEventListener('change', function () {
-      $('#lfYon', wrap).value = YON_DEFAULT[this.value] || 'BORC';
-    });
-
-    $('#ledgerForm', wrap).addEventListener('submit', function (e) {
-      e.preventDefault();
-      var payload = {
-        cariId: Core.num($('#lfCari', wrap).value) || S.ui.cariId || Core.defaultCariId(data),
-        tarih: $('#lfTarih', wrap).value,
-        tutar: $('#lfTutar', wrap).value,
-        islem: $('#lfIslem', wrap).value,
-        yon: $('#lfYon', wrap).value,
-        aciklama: $('#lfAciklama', wrap).value,
-        fisNo: $('#lfFisNo', wrap).value,
-        sipno: $('#lfSipno', wrap).value
-      };
-      try {
-        var lk = isEdit ? Core.updateLedgerEntry(data, row.id, payload) : Core.addLedgerEntry(data, payload);
-        log(isEdit ? 'HAREKET DÜZENLE' : 'HAREKET EKLE', lk.islem + ' · ' + money(lk.tutar) + ' · ' + cariAdi(lk.cariId));
-        setDirty(true);
-        m.close();
-        renderView();
-        toast(isEdit ? 'Hareket güncellendi' : 'Hareket eklendi', 'ok');
-      } catch (err) { toast(err.message, 'err'); }
-    });
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* Kullanıcı formları                                                  */
-  /* ------------------------------------------------------------------ */
-  function openUserForm(user, sifreOdak) {
-    var isEdit = !!user;
-    var u = user || { ad: '', kullanici: '', rol: 'KULLANICI', aktif: true };
-
-    var body =
-      '<form id="userForm" class="form-grid g2" autocomplete="off">' +
-      '  <div class="field span2"><label for="ufAd">Ad soyad *</label><input id="ufAd" class="input" required value="' + esc(u.ad) + '"></div>' +
-      '  <div class="field"><label for="ufKullanici">Kullanıcı adı *</label><input id="ufKullanici" class="input" required autocomplete="username" value="' + esc(u.kullanici) + '"></div>' +
-      '  <div class="field"><label for="ufRol">Yetki</label><select id="ufRol" class="select">' +
-      '<option value="KULLANICI"' + (u.rol !== 'YÖNETİCİ' ? ' selected' : '') + '>Kullanıcı</option>' +
-      '<option value="YÖNETİCİ"' + (u.rol === 'YÖNETİCİ' ? ' selected' : '') + '>Yönetici</option>' +
-      '</select></div>' +
-      '  <div class="field span2"><label for="ufSifre">' + (isEdit ? 'Yeni şifre <span class="hint">(boş bırakılırsa değişmez)</span>' : 'Şifre *') + '</label>' +
-      '    <input id="ufSifre" type="password" class="input" autocomplete="new-password" placeholder="' + (isEdit ? '••••••' : '') + '"></div>' +
-      '  <div class="field span2"><label class="switch"><input type="checkbox" id="ufAktif"' + (u.aktif === false ? '' : ' checked') + '><span class="track"></span><span>Aktif (giriş yapabilir)</span></label></div>' +
-      '  <div class="auth-err span2" id="ufErr"></div>' +
-      '</form>';
-
-    var m = openModal({
-      title: isEdit ? 'Kullanıcıyı düzenle' : 'Yeni kullanıcı',
-      subtitle: isEdit ? u.kullanici : 'Uygulamaya giriş için hesap oluşturun',
-      body: body,
-      footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
-        '<button class="btn btn-primary" type="submit" form="userForm">' + ICONS.check + ' Kaydet</button>'
-    });
-    var wrap = m.el;
-    if (sifreOdak) setTimeout(function () { var f = $('#ufSifre', wrap); if (f) f.focus(); }, 80);
-
-    $('#userForm', wrap).addEventListener('submit', async function (e) {
-      e.preventDefault();
-      var kadi = $('#ufKullanici', wrap).value.trim();
-      var sifre = $('#ufSifre', wrap).value;
-      var payload = {
-        ad: $('#ufAd', wrap).value,
-        kullanici: kadi,
-        rol: $('#ufRol', wrap).value,
-        aktif: $('#ufAktif', wrap).checked
-      };
-      var err = $('#ufErr', wrap);
-      if (sifre) {
-        if (sifre.length < 4) { err.textContent = 'Şifre en az 4 karakter olmalı.'; return; }
-        var tuz = randomHex(16);
-        payload.tuz = tuz;
-        payload.sifre = await sifreHash(kadi, sifre, tuz);
-      } else if (!isEdit) {
-        err.textContent = 'Şifre zorunlu.';
-        return;
-      }
-      try {
-        var ku = isEdit ? Core.updateKullanici(data, u.id, payload) : Core.addKullanici(data, payload);
-        log(isEdit ? 'KULLANICI DÜZENLE' : 'KULLANICI EKLE', ku.kullanici + ' · ' + ku.rol);
-        setDirty(true);
-        m.close();
-        renderView();
-        toast(isEdit ? 'Kullanıcı güncellendi' : 'Kullanıcı eklendi', 'ok');
-      } catch (ex) { err.textContent = ex.message; }
-    });
-  }
-
-  function openPasswordForm() {
-    var body =
-      '<form id="passForm" class="form-grid g2" autocomplete="off">' +
-      '  <div class="field span2"><label for="pf1">Yeni şifre</label><input id="pf1" type="password" class="input" required autocomplete="new-password"></div>' +
-      '  <div class="field span2"><label for="pf2">Yeni şifre (tekrar)</label><input id="pf2" type="password" class="input" required autocomplete="new-password"></div>' +
-      '  <div class="auth-err span2" id="pfErr"></div>' +
-      '</form>';
-    var m = openModal({
-      title: 'Şifremi değiştir',
-      subtitle: S.user ? S.user.kullanici : '',
-      body: body,
-      footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
-        '<button class="btn btn-primary" type="submit" form="passForm">' + ICONS.check + ' Şifreyi kaydet</button>'
-    });
-    var wrap = m.el;
-    $('#passForm', wrap).addEventListener('submit', async function (e) {
-      e.preventDefault();
-      var p1 = $('#pf1', wrap).value, p2 = $('#pf2', wrap).value;
-      var err = $('#pfErr', wrap);
-      if (p1.length < 4) { err.textContent = 'Şifre en az 4 karakter olmalı.'; return; }
-      if (p1 !== p2) { err.textContent = 'Şifreler uyuşmuyor.'; return; }
-      var tuz = randomHex(16);
-      var hash = await sifreHash(S.user.kullanici, p1, tuz);
-      try {
-        Core.updateKullanici(data, S.user.id, { tuz: tuz, sifre: hash });
-        log('ŞİFRE DEĞİŞTİ', S.user.kullanici);
-        setDirty(true);
-        m.close();
-        toast('Şifreniz güncellendi', 'ok');
-      } catch (ex) { err.textContent = ex.message; }
-    });
-  }
-
-  function removeKullanici(id) {
-    var u = Core.kullaniciById(data, id);
-    if (!u) return;
-    if (S.user && S.user.id === id) { toast('Kendi hesabınızı silemezsiniz.', 'err'); return; }
-    confirmDialog({
-      title: 'Kullanıcı silinsin mi?',
-      message: u.ad + ' (' + u.kullanici + ') hesabı silinecek.',
-      confirmText: 'Sil', danger: true
-    }).then(function (ok) {
-      if (!ok) return;
-      try {
-        Core.deleteKullanici(data, id);
-        log('KULLANICI SİL', u.kullanici);
-        setDirty(true);
-        renderView();
-        toast('Kullanıcı silindi', 'ok');
-      } catch (e) { toast(e.message, 'err'); }
-    });
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* Silme işlemleri                                                     */
-  /* ------------------------------------------------------------------ */
-  function closeModals() {
-    var kapali = $$('#modalRoot [data-modal-close]');
-    kapali.forEach(function (b) { b.click(); });
-    var r = $('#modalRoot');
-    if (r) r.innerHTML = '';
-  }
-
-  function modelById(id) {
-    return (data.modeller || []).filter(function (m) { return m.id === id; })[0] || null;
-  }
-
-  function showModelImage(id) {
-    var kart = modelById(id);
-    var src = data.modelImages[id];
-    if (!kart || !src) return;
-    openModal({
-      title: kart.model,
-      subtitle: 'Model resmi',
-      body: '<div style="text-align:center"><img src="' + esc(src) + '" alt="" style="max-width:100%;max-height:62vh;border-radius:10px;border:1px solid var(--line)"></div>',
-      footer: '<button class="btn" data-modal-close>Kapat</button>'
-    });
-  }
-
-  function removeModel(id) {
-    var kart = modelById(id);
-    if (!kart) return;
-    var kullanim = data.orders.filter(function (o) { return Core.normKey(o.model) === Core.normKey(kart.model); }).length;
-    confirmDialog({
-      title: 'Model kartı silinsin mi?',
-      message: kart.model + ' kartı silinecek.' + (kullanim ? ' Bu modele ait ' + kullanim + ' sipariş etkilenmez, sadece fiyat/maliyet bilgisi silinir.' : ''),
-      confirmText: 'Sil', danger: true
-    }).then(function (ok) {
-      if (!ok) return;
-      Core.deleteModel(data, id);
-      log('MODEL SİL', kart.model);
-      setDirty(true);
-      renderView();
-      toast('Model kartı silindi', 'ok');
-    });
+    form.addEventListener('submit', function (e) { e.preventDefault(); kaydet(false); });
+    var yeniKaydet = false;
+    var saveNew = $('#ofSaveNew', wrap);
+    if (saveNew) saveNew.addEventListener('click', function () { yeniKaydet = true; kaydet(true); });
   }
 
   function copyOrder(id) {
@@ -3081,20 +3010,23 @@ function viewShipments() {
   function fillCart() {
     var cid = shipCariId();
     if (!cid) { toast('Önce cari hesap seçin.', 'err'); return; }
-    var shipped = Core.shippedMap(data);
+    normalizeCart();
     var mevcut = {};
-    S.ui.cart.forEach(function (c) { mevcut[c.orderId] = 1; });
+    S.ui.cart.forEach(function (c) { mevcut[c.lineId] = 1; });
     var eklenen = 0;
     data.orders.forEach(function (o) {
-      if (o.cariId !== cid || mevcut[o.id]) return;
-      var info = Core.orderInfo(data, o, shipped);
-      if (info.kalan <= 0) return;
-      S.ui.cart.push({ orderId: o.id, cift: info.kalan, koli: info.kalanKoli, fiyat: o.fiyat });
-      eklenen++;
+      if (o.cariId !== cid) return;
+      Matris.orderLinesOf(data, o.id).forEach(function (l) {
+        if (mevcut[l.id]) return;
+        var info = Core.lineInfo(data, l);
+        if (info.kalan <= 0) return;
+        S.ui.cart.push({ lineId: l.id, orderId: o.id, cift: info.kalan, koli: info.kalanKoli, fiyat: o.fiyat });
+        eklenen++;
+      });
     });
-    if (!eklenen) { toast('Eklenecek kalan sipariş yok.', ''); return; }
+    if (!eklenen) { toast('Eklenecek kalan satır yok.', ''); return; }
     renderView();
-    toast(eklenen + ' sipariş sepete eklendi', 'ok');
+    toast(eklenen + ' satır sepete eklendi', 'ok');
   }
 
   function trashRestore(id) {
@@ -3201,11 +3133,26 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sepet                                                               */
   /* ------------------------------------------------------------------ */
-  function addToCart(id, jump) {
+  function shipOrder(id) {
     var o = findOrder(id);
     if (!o) return;
-    var info = Core.orderInfo(data, o);
-    if (info.kalan <= 0) { toast('Bu siparişin kalanı yok.', 'err'); return; }
+    var ls = Matris.orderLinesOf(data, id).filter(function (l) { return Core.lineInfo(data, l).kalan > 0; });
+    if (!ls.length) { toast('Bu siparişin kalanı yok.', 'err'); return; }
+    if (ls.length === 1) { addToCart(ls[0].id, true); return; }
+    S.ui.shipCariId = o.cariId;
+    S.ui.shipSearch = o.model;
+    if (S.view === 'ship') renderView(); else go('ship');
+    toast('Siparişin renk/beden satırını listeden seçin.', '');
+  }
+
+  function addToCart(lineId, jump) {
+    normalizeCart();
+    var l = findLine(lineId);
+    if (!l) return;
+    var o = findOrder(l.orderId);
+    if (!o) return;
+    var info = Core.lineInfo(data, l);
+    if (info.kalan <= 0) { toast('Bu satırın kalanı yok.', 'err'); return; }
     var scid = shipCariId();
     if (o.cariId !== scid) {
       if (S.ui.cariId) {
@@ -3220,34 +3167,34 @@ function viewShipments() {
       S.ui.cart = [];
       toast('Cari ' + cariAdi(o.cariId) + ' olarak değiştirildi.', '');
     }
-    if (!S.ui.cart.some(function (c) { return c.orderId === id; })) {
-      S.ui.cart.push({ orderId: id, cift: info.kalan, koli: info.kalanKoli, fiyat: o.fiyat });
+    if (!S.ui.cart.some(function (c) { return c.lineId === l.id; })) {
+      S.ui.cart.push({ lineId: l.id, orderId: o.id, cift: info.kalan, koli: info.kalanKoli, fiyat: o.fiyat });
     }
     if (S.view !== 'ship') go('ship');
     else renderView();
   }
 
-  function removeFromCart(id) {
-    S.ui.cart = S.ui.cart.filter(function (c) { return c.orderId !== id; });
+  function removeFromCart(lineId) {
+    S.ui.cart = S.ui.cart.filter(function (c) { return c.lineId !== lineId; });
     renderView();
   }
 
   function updateCartField(input) {
-    var id = parseInt(input.dataset.id, 10);
+    var id = Core.num(input.dataset.id);
     var field = input.dataset.cart;
-    var line = S.ui.cart.filter(function (c) { return c.orderId === id; })[0];
-    var o = findOrder(id);
-    if (!line || !o) return;
+    var line = S.ui.cart.filter(function (c) { return c.lineId === id; })[0];
+    var l = findLine(id);
+    if (!line || !l) return;
+    var per = linePerBox(l) || 1;
     var val = Core.num(input.value);
-    var asorti = Core.num(o.asorti) || 1;
     if (field === 'koli') {
       line.koli = val;
-      line.cift = Math.round(val * asorti * 1000) / 1000;
+      line.cift = Math.round(val * per * 1000) / 1000;
       var ciftInput = $('[data-cart="cift"][data-id="' + id + '"]');
       if (ciftInput) ciftInput.value = nf1(line.cift);
     } else if (field === 'cift') {
       line.cift = val;
-      line.koli = Math.round((val / asorti) * 1000) / 1000;
+      line.koli = Math.round((val / per) * 1000) / 1000;
       var koliInput = $('[data-cart="koli"][data-id="' + id + '"]');
       if (koliInput) koliInput.value = nf1(line.koli);
     } else {
@@ -3274,11 +3221,10 @@ function viewShipments() {
   }
 
   function cartHasError() {
-    var shipped = Core.shippedMap(data);
     return S.ui.cart.some(function (c) {
-      var o = findOrder(c.orderId);
-      if (!o) return true;
-      var info = Core.orderInfo(data, o, shipped);
+      var l = findLine(c.lineId);
+      if (!l) return true;
+      var info = Core.lineInfo(data, l);
       var cift = Core.num(c.cift);
       return cift <= 0 || cift > info.kalan + 0.001;
     });
@@ -3328,6 +3274,7 @@ function viewShipments() {
   }
 
   function createShipmentFromCart() {
+    normalizeCart();
     if (!S.ui.cart.length) { toast('Önce sipariş ekleyin.', 'err'); return; }
     var tarih = $('#shipTarih') ? $('#shipTarih').value : S.ui.shipTarih;
     var fisNo = $('#shipFisNo') ? Core.num($('#shipFisNo').value) : S.ui.shipFisNo;
@@ -3341,7 +3288,7 @@ function viewShipments() {
         faturaNo: faturaNo, faturaTarih: faturaTarih,
         lines: S.ui.cart.map(function (c) {
           var o = findOrder(c.orderId);
-          return { orderId: c.orderId, cift: c.cift, fiyat: c.fiyat !== '' ? c.fiyat : o.fiyat };
+          return { orderId: c.orderId, orderLineId: c.lineId, cift: c.cift, koli: c.koli, fiyat: c.fiyat !== '' ? c.fiyat : o.fiyat };
         })
       });
       log('SEVK FİŞİ', '#' + res.shipment.fisNo + ' · ' + (res.shipment.cari || '') + ' · ' + nf0(res.shipment.cift) + ' çift');
@@ -3389,13 +3336,42 @@ function viewShipments() {
         if (src) img = '<img src="' + esc(src) + '" alt="">';
       }
       rows += '<tr><td class="imgcell">' + img + '</td>' +
-        '<td class="model">' + (l ? esc(l.model) : '') + (l && l.renk ? '<div style="font-weight:400;font-size:10px;color:#555">' + esc(l.renk) + '</div>' : '') + '</td>' +
+        '<td class="model">' + (l ? esc(l.model) : '') +
+        (l && (l.renk || l.mod) ? '<div style="font-weight:400;font-size:9.5px;color:#555">' + esc([l.renk, l.mod ? lineLabel(l) : ''].filter(Boolean).join(' · ')) + '</div>' : '') +
+        '</td>' +
         '<td class="n">' + (l ? nf1(l.koli) : '') + '</td>' +
         '<td class="n">' + (l ? nf0(l.cift) : '') + '</td></tr>';
     }
     var totalKoli = lines.reduce(function (a, l) { return a + Core.num(l.koli); }, 0);
     var totalCift = lines.reduce(function (a, l) { return a + Core.num(l.cift); }, 0);
     var totalTutar = lines.reduce(function (a, l) { return a + Core.num(l.tutar); }, 0);
+
+    // Beden dökümü: yalnızca sevk edilen, boş beden yok
+    var sizeSet = {};
+    lines.forEach(function (l) {
+      Object.keys(l.dagilim || {}).forEach(function (sz) { if (Core.num(l.dagilim[sz])) sizeSet[sz] = 1; });
+    });
+    var sizes = Object.keys(sizeSet).map(Number).sort(function (a, b) { return a - b; });
+    var sizeTable = '';
+    if (sizes.length) {
+      var colTotals = {};
+      var body = lines.filter(function (l) {
+        return Object.keys(l.dagilim || {}).some(function (sz) { return Core.num(l.dagilim[sz]); });
+      }).map(function (l) {
+        return '<tr><td>' + esc(l.renk || l.model) + '<div class="szsub">' + esc(lineLabel(l)) + '</div></td>' +
+          sizes.map(function (sz) {
+            var q = Core.num((l.dagilim || {})[sz]);
+            if (q) colTotals[sz] = (colTotals[sz] || 0) + q;
+            return '<td class="n">' + (q ? nf0(q) : '') + '</td>';
+          }).join('') + '<td class="n strong">' + nf0(l.cift) + '</td></tr>';
+      }).join('');
+      sizeTable = '<div class="pf-sizes"><div class="pf-sizes-title">BEDEN DÖKÜMÜ · SEVK EDİLEN</div>' +
+        '<table class="pf-table pf-mx"><thead><tr><th>RENK</th>' +
+        sizes.map(function (sz) { return '<th class="n">' + sz + '</th>'; }).join('') +
+        '<th class="n">TOPLAM</th></tr></thead><tbody>' + body + '</tbody>' +
+        '<tfoot><tr><td>TOPLAM</td>' + sizes.map(function (sz) { return '<td class="n">' + nf0(colTotals[sz] || 0) + '</td>'; }).join('') +
+        '<td class="n">' + nf0(totalCift) + '</td></tr></tfoot></table></div>';
+    }
 
     return '<div class="print-doc' + (a5 ? ' a5' : '') + '">' +
       docHeader(data.settings.sevkBaslik || 'SEVK FİŞİ', '') +
@@ -3410,6 +3386,7 @@ function viewShipments() {
       '<tbody>' + rows + '</tbody>' +
       '<tfoot><tr><td colspan="2">GENEL TOPLAM</td><td class="n">' + nf1(totalKoli) + '</td><td class="n">' + nf0(totalCift) + '</td></tr></tfoot>' +
       '</table>' +
+      sizeTable +
       '<div class="pf-note">' + (s.aciklama ? 'Not: ' + esc(s.aciklama) : '') + '</div>' +
       '<div class="pf-note" style="text-align:right;font-weight:600">Tutar: ' + money(totalTutar) + '</div>' +
       '<div class="pf-sign"><div class="line">TESLİM EDEN</div><div class="line">TESLİM ALAN</div></div>' +

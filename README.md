@@ -7,6 +7,8 @@ Tek bir HTML dosyası olarak çalışan, verilerini seçtiğiniz **Excel (.xlsx)
 ## Özellikler
 
 - Sipariş, model, renk, asorti, fiyat ve kalan çift takibi
+- Renk–beden–asorti matrisi; çok renkli sipariş, asortili/açık satır, satır bazlı sevk
+- Fişte sevk edilen beden dökümü; “Açık · 9’lu”; A4/A5; beden raporu
 - A4 / A5 sevk fişi, fatura no ve tarihi
 - Çoklu cari hesap, cari ekstre, tahsilat ve bakiye
 - Model kartları: fiyat, maliyet, asorti, barkod, sezon ve resim; model bazlı kalan
@@ -58,19 +60,19 @@ Planlanan geliştirmeler ve tasarım notları: [ROADMAP.md](ROADMAP.md). Örnek:
 
 ## Sürüm
 
-Güncel sürüm: **v1.8.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
+Güncel sürüm: **v2.0.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
 
 ### Yeni sürüm çıkarma
 
 ```bash
 python tools/build.py
 git add -A
-git commit -m "v1.8.1: kısa açıklama"
-git tag -a v1.8.1 -m "Sürüm 1.6.1"
+git commit -m "v2.0.1: kısa açıklama"
+git tag -a v2.0.1 -m "Sürüm 2.0.1"
 git push origin main --tags
 ```
 
-Ardından GitHub'da **Releases → Draft a new release** ile `v1.8.1` etiketini seçip `DMR_SEVK.html` dosyasını ekleyin. CI, HTML'in kaynaklarla aynı olduğunu otomatik doğrular.
+Ardından GitHub'da **Releases → Draft a new release** ile `v2.0.1` etiketini seçip `DMR_SEVK.html` dosyasını ekleyin. CI, HTML'in kaynaklarla aynı olduğunu otomatik doğrular.
 
 ## Gizlilik
 

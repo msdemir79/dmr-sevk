@@ -73,6 +73,12 @@ BOOT = r"""
       if (x[7]) d.images[o.id] = svgImg(x[7], x[8]);
     });
 
+    var omm = Core.addOrder(d, { cariId: gns.id, sipno: 72, tarih: dt(1), model: '6049', renk: 'SİYAH', asorti: 10, adet: 48, fiyat: 75 });
+    d.orderLines = (d.orderLines || []).filter(function (l) { return l.orderId !== omm.id; });
+    var oml1 = Core.nextId(d.orderLines);
+    d.orderLines.push({ id: oml1, orderId: omm.id, renk: 'SİYAH', mod: 'ASORTILI', beden: 0, koli: 3, koliIci: 10, cift: 30 });
+    d.orderLines.push({ id: oml1 + 1, orderId: omm.id, renk: 'BEYAZ', mod: 'ACIK', beden: 42, koli: 2, koliIci: 9, cift: 18 });
+
     var o = d.orders;
     Core.createShipment(d, { cariId: gns.id, tarih: dt(30), fisNo: 242, aciklama: 'Kargo: Aras', lines: [
       { orderId: o[0].id, cift: 1200 }, { orderId: o[2].id, cift: 600 }
@@ -97,6 +103,7 @@ BOOT = r"""
     Core.addModel(d, { model: 'TALKIEN SİYAH HUC', fiyat: 62, maliyet: 45, asorti: 10, barkod: '8680000000042', sezon: '2026', resim: svgImg('#7c2d12', 'TALK') });
     Core.addModel(d, { model: 'BENZEMA FÜME RSZ', fiyat: 62, maliyet: 43, asorti: 10, barkod: '8680000000059', sezon: '2026' });
     Core.addModel(d, { model: 'BİRCE BEJ', fiyat: 62, maliyet: 40, asorti: 10, sezon: '2025' });
+    Core.addModel(d, { model: '6049', kategori: 'MERDANE', renkler: ['SİYAH', 'BEYAZ', 'LACİVERT', 'KAHVE'], asortiSablon: { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 }, fiyat: 75, maliyet: 48, asorti: 10, sezon: '2026' });
 
     Core.audit(d, 'Ali Veli', 'SEVK FİŞİ', '#246 · YILDIZ SPOR · 400 çift');
     Core.audit(d, 'Ali Veli', 'SİPARİŞ EKLE', 'RUNNER LACİVERT · 800 çift · YILDIZ SPOR');
@@ -135,6 +142,50 @@ BOOT = r"""
       APP.S.ui.cart = [{ orderId: o[0].id, cift: 600, koli: 60, fiyat: 75 }, { orderId: o[1].id, cift: 400, koli: 50, fiyat: 62 }];
       APP.updateChrome(); APP.renderView();
     }
+    if (h === 'ship-lines') {
+      var om3 = d.orders.filter(function (o) { return o.sipno === 72; })[0];
+      var ls3 = Matris.orderLinesOf(d, om3.id);
+      APP.S.ui.shipCariId = om3.cariId;
+      APP.S.ui.cart = ls3.map(function (l) {
+        return { lineId: l.id, orderId: om3.id, cift: Core.lineInfo(d, l).kalan, koli: Core.lineInfo(d, l).kalanKoli, fiyat: om3.fiyat };
+      });
+      APP.S.view = 'ship'; APP.updateChrome(); APP.renderView();
+    }
+    if (h === 'report-matris') {
+      var om5 = d.orders.filter(function (o) { return o.sipno === 72; })[0];
+      var ls5 = Matris.orderLinesOf(d, om5.id);
+      Core.createShipment(d, {
+        cariId: om5.cariId, tarih: om5.tarih,
+        lines: ls5.map(function (l) {
+          return { orderId: om5.id, orderLineId: l.id, cift: l.cift, koli: l.koli, fiyat: om5.fiyat };
+        })
+      });
+      APP.S.view = 'reports';
+      APP.S.ui.reportMonth = (om5.tarih || '').slice(0, 7);
+      APP.updateChrome(); APP.renderView();
+    }
+    if (h === 'print-fis' || h === 'print-fis-a5') {
+      var om4 = d.orders.filter(function (o) { return o.sipno === 72; })[0];
+      var ls4 = Matris.orderLinesOf(d, om4.id);
+      var res4 = Core.createShipment(d, {
+        cariId: om4.cariId, tarih: om4.tarih,
+        lines: ls4.map(function (l) {
+          return { orderId: om4.id, orderLineId: l.id, cift: l.cift, koli: l.koli, fiyat: om4.fiyat };
+        })
+      });
+      APP.S.view = 'ship'; APP.renderView();
+      setTimeout(function () { APP.printShipment(res4.shipment.id, h === 'print-fis-a5' ? 'A5' : 'A4'); }, 250);
+    }
+    if (h === 'ship-matris') {
+      var om2 = d.orders.filter(function (o) { return o.sipno === 72; })[0];
+      var ls2 = Matris.orderLinesOf(d, om2.id);
+      APP.S.ui.shipCariId = om2.cariId;
+      APP.S.ui.cart = ls2.map(function (l) {
+        return { lineId: l.id, orderId: om2.id, cift: Matris.lineCift(l, Core.modelKart(d, om2.model)), koli: l.koli, fiyat: om2.fiyat };
+      });
+      APP.S.view = 'ship'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { document.querySelector('[data-act="ship-create"]').click(); }, 350);
+    }
     if (h === 'flow-create') {
       APP.S.view = 'ship';
       APP.S.ui.cart = [{ orderId: o[2].id, cift: 500, koli: 50, fiyat: 62 }, { orderId: o[3].id, cift: 640, koli: 64, fiyat: 62 }];
@@ -148,14 +199,78 @@ BOOT = r"""
         document.querySelector('[data-act="order-new"]').click();
         setTimeout(function () {
           var f = document.getElementById('orderForm');
-          document.getElementById('ofModel').value = 'TEST MODEL ÇOK CARİ';
-          document.getElementById('ofAdet').value = '120';
+          var model = document.getElementById('ofModel');
+          model.value = 'TEST MODEL ÇOK CARİ';
+          model.dispatchEvent(new Event('change', { bubbles: true }));
           document.getElementById('ofFiyat').value = '99,50';
           document.getElementById('ofCari').value = String(mod.id);
-          f.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+          var renk = document.querySelector('[data-f="renk"][data-i="0"]');
+          var koli = document.querySelector('[data-f="koli"][data-i="0"]');
+          var koliIci = document.querySelector('[data-f="koliIci"][data-i="0"]');
+          if (renk) renk.value = 'SİYAH';
+          if (koli) koli.value = '12';
+          if (koliIci) koliIci.value = '10';
+          setTimeout(function () { f.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }, 100);
         }, 200);
       }, 150);
-    }    if (h === 'modal-order') setTimeout(function () { document.querySelector('[data-act="order-new"]').click(); }, 150);
+    }    if (h === 'order-form-matris') {
+      APP.S.view = 'orders'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        document.querySelector('[data-act="order-new"]').click();
+        setTimeout(function () {
+          var model = document.getElementById('ofModel');
+          model.value = '6049';
+          model.dispatchEvent(new Event('change', { bubbles: true }));
+          setTimeout(function () {
+            document.getElementById('ofAddLine').click();
+            setTimeout(function () {
+              var i = 1;
+              var mod = document.querySelector('[data-f="mod"][data-i="' + i + '"]');
+              mod.value = 'ACIK';
+              mod.dispatchEvent(new Event('change', { bubbles: true }));
+              setTimeout(function () {
+                var renk = document.querySelector('[data-f="renk"][data-i="' + i + '"]'); if (renk) renk.value = 'BEYAZ';
+                var beden = document.querySelector('[data-f="beden"][data-i="' + i + '"]'); if (beden) beden.value = '42';
+                var koli = document.querySelector('[data-f="koli"][data-i="' + i + '"]'); if (koli) koli.value = '2';
+                var ki = document.querySelector('[data-f="koliIci"][data-i="' + i + '"]'); if (ki) ki.value = '9';
+                var k0 = document.querySelector('[data-f="koli"][data-i="0"]'); if (k0) k0.value = '3';
+                document.getElementById('orderForm').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+              }, 150);
+            }, 150);
+          }, 200);
+        }, 200);
+      }, 150);
+    }
+    if (h === 'model-form-matris') {
+      APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        document.querySelector('[data-act="model-new"]').click();
+        setTimeout(function () {
+          var sel = document.getElementById('mfKategori');
+          sel.value = 'MERDANE';
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          var ins = document.querySelectorAll('#mfAsortiGrid input');
+          [1, 2, 3, 2, 1, 1].forEach(function (v, i) { if (ins[i]) ins[i].value = v; });
+        }, 200);
+      }, 150);
+    }
+    if (h === 'model-save-matris') {
+      APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        document.querySelector('[data-act="model-new"]').click();
+        setTimeout(function () {
+          document.getElementById('mfModel').value = 'TEST 6049';
+          document.getElementById('mfFiyat').value = '88';
+          var sel = document.getElementById('mfKategori');
+          sel.value = 'MERDANE';
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          var ins = document.querySelectorAll('#mfAsortiGrid input');
+          [1, 2, 3, 2, 1, 1].forEach(function (v, i) { if (ins[i]) { ins[i].value = v; ins[i].dispatchEvent(new Event('input', { bubbles: true })); } });
+          setTimeout(function () { document.getElementById('modelForm').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }, 120);
+        }, 200);
+      }, 150);
+    }
+    if (h === 'modal-order') setTimeout(function () { document.querySelector('[data-act="order-new"]').click(); }, 150);
     if (h === 'modal-cari') { APP.S.view = 'cariler'; APP.updateChrome(); APP.renderView(); setTimeout(function () { document.querySelector('[data-act="cari-new"]').click(); }, 150); }
     if (h === 'modal-ship') { APP.previewShipment(3); }
     if (h === 'upgrade') {

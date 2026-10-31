@@ -2,6 +2,23 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v2.0.0 — 31.10.2026
+
+### Eklendi
+- **Renk–beden–asorti matrisi:** model kartında kategori (Bebe…Merdane), çoklu renk listesi ve beden bazlı asorti şablonu
+- Siparişte renk/beden satırları; **asortili** veya **açık** (tek numara, elle koli içi), aynı siparişte çok renk
+- **Satır bazlı sevk:** her renk/beden satırının kalanı ayrı; kısmi sevk ve fazla sevk engeli
+- Fişte **yalnızca sevk edilen bedenler**; boş beden kolonu yok; “Açık · 9’lu” etiketi
+- **Beden dökümü raporu**; A4/A5 fiş tek sayfa
+
+### Değişti
+- Excel: **SİPARİŞ SATIRLARI** sayfası; model kartı ve sevk satırı yeni kolonları
+- Sevk ekranı ve sepet sipariş yerine **renk/beden satırı** bazlı
+- Eski siparişler `ESKI` satırına taşınır; bakiye, sevk ve kalanlar korunur
+
+### Not
+- Eski Excel dosyası ilk açılışta yeni şemaya yükseltilir; veri silinmez.
+
 ## v1.8.0 — 30.10.2026
 
 ### Değişti

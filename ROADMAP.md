@@ -46,9 +46,10 @@ Bu dosya, henüz uygulanmayan ama değerlendirilen geliştirmeleri tutar. Uygula
 1. ✅ Kağıt tasarım — kategori, asorti, açık sipariş, fiş kararları.
 2. ✅ HTML prototip v3 — çoklu renk, açıkta çok beden, kısmi sevk, 9’lu, fiyat.
 3. ✅ Geri bildirim — açık giriş yöntemi: her beden ayrı satır.
-4. ⏳ Çekirdek — veri modeli, Excel şeması (`SİPARİŞ SATIRLARI`), migration, testler.
-5. ⏳ Arayüz — mevcut uygulamaya sipariş matrisi + fiş seçeneği.
-6. ⏳ Rapor + kabul testi → sürüm.
+4. ✅ Çekirdek — veri modeli, Excel, migration ve testler `feature/matris` dalında tamamlandı.
+eature/matris dalında tamamlandı (veri modeli, Excel, migration, testler); arayüz bekliyor.
+5. ✅ Arayüz — model kartı, sipariş satırları, satır bazlı sevk ve fiş beden dökümü tamamlandı.
+6. 🟡 Rapor + kabul — beden raporu ve v2.0.0 release candidate hazır; kullanıcı testi/onayı bekliyor.
 
 **Neden önce prototip?** Veri modeli ve fiş yerleşimi değişiyor; mevcut dosyalarla uyumluluk riski var. Gerçek siparişlerle denemeden üretime almamak gerekiyor.
 
