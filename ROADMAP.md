@@ -59,3 +59,4 @@ eature/matris dalında tamamlandı (veri modeli, Excel, migration, testler); ara
 
 - Bu başlık kullanıcı talebiyle 30.10.2026’da yol haritasına alındı.
 - Öncelik sırası: önce tasarım + deneme, sonra üretim.
+7. ✅ Renk/şablon ustaları — v2.1.0: RENKLER, ASORTİ ŞABLONLARI, MODEL RENKLERİ; Ayarlar ve model matrisi.

@@ -2,6 +2,22 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v2.1.0 — 31.10.2026
+
+### Eklendi
+- **Renk ustası:** Renkler ayrı tabloda (ad, kısa kod, aktif); model kartında çoklu seçim.
+- **Asorti şablonları:** Ayarlar’da ad + kategori + beden dağılımı; modele atanır.
+- **Model renkleri:** Model ↔ renk ilişkisi ayrı tabloda.
+- Model kartında **renk × beden matrisi** önizlemesi.
+- Excel: **RENKLER**, **ASORTİ ŞABLONLARI**, **MODEL RENKLERİ** sayfaları.
+
+### Değişti
+- Model formu: kategori yerine şablon seçimi; renkler metin yerine usta kayıttan seçilir.
+- Eski model kartlarındaki renkler ve asorti şablonları otomatik olarak ustalara taşınır; aynı dağılım tek şablonda birleşir.
+
+### Düzeltildi
+- v2.0.1: Modeller sayfasında Düzenle/Sil/Resim butonları.
+
 ## v2.0.1 — 31.10.2026
 
 ### Düzeltildi

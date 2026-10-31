@@ -125,6 +125,187 @@
     };
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Renk ve asorti şablonu ustaları                                     */
+  /* ------------------------------------------------------------------ */
+  function ensureMasterArrays(data) {
+    if (!Array.isArray(data.renkler)) data.renkler = [];
+    if (!Array.isArray(data.asortiSablonlari)) data.asortiSablonlari = [];
+    if (!Array.isArray(data.modelRenkleri)) data.modelRenkleri = [];
+    return data;
+  }
+
+  function nextMasterId(arr) {
+    var m = 0;
+    (arr || []).forEach(function (x) { if (num(x.id) > m) m = num(x.id); });
+    return m + 1;
+  }
+
+  function colorById(data, id) {
+    return (data.renkler || []).filter(function (c) { return c.id === id; })[0] || null;
+  }
+
+  function templateById(data, id) {
+    return (data.asortiSablonlari || []).filter(function (t) { return t.id === id; })[0] || null;
+  }
+
+  function findColorByName(data, ad) {
+    var key = normKey(ad);
+    if (!key) return null;
+    return (data.renkler || []).filter(function (c) { return normKey(c.ad) === key; })[0] || null;
+  }
+
+  function uniqueColorName(data, ad) {
+    var base = String(ad || '').trim() || 'RENK';
+    var ad2 = base, n = 2;
+    while ((data.renkler || []).some(function (c) { return normKey(c.ad) === normKey(ad2); })) {
+      ad2 = base + ' ' + n;
+      n++;
+    }
+    return ad2;
+  }
+
+  function findOrCreateColor(data, ad, kod) {
+    ensureMasterArrays(data);
+    var mevcut = findColorByName(data, ad);
+    if (mevcut) {
+      if (kod && !mevcut.kod) mevcut.kod = String(kod).trim();
+      return mevcut;
+    }
+    var renk = {
+      id: nextMasterId(data.renkler),
+      ad: uniqueColorName(data, ad),
+      kod: String(kod || '').trim(),
+      aktif: true
+    };
+    data.renkler.push(renk);
+    return renk;
+  }
+
+  function templateKey(t) {
+    return normKey(t && t.kategori) + '|' + formatAsorti(t && t.dagilim);
+  }
+
+  function uniqueTemplateName(data, ad) {
+    var base = String(ad || '').trim() || 'ASORTİ';
+    var ad2 = base, n = 2;
+    while ((data.asortiSablonlari || []).some(function (t) { return normKey(t.ad) === normKey(ad2); })) {
+      ad2 = base + ' (' + n + ')';
+      n++;
+    }
+    return ad2;
+  }
+
+  function findOrCreateTemplate(data, opts) {
+    ensureMasterArrays(data);
+    var dagilim = normalizeSablon(opts && opts.dagilim);
+    if (!Object.keys(dagilim).length) return null;
+    var kategori = kategoriKodu(opts && opts.kategori);
+    var key = kategori + '|' + formatAsorti(dagilim);
+    var mevcut = (data.asortiSablonlari || []).filter(function (t) { return templateKey(t) === key; })[0];
+    if (mevcut) return mevcut;
+    var sablon = {
+      id: nextMasterId(data.asortiSablonlari),
+      ad: uniqueTemplateName(data, (opts && opts.ad) || (kategori || 'ASORTİ') + ' · ' + asortiToplam(dagilim) + "'li"),
+      kategori: kategori,
+      dagilim: dagilim,
+      aktif: true
+    };
+    data.asortiSablonlari.push(sablon);
+    return sablon;
+  }
+
+  function modelColorIds(data, modelId) {
+    return (data.modelRenkleri || []).filter(function (r) { return r.modelId === modelId; })
+      .sort(function (a, b) { return num(a.sira) - num(b.sira); })
+      .map(function (r) { return r.renkId; });
+  }
+
+  function modelColors(data, modelId) {
+    var byId = {};
+    (data.renkler || []).forEach(function (c) { byId[c.id] = c; });
+    return modelColorIds(data, modelId).map(function (id) { return byId[id]; }).filter(Boolean);
+  }
+
+  function setModelColors(data, modelId, colorIds) {
+    ensureMasterArrays(data);
+    data.modelRenkleri = (data.modelRenkleri || []).filter(function (r) { return r.modelId !== modelId; });
+    (colorIds || []).forEach(function (cid, i) {
+      var c = colorById(data, num(cid));
+      if (c) data.modelRenkleri.push({ modelId: modelId, renkId: c.id, sira: i + 1 });
+    });
+  }
+
+  function hydrateModel(data, kart) {
+    if (!kart) return kart;
+    ensureMasterArrays(data);
+    var tpl = templateById(data, kart.asortiSablonId);
+    if (!tpl && kart.asortiSablon && Object.keys(kart.asortiSablon).length) {
+      tpl = findOrCreateTemplate(data, { kategori: kart.kategori, dagilim: kart.asortiSablon, ad: kart.model + ' · asorti' });
+    }
+    if (tpl) {
+      kart.asortiSablonId = tpl.id;
+      kart.kategori = tpl.kategori || kart.kategori;
+      kart.asortiSablon = JSON.parse(JSON.stringify(tpl.dagilim));
+      kart.asorti = asortiToplam(tpl.dagilim);
+    } else {
+      kart.asortiSablonId = 0;
+      if (!kart.asortiSablon) kart.asortiSablon = {};
+    }
+
+    var ids = modelColorIds(data, kart.id);
+    if (!ids.length && Array.isArray(kart.renkler) && kart.renkler.length) {
+      var yeni = [];
+      kart.renkler.forEach(function (ad) {
+        var c = findOrCreateColor(data, ad);
+        if (c) yeni.push(c.id);
+      });
+      setModelColors(data, kart.id, yeni);
+    }
+    kart.renkler = modelColors(data, kart.id).map(function (c) { return c.ad; });
+    kart.renkIds = modelColors(data, kart.id).map(function (c) { return c.id; });
+    return kart;
+  }
+
+  /**
+   * Eski model kartlarını renk/şablon ustalarına taşır.
+   * Idempotent: tekrar çağrılması veriyi çoğaltmaz.
+   */
+  function migrateMaster(data) {
+    ensureMasterArrays(data);
+
+    data.renkler = data.renkler.map(function (c) {
+      return { id: num(c.id), ad: String(c.ad || '').trim(), kod: String(c.kod || '').trim(), aktif: c.aktif !== false };
+    }).filter(function (c) { return c.id > 0 && c.ad; });
+
+    data.asortiSablonlari = data.asortiSablonlari.map(function (t) {
+      return { id: num(t.id), ad: String(t.ad || '').trim(), kategori: kategoriKodu(t.kategori), dagilim: normalizeSablon(t.dagilim), aktif: t.aktif !== false };
+    }).filter(function (t) { return t.id > 0 && Object.keys(t.dagilim).length; });
+
+    var modelById = {};
+    (data.modeller || []).forEach(function (m) { modelById[m.id] = m; });
+    var gorulen = {};
+    data.modelRenkleri = data.modelRenkleri.filter(function (r) {
+      if (!modelById[r.modelId] || !colorById(data, r.renkId)) return false;
+      var k = r.modelId + '|' + r.renkId;
+      if (gorulen[k]) return false;
+      gorulen[k] = 1;
+      return true;
+    });
+
+    (data.modeller || []).forEach(function (m) { hydrateModel(data, m); });
+    return data;
+  }
+
+  function templateUsage(data, id) {
+    return (data.modeller || []).filter(function (m) { return num(m.asortiSablonId) === id; }).length;
+  }
+
+  function colorUsage(data, id) {
+    return (data.modelRenkleri || []).filter(function (r) { return r.renkId === id; }).length;
+  }
+
+
   function kartToplam(kart) {
     if (!kart) return 0;
     return asortiToplam(kart.asortiSablon) || num(kart.asorti);
@@ -273,6 +454,18 @@
   }
 
   return {
+    ensureMasterArrays: ensureMasterArrays,
+    findOrCreateColor: findOrCreateColor,
+    findOrCreateTemplate: findOrCreateTemplate,
+    colorById: colorById,
+    templateById: templateById,
+    modelColorIds: modelColorIds,
+    modelColors: modelColors,
+    setModelColors: setModelColors,
+    hydrateModel: hydrateModel,
+    migrateMaster: migrateMaster,
+    templateUsage: templateUsage,
+    colorUsage: colorUsage,
     KATEGORILER: KATEGORILER,
     num: num,
     round3: round3,

@@ -11,7 +11,8 @@ Tek bir HTML dosyası olarak çalışan, verilerini seçtiğiniz **Excel (.xlsx)
 - Fişte sevk edilen beden dökümü; “Açık · 9’lu”; A4/A5; beden raporu
 - A4 / A5 sevk fişi, fatura no ve tarihi
 - Çoklu cari hesap, cari ekstre, tahsilat ve bakiye
-- Model kartları: fiyat, maliyet, asorti, barkod, sezon ve resim; model bazlı kalan
+- Model kartları: kategori, renk seçimi, asorti şablonu, fiyat, maliyet, barkod, sezon ve resim
+- Ayarlar’da renk ustası ve yeniden kullanılabilir asorti şablonları
 - Kârlılık raporu (ciro, maliyet, kâr, marj)
 - Kullanıcı girişi, yönetici/kullanıcı rolleri, oturum kilidi
 - İşlem günlüğü, çöp kutusu (30 gün), günlük otomatik yedek (son 7 gün)
@@ -60,7 +61,7 @@ Planlanan geliştirmeler ve tasarım notları: [ROADMAP.md](ROADMAP.md). Örnek:
 
 ## Sürüm
 
-Güncel sürüm: **v2.0.1**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
+Güncel sürüm: **v2.1.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
 
 ### Yeni sürüm çıkarma
 

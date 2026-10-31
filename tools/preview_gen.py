@@ -118,6 +118,9 @@ BOOT = r"""
     Core.addLedgerEntry(d, { cariId: gns.id, tarih: dt(8), islem: 'GELİR', tutar: 1983.72, aciklama: 'İlaç ve silme suyu', fisNo: 'T- 44' });
     Core.addLedgerEntry(d, { cariId: mod.id, tarih: dt(10), islem: 'TAHSİLAT', tutar: 40000, aciklama: 'Çek tahsilatı', fisNo: 'T- 51' });
 
+    Matris.migrateMaster(d);
+    Matris.ensureLines(d);
+
     APP.data = d;
     APP.S.file.name = 'DMR_VERI.xlsx';
     APP.S.file.lastSaved = new Date();
@@ -263,6 +266,35 @@ BOOT = r"""
           var yes = document.querySelector('[data-yes]');
           if (yes) yes.click();
         }, 200);
+      }, 250);
+    }
+    if (h === 'model-master-save') {
+      APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var mm = d.modeller.filter(function (m) { return m.model === '6049'; })[0];
+        var b = mm ? document.querySelector('[data-act="model-edit"][data-id="' + mm.id + '"]') : null;
+        if (b) b.click();
+        setTimeout(function () {
+          var f = document.getElementById('mfFiyat');
+          if (f) f.value = '80';
+          var form = document.getElementById('modelForm');
+          if (form) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        }, 250);
+      }, 200);
+    }
+    if (h === 'settings-color' || h === 'settings-sablon') {
+      APP.S.view = 'settings'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="' + (h === 'settings-sablon' ? 'sablon-new' : 'color-new') + '"]');
+        if (b) b.click();
+      }, 250);
+    }
+    if (h === 'model-master') {
+      APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var mm = d.modeller.filter(function (m) { return m.model === '6049'; })[0];
+        var b = mm ? document.querySelector('[data-act="model-edit"][data-id="' + mm.id + '"]') : null;
+        if (b) b.click();
       }, 250);
     }
     if (h === 'model-edit' || h === 'model-delete') {

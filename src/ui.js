@@ -408,6 +408,7 @@
     });
     if (!data.modelImages || typeof data.modelImages !== 'object') data.modelImages = {};
     try { Core.markaMigrate(data); } catch (e) { }
+    try { Matris.migrateMaster(data); } catch (e) { }
     try { Matris.ensureLines(data); } catch (e) { }
     try { Core.trashTemizle(data, 30); } catch (e) { }
     S.file.name = fileName || 'DMR_VERI.xlsx';
@@ -1097,6 +1098,12 @@
         case 'user-del': removeKullanici(id); break;
         case 'change-pass': openPasswordForm(); break;
         case 'model-new': openModelForm(null, el.dataset.model || ''); break;
+        case 'color-new': openColorForm(null); break;
+        case 'color-edit': openColorForm((data.renkler || []).filter(function (c) { return c.id === id; })[0]); break;
+        case 'color-del': removeColorMaster(id); break;
+        case 'sablon-new': openSablonForm(null); break;
+        case 'sablon-edit': openSablonForm((data.asortiSablonlari || []).filter(function (t) { return t.id === id; })[0]); break;
+        case 'sablon-del': removeSablonMaster(id); break;
         case 'model-edit': openModelForm(modelById(id)); break;
         case 'model-del': removeModel(id); break;
         case 'model-image': showModelImage(id); break;
@@ -1944,9 +1951,18 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '2.0.1';
+  var SURUM = '2.1.0';
 
   var YENILIKLER = [
+    {
+      v: '2.1.0', t: '31.10.2026', m: [
+        'Renkler artık ayrı tabloda; model kartında çoklu renk seçimi',
+        'Asorti şablonları Ayarlar’da tanımlanır; modele atanır',
+        'Model kartında renk × beden matrisi önizlemesi',
+        'Excelde RENKLER, ASORTİ ŞABLONLARI ve MODEL RENKLERİ sayfaları',
+        'Eski kartlar otomatik renk/şablon kayıtlarına taşınır'
+      ]
+    },
     {
       v: '2.0.1', t: '31.10.2026', m: [
         'Modeller sayfasında Düzenle, Sil ve Resim butonları düzeltildi',
@@ -2388,31 +2404,46 @@ function viewShipments() {
   function openModelForm(model, modelAdi) {
     var isEdit = !!model;
     var m = model || {
-      model: modelAdi || '', kategori: '', renkler: [], asortiSablon: {},
-      fiyat: '', asorti: '', maliyet: '', barkod: '', sezon: '', not: ''
+      model: modelAdi || '', asortiSablonId: 0, renkIds: [], kategori: '',
+      fiyat: '', maliyet: '', barkod: '', sezon: '', not: ''
     };
     var currentImage = model ? (data.modelImages[model.id] || null) : null;
-    var kategoriOpts = '<option value="">Seçin…</option>' + Object.keys(Matris.KATEGORILER).map(function (k) {
-      return '<option value="' + k + '"' + (m.kategori === k ? ' selected' : '') + '>' + Matris.KATEGORILER[k].ad + ' (' + Matris.KATEGORILER[k].min + '–' + Matris.KATEGORILER[k].max + ')</option>';
+    var templates = (data.asortiSablonlari || []).filter(function (t) { return t.aktif !== false || Core.num(m.asortiSablonId) === t.id; });
+    var colors = (data.renkler || []);
+    var secili = {};
+    (m.renkIds || Matris.modelColorIds(data, m.id) || []).forEach(function (id) { secili[id] = 1; });
+    if (!Object.keys(secili).length && m.renkler) {
+      m.renkler.forEach(function (ad) { var c = colors.filter(function (x) { return Core.normKey(x.ad) === Core.normKey(ad); })[0]; if (c) secili[c.id] = 1; });
+    }
+
+    var tOpts = '<option value="">Şablon seçin…</option>' + templates.map(function (t) {
+      var kat = Matris.kategori(t.kategori);
+      return '<option value="' + t.id + '"' + (Core.num(m.asortiSablonId) === t.id ? ' selected' : '') + '>' +
+        esc(t.ad) + ' · ' + esc(kat ? kat.ad : '—') + ' · ' + nf0(Matris.asortiToplam(t.dagilim)) + ' çift/koli</option>';
+    }).join('');
+
+    var colorHtml = colors.filter(function (c) { return c.aktif !== false || secili[c.id]; }).map(function (c) {
+      return '<label class="color-pick-item"><input type="checkbox" data-color-id="' + c.id + '"' + (secili[c.id] ? ' checked' : '') + '>' +
+        '<span>' + esc(c.ad) + '</span>' + (c.kod ? '<small>' + esc(c.kod) + '</small>' : '') + '</label>';
     }).join('');
 
     var modal = openModal({
       title: isEdit ? 'Model kartını düzenle' : 'Yeni model kartı',
-      subtitle: 'Kategori, renkler, asorti ve fiyat',
+      subtitle: 'Asorti şablonu + renkler; beden dağılımı şablondan gelir',
       size: 'wide',
       body:
         '<form id="modelForm" class="form-grid g2" autocomplete="off">' +
         '  <div class="field span2"><label for="mfModel">Model *</label><input id="mfModel" class="input" required value="' + esc(m.model) + '"></div>' +
-        '  <div class="field"><label for="mfKategori">Kategori *</label><select id="mfKategori" class="select" required>' + kategoriOpts + '</select></div>' +
+        '  <div class="field"><label for="mfSablon">Asorti şablonu *</label><select id="mfSablon" class="select" required>' + tOpts + '</select></div>' +
+        '  <div class="field"><label>Kategori</label><div class="input" id="mfKategori" style="background:var(--surface-2)">—</div></div>' +
+        '  <div class="field span2"><label>Renkler * <span class="hint">(' + colors.length + ' renk tanımlı)</span></label>' +
+        '    <div id="mfRenkler" class="color-pick">' + (colorHtml || '<span class="muted small">Önce <b>Ayarlar → Renkler</b> bölümünden renk ekleyin.</span>') + '</div></div>' +
+        '  <div class="span2"><label class="f">Renk × beden matrisi <span class="hint">(koli içi çift)</span></label><div id="mfMatrix" class="table-wrap" style="max-height:none"></div></div>' +
         '  <div class="field"><label for="mfFiyat">Liste fiyatı</label><input id="mfFiyat" class="input num" type="text" inputmode="decimal" value="' + esc(m.fiyat || '') + '"></div>' +
-        '  <div class="field span2"><label for="mfRenkler">Renkler <span class="hint">(virgülle ayırın)</span></label><textarea id="mfRenkler" class="input" rows="2" spellcheck="false">' + esc((m.renkler || []).join(', ')) + '</textarea></div>' +
-        '  <div class="span2"><label class="f">Koli içi asorti <span class="hint">(her numaradan kaç çift)</span></label>' +
-        '    <div id="mfAsortiGrid" class="m-sz-grid"></div>' +
-        '    <div class="muted small" id="mfAsortiToplam" style="margin-top:5px"></div></div>' +
         '  <div class="field"><label for="mfMaliyet">Maliyet</label><input id="mfMaliyet" class="input num" type="text" inputmode="decimal" value="' + esc(m.maliyet || '') + '"></div>' +
         '  <div class="field"><label for="mfBarkod">Barkod</label><input id="mfBarkod" class="input" value="' + esc(m.barkod || '') + '"></div>' +
         '  <div class="field"><label for="mfSezon">Sezon</label><input id="mfSezon" class="input" value="' + esc(m.sezon || '') + '"></div>' +
-        '  <div class="field"><label for="mfNot">Not</label><input id="mfNot" class="input" value="' + esc(m.not || '') + '"></div>' +
+        '  <div class="field span2"><label for="mfNot">Not</label><input id="mfNot" class="input" value="' + esc(m.not || '') + '"></div>' +
         '  <div class="span2" style="display:flex;gap:14px;align-items:center;padding:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px">' +
         '    <div class="thumb lg" id="mfThumb" style="' + (currentImage ? 'background-image:url(&quot;' + esc(currentImage) + '&quot;)' : '') + '">' + (currentImage ? '' : 'RESİM') + '</div>' +
         '    <div style="flex:1;min-width:0">' +
@@ -2420,7 +2451,7 @@ function viewShipments() {
         '        <button type="button" class="btn btn-sm" data-mimg-pick>' + ICONS.image + ' Resim seç</button>' +
         '        <button type="button" class="btn btn-sm btn-ghost" data-mimg-clear>Kaldır</button>' +
         '      </div>' +
-        '      <p class="muted small" style="margin:8px 0 0">Resmi yapıştırabilir (Ctrl+V) veya sürükleyebilirsiniz. Küçük önizleme Excel dosyasına gömülür.</p>' +
+        '      <p class="muted small" style="margin:8px 0 0">Resmi yapıştırabilir (Ctrl+V) veya sürükleyebilirsiniz.</p>' +
         '    </div>' +
         '    <input type="file" accept="image/*" id="mfImage" class="hidden">' +
         '  </div>' +
@@ -2431,35 +2462,45 @@ function viewShipments() {
     });
 
     var wrap = modal.el;
-    var sablon = Object.assign({}, m.asortiSablon || {});
 
-    function renderAsorti() {
-      var kat = $('#mfKategori', wrap).value;
-      var list = Matris.bedenler(kat);
-      var grid = $('#mfAsortiGrid', wrap);
-      if (!list.length) {
-        grid.innerHTML = '<span class="muted small">Önce kategori seçin.</span>';
-        $('#mfAsortiToplam', wrap).textContent = '';
-        return;
-      }
-      grid.innerHTML = list.map(function (size) {
-        var q = Core.num(sablon[size]);
-        return '<label class="m-sz"><span>' + size + '</span><input type="number" min="0" step="1" data-size="' + size + '" value="' + (q ? q : '') + '" placeholder="0"></label>';
-      }).join('');
-      updateToplam();
+    function seciliTpl() {
+      return Matris.templateById(data, Core.num($('#mfSablon', wrap).value));
     }
-
-    function updateToplam() {
-      var t = 0;
-      $$('#mfAsortiGrid [data-size]', wrap).forEach(function (inp) { t += Core.num(inp.value); });
-      $('#mfAsortiToplam', wrap).textContent = 'Koli içi toplam: ' + nf0(t) + ' çift';
+    function seciliRenkler() {
+      return $$('#mfRenkler input[data-color-id]:checked', wrap).map(function (i) { return Core.num(i.getAttribute('data-color-id')); });
     }
+    function renderKategori() {
+      var t = seciliTpl();
+      var k = t ? Matris.kategori(t.kategori) : null;
+      $('#mfKategori', wrap).textContent = k ? k.ad + ' (' + k.min + '–' + k.max + ')' : '—';
+    }
+    function renderMatrix() {
+      var t = seciliTpl();
+      var ids = seciliRenkler();
+      var box = $('#mfMatrix', wrap);
+      if (!t) { box.innerHTML = '<div class="empty">Asorti şablonu seçin.</div>'; return; }
+      if (!ids.length) { box.innerHTML = '<div class="empty">En az bir renk seçin.</div>'; return; }
+      var sizes = Object.keys(t.dagilim).map(Number).sort(function (a, b) { return a - b; });
+      var byId = {};
+      colors.forEach(function (c) { byId[c.id] = c; });
+      var total = Matris.asortiToplam(t.dagilim);
+      box.innerHTML = '<table class="data mini"><thead><tr><th>Renk</th>' +
+        sizes.map(function (sz) { return '<th class="right">' + sz + '</th>'; }).join('') +
+        '<th class="right">Koli içi</th></tr></thead><tbody>' +
+        ids.map(function (id) {
+          var c = byId[id] || { ad: '—' };
+          return '<tr><td><div class="strong">' + esc(c.ad) + '</div><div class="sub">' + esc(c.kod || '') + '</div></td>' +
+            sizes.map(function (sz) { var q = Core.num(t.dagilim[sz]); return '<td class="right">' + (q ? nf0(q) : '—') + '</td>'; }).join('') +
+            '<td class="right strong">' + nf0(total) + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    }
+    function renderAll() { renderKategori(); renderMatrix(); }
 
-    $('#mfKategori', wrap).addEventListener('change', renderAsorti);
-    $('#mfAsortiGrid', wrap).addEventListener('input', updateToplam);
-    renderAsorti();
+    $('#mfSablon', wrap).addEventListener('change', renderAll);
+    $('#mfRenkler', wrap).addEventListener('change', renderMatrix);
+    renderAll();
 
-    // ---- model resmi ----
+    // ---- resim ----
     function setModelImage(dataUrl) {
       currentImage = dataUrl;
       var th = $('#mfThumb', wrap);
@@ -2492,20 +2533,14 @@ function viewShipments() {
     $('#modelForm', wrap).addEventListener('submit', function (e) {
       e.preventDefault();
       var err = $('#mfErr', wrap);
-      var kategori = $('#mfKategori', wrap).value;
-      if (!kategori) { err.textContent = 'Kategori seçin.'; return; }
-      var yeniSablon = {};
-      $$('#mfAsortiGrid [data-size]', wrap).forEach(function (inp) {
-        var q = Core.num(inp.value);
-        if (q > 0) yeniSablon[inp.getAttribute('data-size')] = Math.round(q);
-      });
-      var toplam = Matris.asortiToplam(yeniSablon);
+      var t = seciliTpl();
+      if (!t) { err.textContent = 'Asorti şablonu seçin. Ayarlar → Asorti şablonları.'; return; }
+      var ids = seciliRenkler();
+      if (!ids.length) { err.textContent = 'En az bir renk seçin. Ayarlar → Renkler.'; return; }
       var payload = {
         model: $('#mfModel', wrap).value,
-        kategori: kategori,
-        renkler: $('#mfRenkler', wrap).value,
-        asortiSablon: yeniSablon,
-        asorti: toplam || Core.num(m.asorti),
+        asortiSablonId: t.id,
+        renkIds: ids,
         fiyat: $('#mfFiyat', wrap).value.replace(',', '.'),
         maliyet: $('#mfMaliyet', wrap).value.replace(',', '.'),
         barkod: $('#mfBarkod', wrap).value,
@@ -2515,7 +2550,7 @@ function viewShipments() {
       };
       try {
         var kayit = isEdit ? Core.updateModel(data, m.id, payload) : Core.addModel(data, payload);
-        log(isEdit ? 'MODEL DÜZENLE' : 'MODEL EKLE', kayit.model + ' · ' + kategori + ' · ' + toplam + ' çift/koli');
+        log(isEdit ? 'MODEL DÜZENLE' : 'MODEL EKLE', kayit.model + ' · ' + t.ad + ' · ' + ids.length + ' renk');
         setDirty(true);
         modal.close();
         renderView();
@@ -2562,6 +2597,118 @@ function viewShipments() {
   /* Ayarlar  /* ------------------------------------------------------------------ */
   /* Ayarlar                                                             */
   /* ------------------------------------------------------------------ */
+  function openColorForm(renk) {
+    var isEdit = !!renk;
+    var c = renk || { ad: '', kod: '', aktif: true };
+    var m = openModal({
+      title: isEdit ? 'Rengi düzenle' : 'Yeni renk',
+      subtitle: 'Model kartlarında bu renk seçilir',
+      body: '<form id="colorForm" class="form-grid g2" autocomplete="off">' +
+        '  <div class="field span2"><label for="cfAd">Renk adı *</label><input id="cfAd" class="input" required value="' + esc(c.ad) + '"></div>' +
+        '  <div class="field"><label for="cfKod">Kısa kod</label><input id="cfKod" class="input" maxlength="8" value="' + esc(c.kod || '') + '"></div>' +
+        '  <div class="field" style="display:flex;align-items:flex-end"><label class="check"><input type="checkbox" id="cfAktif"' + (c.aktif !== false ? ' checked' : '') + '> Aktif</label></div>' +
+        '  <div class="auth-err span2" id="cfErr"></div>' +
+        '</form>',
+      footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
+        '<button class="btn btn-primary" type="submit" form="colorForm">' + ICONS.check + ' Kaydet</button>'
+    });
+    $('#colorForm', m.el).addEventListener('submit', function (e) {
+      e.preventDefault();
+      try {
+        var payload = { ad: $('#cfAd', m.el).value, kod: $('#cfKod', m.el).value, aktif: $('#cfAktif', m.el).checked };
+        var kayit = isEdit ? Core.updateColor(data, c.id, payload) : Core.addColor(data, payload);
+        log(isEdit ? 'RENK DÜZENLE' : 'RENK EKLE', kayit.ad);
+        setDirty(true); m.close(); renderView();
+        toast(isEdit ? 'Renk güncellendi' : 'Renk eklendi', 'ok');
+      } catch (ex) { $('#cfErr', m.el).textContent = ex.message; }
+    });
+  }
+
+  function removeColorMaster(id) {
+    var c = (data.renkler || []).filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    confirmDialog({
+      title: 'Renk silinsin mi?', message: c.ad + ' rengi silinecek. Kullanılan model varsa silinmez.', confirmText: 'Sil', danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      try {
+        Core.deleteColor(data, id);
+        log('RENK SİL', c.ad); setDirty(true); renderView(); toast('Renk silindi', 'ok');
+      } catch (ex) { toast(ex.message, 'err'); }
+    });
+  }
+
+  function openSablonForm(sablon) {
+    var isEdit = !!sablon;
+    var t = sablon || { ad: '', kategori: 'MERDANE', dagilim: {} };
+    var dagilim = Object.assign({}, t.dagilim || {});
+    var katOpts = '<option value="">Kategori seçin</option>' + Object.keys(Matris.KATEGORILER).map(function (k) {
+      return '<option value="' + k + '"' + (t.kategori === k ? ' selected' : '') + '>' + Matris.KATEGORILER[k].ad + ' (' + Matris.KATEGORILER[k].min + '–' + Matris.KATEGORILER[k].max + ')</option>';
+    }).join('');
+    var m = openModal({
+      title: isEdit ? 'Asorti şablonunu düzenle' : 'Yeni asorti şablonu',
+      subtitle: 'Koli içi beden dağılımı; modele atanır',
+      size: 'wide',
+      body: '<form id="sablonForm" class="form-grid g2" autocomplete="off">' +
+        '  <div class="field span2"><label for="sfAd">Şablon adı *</label><input id="sfAd" class="input" required value="' + esc(t.ad) + '" placeholder="Örn. Merdane 10\'lu 40-45"></div>' +
+        '  <div class="field"><label for="sfKat">Kategori *</label><select id="sfKat" class="select" required>' + katOpts + '</select></div>' +
+        '  <div class="field"><label>Koli içi toplam</label><div class="input" id="sfToplam" style="background:var(--surface-2)">0 çift</div></div>' +
+        '  <div class="span2"><label class="f">Beden dağılımı <span class="hint">(her numaradan kaç çift)</span></label><div id="sfGrid" class="m-sz-grid"></div></div>' +
+        '  <div class="auth-err span2" id="sfErr"></div>' +
+        '</form>',
+      footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
+        '<button class="btn btn-primary" type="submit" form="sablonForm">' + ICONS.check + ' Kaydet</button>'
+    });
+
+    function renderGrid() {
+      var kat = $('#sfKat', m.el).value;
+      var list = Matris.bedenler(kat);
+      if (!list.length) { $('#sfGrid', m.el).innerHTML = '<span class="muted small">Önce kategori seçin.</span>'; updateTotal(); return; }
+      $('#sfGrid', m.el).innerHTML = list.map(function (sz) {
+        return '<label class="m-sz"><span>' + sz + '</span><input type="number" min="0" step="1" data-size="' + sz + '" value="' + (Core.num(dagilim[sz]) || '') + '" placeholder="0"></label>';
+      }).join('');
+      updateTotal();
+    }
+    function updateTotal() {
+      var total = 0;
+      $$('#sfGrid [data-size]', m.el).forEach(function (inp) { total += Core.num(inp.value); });
+      $('#sfToplam', m.el).textContent = nf0(total) + ' çift';
+    }
+    $('#sfKat', m.el).addEventListener('change', renderGrid);
+    $('#sfGrid', m.el).addEventListener('input', updateTotal);
+    renderGrid();
+
+    $('#sablonForm', m.el).addEventListener('submit', function (e) {
+      e.preventDefault();
+      var yeni = {};
+      $$('#sfGrid [data-size]', m.el).forEach(function (inp) {
+        var q = Core.num(inp.value);
+        if (q > 0) yeni[inp.getAttribute('data-size')] = Math.round(q);
+      });
+      try {
+        var payload = { ad: $('#sfAd', m.el).value, kategori: $('#sfKat', m.el).value, dagilim: yeni, aktif: true };
+        var kayit = isEdit ? Core.updateAsortiSablon(data, t.id, payload) : Core.addAsortiSablon(data, payload);
+        log(isEdit ? 'ŞABLON DÜZENLE' : 'ŞABLON EKLE', kayit.ad);
+        setDirty(true); m.close(); renderView();
+        toast(isEdit ? 'Şablon güncellendi' : 'Şablon eklendi', 'ok');
+      } catch (ex) { $('#sfErr', m.el).textContent = ex.message; }
+    });
+  }
+
+  function removeSablonMaster(id) {
+    var t = (data.asortiSablonlari || []).filter(function (x) { return x.id === id; })[0];
+    if (!t) return;
+    confirmDialog({
+      title: 'Şablon silinsin mi?', message: t.ad + ' şablonu silinecek. Kullanan model varsa silinmez.', confirmText: 'Sil', danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      try {
+        Core.deleteAsortiSablon(data, id);
+        log('ŞABLON SİL', t.ad); setDirty(true); renderView(); toast('Şablon silindi', 'ok');
+      } catch (ex) { toast(ex.message, 'err'); }
+    });
+  }
+
   function viewSettings() {
     if (!isAdmin()) return viewSettingsKullanici();
     var s = data.settings;
@@ -2576,6 +2723,25 @@ function viewShipments() {
         '<button class="btn btn-icon" data-act="user-pass" data-id="' + u.id + '" title="Şifre sıfırla" aria-label="Şifre sıfırla">' + ICONS.lock + '</button>' +
         '<button class="btn btn-icon" data-act="user-edit" data-id="' + u.id + '" title="Düzenle" aria-label="Düzenle">' + ICONS.edit + '</button>' +
         '<button class="btn btn-icon danger" data-act="user-del" data-id="' + u.id + '" title="Sil" aria-label="Sil">' + ICONS.trash + '</button>' +
+        '</div></td></tr>';
+    }).join('');
+
+    var renkRows = (data.renkler || []).map(function (c) {
+      return '<tr><td><div class="strong">' + esc(c.ad) + '</div><div class="sub">' + esc(c.kod || '—') + '</div></td>' +
+        '<td class="right sub">' + Matris.colorUsage(data, c.id) + '</td>' +
+        '<td><div class="row-actions">' +
+        '<button class="btn btn-icon" data-act="color-edit" data-id="' + c.id + '" title="Düzenle" aria-label="Düzenle">' + ICONS.edit + '</button>' +
+        '<button class="btn btn-icon danger" data-act="color-del" data-id="' + c.id + '" title="Sil" aria-label="Sil">' + ICONS.trash + '</button>' +
+        '</div></td></tr>';
+    }).join('');
+    var sablonRows = (data.asortiSablonlari || []).map(function (t) {
+      var top = Matris.asortiToplam(t.dagilim);
+      return '<tr><td><div class="strong">' + esc(t.ad) + '</div><div class="sub">' + esc(Matris.bedenler(t.kategori).length ? (Matris.kategori(t.kategori) || {}).ad : '—') + '</div></td>' +
+        '<td class="right">' + nf0(top) + '</td>' +
+        '<td class="right sub">' + Matris.templateUsage(data, t.id) + '</td>' +
+        '<td><div class="row-actions">' +
+        '<button class="btn btn-icon" data-act="sablon-edit" data-id="' + t.id + '" title="Düzenle" aria-label="Düzenle">' + ICONS.edit + '</button>' +
+        '<button class="btn btn-icon danger" data-act="sablon-del" data-id="' + t.id + '" title="Sil" aria-label="Sil">' + ICONS.trash + '</button>' +
         '</div></td></tr>';
     }).join('');
 
@@ -2627,6 +2793,16 @@ function viewShipments() {
       '      </div>' +
       '      <p class="muted small" style="margin:12px 0 0">Excel dosyasını bu ekran açıkken de açabilirsiniz; ancak kaydetmeden önce Excel\'de kapatın.</p>' +
       '    </div></div>' +
+      '  <div class="card"><div class="card-head"><div><h2>Renkler</h2><div class="sub">Model kartlarında seçilir</div></div>' +
+      '    <button class="btn btn-sm" data-act="color-new">' + ICONS.plus + ' Renk</button></div>' +
+      '    <div class="table-wrap" style="max-height:none"><table class="data"><thead><tr><th>Renk</th><th class="right">Model</th><th></th></tr></thead><tbody>' +
+      (renkRows || '<tr><td colspan="3">' + emptyState('tag', 'Renk yok', 'Model kartlarında kullanmak için renk ekleyin.', '') + '</td></tr>') +
+      '    </tbody></table></div></div>' +
+      '  <div class="card"><div class="card-head"><div><h2>Asorti şablonları</h2><div class="sub">Modele atanır; beden dağılımı burada tanımlanır</div></div>' +
+      '    <button class="btn btn-sm" data-act="sablon-new">' + ICONS.plus + ' Şablon</button></div>' +
+      '    <div class="table-wrap" style="max-height:none"><table class="data"><thead><tr><th>Şablon</th><th class="right">Çift</th><th class="right">Model</th><th></th></tr></thead><tbody>' +
+      (sablonRows || '<tr><td colspan="4">' + emptyState('tag', 'Şablon yok', 'Asorti şablonu ekleyip modele atayın.', '') + '</td></tr>') +
+      '    </tbody></table></div></div>' +
       '  <div class="card"><div class="card-head"><div><h2>Yedekler</h2><div class="sub">Günde bir otomatik · son 7 gün</div></div></div>' +
       '    <div class="card-body">' +
       '      <div style="display:flex;gap:8px;flex-wrap:wrap">' +
