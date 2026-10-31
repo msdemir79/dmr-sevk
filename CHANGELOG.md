@@ -2,6 +2,13 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v2.2.0 — 31.10.2026
+
+### Eklendi
+- **Model kartında “Yeni renk” kısayolu:** Ayarlar’a gitmeden renk tanımlama.
+- Yeni renk kaydedilince model formu kapanmaz; renk otomatik seçilir ve renk × beden matrisine eklenir.
+- İç içe pencerelerde Escape yalnızca üstteki pencereyi kapatır.
+
 ## v2.1.1 — 31.10.2026
 
 ### Düzeltildi

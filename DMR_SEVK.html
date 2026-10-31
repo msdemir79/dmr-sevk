@@ -4478,7 +4478,12 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
       if (opts.onClose) opts.onClose();
       if (lastFocus && lastFocus.focus) try { lastFocus.focus(); } catch (e) { }
     }
-    function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); close(); } }
+    function onKey(e) {
+      if (e.key !== 'Escape') return;
+      var hepsi = document.querySelectorAll('.modal-backdrop');
+      if (hepsi.length && hepsi[hepsi.length - 1] !== wrap) return;
+      e.preventDefault(); close();
+    }
     document.addEventListener('keydown', onKey);
     wrap.addEventListener('mousedown', function (e) { if (e.target === wrap) close(); });
     $$('[data-modal-close]', wrap).forEach(function (b) { b.addEventListener('click', close); });
@@ -6152,9 +6157,16 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '2.1.1';
+  var SURUM = '2.2.0';
 
   var YENILIKLER = [
+    {
+      v: '2.2.0', t: '31.10.2026', m: [
+        'Model kartında “Yeni renk” kısayolu: modelden ayrılmadan renk tanımlama',
+        'Yeni renk kaydedilince model formunda otomatik seçilir ve matrise eklenir',
+        'İç içe pencerelerde Escape yalnızca üstteki pencereyi kapatır'
+      ]
+    },
     {
       v: '2.1.1', t: '31.10.2026', m: [
         'Siparişte renk artık model kartındaki tanımlı renklerden seçilir; elle yazılamaz',
@@ -6617,7 +6629,7 @@ function viewShipments() {
     };
     var currentImage = model ? (data.modelImages[model.id] || null) : null;
     var templates = (data.asortiSablonlari || []).filter(function (t) { return t.aktif !== false || Core.num(m.asortiSablonId) === t.id; });
-    var colors = (data.renkler || []);
+    var colors = (data.renkler || []).slice();
     var secili = {};
     (m.renkIds || Matris.modelColorIds(data, m.id) || []).forEach(function (id) { secili[id] = 1; });
     if (!Object.keys(secili).length && m.renkler) {
@@ -6644,7 +6656,9 @@ function viewShipments() {
         '  <div class="field span2"><label for="mfModel">Model *</label><input id="mfModel" class="input" required value="' + esc(m.model) + '"></div>' +
         '  <div class="field"><label for="mfSablon">Asorti şablonu *</label><select id="mfSablon" class="select" required>' + tOpts + '</select></div>' +
         '  <div class="field"><label>Kategori</label><div class="input" id="mfKategori" style="background:var(--surface-2)">—</div></div>' +
-        '  <div class="field span2"><label>Renkler * <span class="hint">(' + colors.length + ' renk tanımlı)</span></label>' +
+        '  <div class="span2"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px">' +
+        '    <label class="f" style="margin:0">Renkler * <span class="hint" id="mfRenkSayisi">(' + colors.length + ' renk tanımlı)</span></label>' +
+        '    <button type="button" class="btn btn-sm" id="mfRenkEkle">' + ICONS.plus + ' Yeni renk</button></div>' +
         '    <div id="mfRenkler" class="color-pick">' + (colorHtml || '<span class="muted small">Önce <b>Ayarlar → Renkler</b> bölümünden renk ekleyin.</span>') + '</div></div>' +
         '  <div class="span2"><label class="f">Renk × beden matrisi <span class="hint">(koli içi çift)</span></label><div id="mfMatrix" class="table-wrap" style="max-height:none"></div></div>' +
         '  <div class="field"><label for="mfFiyat">Liste fiyatı</label><input id="mfFiyat" class="input num" type="text" inputmode="decimal" value="' + esc(m.fiyat || '') + '"></div>' +
@@ -6677,6 +6691,15 @@ function viewShipments() {
     function seciliRenkler() {
       return $$('#mfRenkler input[data-color-id]:checked', wrap).map(function (i) { return Core.num(i.getAttribute('data-color-id')); });
     }
+    function renderColorPicker() {
+      var html = colors.filter(function (c) { return c.aktif !== false || secili[c.id]; }).map(function (c) {
+        return '<label class="color-pick-item"><input type="checkbox" data-color-id="' + c.id + '"' + (secili[c.id] ? ' checked' : '') + '>' +
+          '<span>' + esc(c.ad) + '</span>' + (c.kod ? '<small>' + esc(c.kod) + '</small>' : '') + '</label>';
+      }).join('');
+      $('#mfRenkler', wrap).innerHTML = html || '<span class="muted small">Henüz renk yok. “Yeni renk” ile ekleyin.</span>';
+      var say = $('#mfRenkSayisi', wrap); if (say) say.textContent = '(' + colors.length + ' renk tanımlı)';
+    }
+
     function renderKategori() {
       var t = seciliTpl();
       var k = t ? Matris.kategori(t.kategori) : null;
@@ -6705,7 +6728,22 @@ function viewShipments() {
     function renderAll() { renderKategori(); renderMatrix(); }
 
     $('#mfSablon', wrap).addEventListener('change', renderAll);
-    $('#mfRenkler', wrap).addEventListener('change', renderMatrix);
+    $('#mfRenkler', wrap).addEventListener('change', function (e) {
+      var cb = e.target.closest('input[data-color-id]');
+      if (cb) {
+        var cid = Core.num(cb.getAttribute('data-color-id'));
+        if (cb.checked) secili[cid] = 1; else delete secili[cid];
+      }
+      renderMatrix();
+    });
+    $('#mfRenkEkle', wrap).addEventListener('click', function () {
+      openColorForm(null, function (c) {
+        if (!colors.some(function (x) { return x.id === c.id; })) colors.push(c);
+        secili[c.id] = 1;
+        renderColorPicker();
+        renderMatrix();
+      });
+    });
     renderAll();
 
     // ---- resim ----
@@ -6805,7 +6843,7 @@ function viewShipments() {
   /* Ayarlar  /* ------------------------------------------------------------------ */
   /* Ayarlar                                                             */
   /* ------------------------------------------------------------------ */
-  function openColorForm(renk) {
+  function openColorForm(renk, onSaved) {
     var isEdit = !!renk;
     var c = renk || { ad: '', kod: '', aktif: true };
     var m = openModal({
@@ -6826,7 +6864,8 @@ function viewShipments() {
         var payload = { ad: $('#cfAd', m.el).value, kod: $('#cfKod', m.el).value, aktif: $('#cfAktif', m.el).checked };
         var kayit = isEdit ? Core.updateColor(data, c.id, payload) : Core.addColor(data, payload);
         log(isEdit ? 'RENK DÜZENLE' : 'RENK EKLE', kayit.ad);
-        setDirty(true); m.close(); renderView();
+        setDirty(true); m.close();
+        if (onSaved) onSaved(kayit); else renderView();
         toast(isEdit ? 'Renk güncellendi' : 'Renk eklendi', 'ok');
       } catch (ex) { $('#cfErr', m.el).textContent = ex.message; }
     });

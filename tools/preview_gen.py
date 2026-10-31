@@ -268,6 +268,26 @@ BOOT = r"""
         }, 200);
       }, 250);
     }
+    if (h === 'model-color-shortcut') {
+      APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var mm = d.modeller.filter(function (m) { return m.model === '6049'; })[0];
+        var b = mm ? document.querySelector('[data-act="model-edit"][data-id="' + mm.id + '"]') : null;
+        if (b) b.click();
+        setTimeout(function () {
+          var ekle = document.getElementById('mfRenkEkle');
+          if (ekle) ekle.click();
+          setTimeout(function () {
+            var ad = document.getElementById('cfAd');
+            if (ad) ad.value = 'YEŞİL';
+            var kod = document.getElementById('cfKod');
+            if (kod) kod.value = 'YSL';
+            var form = document.getElementById('colorForm');
+            if (form) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+          }, 220);
+        }, 220);
+      }, 160);
+    }
     if (h === 'order-color') {
       APP.S.view = 'orders'; APP.updateChrome(); APP.renderView();
       setTimeout(function () {
