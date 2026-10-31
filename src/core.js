@@ -16,7 +16,7 @@
   }
   if (!Matris) throw new Error('matris.js yüklenmedi');
 
-  var TYPES = { SATIS: 'SATIŞ', TAHSILAT: 'TAHSİLAT', ALIS: 'ALIŞ', GELIR: 'GELİR', DEVIR: 'DEVRİ', DIGER: 'DİĞER' };
+  var TYPES = { SATIS: 'SATIŞ', TAHSILAT: 'TAHSİLAT', ALIS: 'ALIŞ', GIDER: 'GİDER', GELIR: 'GELİR', DEVIR: 'DEVRİ', DIGER: 'DİĞER' };
 
   var SHEET = {
     CARILER: 'CARİLER',
@@ -766,7 +766,7 @@
     if (tutar <= 0) throw new Error('Tutar sıfırdan büyük olmalı.');
     var cariId = num(input.cariId) || defaultCariId(data);
     if (!cariById(data, cariId)) throw new Error('Cari hesap seçin.');
-    var yon = input.yon || (islem === TYPES.SATIS ? 'BORC' : islem === TYPES.DIGER ? 'BORC' : 'ALACAK');
+    var yon = input.yon || (islem === TYPES.SATIS || islem === TYPES.GIDER || islem === TYPES.DIGER ? 'BORC' : 'ALACAK');
     var entry = {
       id: nextId(data.ledger),
       cariId: cariId,

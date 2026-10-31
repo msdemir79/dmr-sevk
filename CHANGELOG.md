@@ -2,6 +2,16 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v2.3.0 — 31.10.2026
+
+### Eklendi
+- **Cari Hesap → Tahsilat:** cariye alacak olarak hızlı tahsilat girişi.
+- **Cari Hesap → Gider:** GİDER işlem türü; varsayılan **cariye borç**, yön alacak olarak değiştirilebilir.
+- Gider filtresi ve işlem etiketi.
+
+### Düzeltildi
+- Cari hesap **“Hareket ekle”** butonu çalışmıyordu; eksik `openLedgerForm` fonksiyonu geri eklendi.
+
 ## v2.2.0 — 31.10.2026
 
 ### Eklendi

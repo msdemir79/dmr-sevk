@@ -134,6 +134,28 @@ BOOT = r"""
     if (h === 'all-dashboard') { APP.S.ui.cariId = 0; APP.updateChrome(); APP.renderView(); }
     if (h === 'cariler') { APP.S.view = 'cariler'; APP.updateChrome(); APP.renderView(); }
     if (h === 'settings') { APP.S.view = 'settings'; APP.updateChrome(); APP.renderView(); }
+    if (h === 'ledger-gider-save') {
+      APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="ledger-gider"]');
+        if (b) b.click();
+        setTimeout(function () {
+          var t = document.getElementById('lfTutar');
+          var a = document.getElementById('lfAciklama');
+          if (t) t.value = '1250';
+          if (a) a.value = 'Kargo gideri';
+          var f = document.getElementById('ledgerForm');
+          if (f) f.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        }, 250);
+      }, 250);
+    }
+    if (h === 'ledger-open' || h === 'ledger-gider-open') {
+      APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="' + (h === 'ledger-gider-open' ? 'ledger-gider' : 'ledger-new') + '"]');
+        if (b) b.click();
+      }, 250);
+    }
     if (h === 'ledger') { APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView(); }
     if (h === 'shipments') { APP.S.view = 'shipments'; APP.updateChrome(); APP.renderView(); }
     if (h === 'orders') { APP.S.view = 'orders'; APP.updateChrome(); APP.renderView(); }

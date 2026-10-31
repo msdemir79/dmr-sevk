@@ -97,6 +97,15 @@ const S = { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 };
   ok(d4.orderLines.length === 2, 'iki sipariş satırı Excelden okundu');
   ok(d4.orderLines[1].mod === 'ACIK' && d4.orderLines[1].beden === 40, 'açık satır bedeni korundu');
 
+  // ---- tahsilat / gider ----
+  const dg = Core.newData();
+  const cg = dg.cariler[0];
+  const gider = Core.addLedgerEntry(dg, { cariId: cg.id, islem: 'GİDER', tutar: 1250, aciklama: 'Kargo gideri' });
+  ok(gider.borc === 1250 && gider.alacak === 0, 'gider borç olarak eklendi');
+  const tahsil = Core.addLedgerEntry(dg, { cariId: cg.id, islem: 'TAHSİLAT', tutar: 500, aciklama: 'Nakit' });
+  ok(tahsil.alacak === 500 && tahsil.borc === 0, 'tahsilat alacak olarak eklendi');
+  ok(Core.balance(dg, cg.id) === 750, 'gider/tahsilat bakiyesi 750');
+
   // ---- renk / asorti şablonu ustaları ----
   const dm = Core.newData();
   const syh = Core.addColor(dm, { ad: 'SİYAH', kod: 'SYH' });

@@ -1006,7 +1006,9 @@
       actions.push(btn('Yeni model', 'model-new', 'btn btn-primary', 'plus'));
     } else if (S.view === 'ledger') {
       actions.push(btn('Ekstre yazdır', 'print-ekstre', 'btn', 'print'));
-      actions.push(btn('Hareket ekle', 'ledger-new', 'btn btn-primary', 'plus'));
+      actions.push(btn('Tahsilat', 'ledger-tahsilat', 'btn btn-primary', 'wallet'));
+      actions.push(btn('Gider', 'ledger-gider', 'btn', 'receipt'));
+      actions.push(btn('Hareket ekle', 'ledger-new', 'btn', 'plus'));
     } else if (S.view === 'settings') {
       actions.push(btn('Yedek indir', 'backup', 'btn', 'download'));
     }
@@ -1076,6 +1078,8 @@
         case 'order-del': removeOrder(id); break;
         case 'order-ship': shipOrder(id); break;
         case 'go-ship': go('ship'); break;
+        case 'ledger-tahsilat': openLedgerForm(null, { islem: 'TAHSİLAT', yon: 'ALACAK', baslik: 'Tahsilat ekle', altBaslik: 'Cariye alacak / tahsilat kaydı' }); break;
+        case 'ledger-gider': openLedgerForm(null, { islem: 'GİDER', yon: 'BORC', baslik: 'Gider ekle', altBaslik: 'Cariye borç / masraf kaydı' }); break;
         case 'ledger-new': openLedgerForm(null); break;
         case 'ledger-del': removeLedger(id); break;
         case 'print-ekstre': printEkstre(); break;
@@ -1237,7 +1241,7 @@
   }
 
   function islemPill(islem) {
-    var map = { 'SATIŞ': 'info', 'TAHSİLAT': 'ok', 'ALIŞ': 'warn', 'GELİR': 'ok', 'DİĞER': 'muted' };
+    var map = { 'SATIŞ': 'info', 'TAHSİLAT': 'ok', 'GİDER': 'warn', 'ALIŞ': 'warn', 'GELİR': 'ok', 'DİĞER': 'muted' };
     return '<span class="pill ' + (map[islem] || 'muted') + '">' + esc(islem || '—') + '</span>';
   }
 
@@ -1746,7 +1750,7 @@
 
   function viewLedger() {
     var st = Core.stats(data, S.ui.cariId);
-    var types = [['all', 'Tümü'], ['SATIŞ', 'Satış'], ['TAHSİLAT', 'Tahsilat'], ['ALIŞ', 'Alış'], ['GELİR', 'Gelir'], ['DEVRİ', 'Devir']];
+    var types = [['all', 'Tümü'], ['SATIŞ', 'Satış'], ['TAHSİLAT', 'Tahsilat'], ['GİDER', 'Gider'], ['ALIŞ', 'Alış'], ['GELİR', 'Gelir'], ['DEVRİ', 'Devir']];
     var kaynak = data.ledger.filter(function (r) { return !S.ui.cariId || r.cariId === S.ui.cariId; });
     var toplamBorc = kaynak.reduce(function (a, r) { return a + Core.num(r.borc); }, 0);
     var toplamAlacak = kaynak.reduce(function (a, r) { return a + Core.num(r.alacak); }, 0);
@@ -1956,9 +1960,17 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '2.2.0';
+  var SURUM = '2.3.0';
 
   var YENILIKLER = [
+    {
+      v: '2.3.0', t: '31.10.2026', m: [
+        'Cari Hesap ekranında Tahsilat ve Gider hızlı işlem butonları',
+        'GİDER işlem türü; varsayılan cariye borç, yön değiştirilebilir',
+        'Cari hesap “Hareket ekle” butonu düzeltildi',
+        'Gider filtresi ve işlem etiketi'
+      ]
+    },
     {
       v: '2.2.0', t: '31.10.2026', m: [
         'Model kartında “Yeni renk” kısayolu: modelden ayrılmadan renk tanımlama',
@@ -3377,6 +3389,72 @@ function viewShipments() {
         setDirty(true); renderView(); updateChrome();
         toast('Sipariş silindi (çöp kutusundan geri alınabilir)', 'ok');
       } catch (e) { toast(e.message, 'err'); }
+    });
+  }
+
+  var YON_DEFAULT = { 'SATIŞ': 'BORC', 'TAHSİLAT': 'ALACAK', 'ALIŞ': 'ALACAK', 'GİDER': 'BORC', 'GELİR': 'ALACAK', 'DEVRİ': 'BORC', 'DİĞER': 'BORC' };
+
+  function openLedgerForm(row, opts) {
+    var isEdit = !!row;
+    var o = opts || {};
+    var varsayilan = o.islem || 'TAHSİLAT';
+    var r = row || {
+      tarih: Core.todayISO(), islem: varsayilan, tutar: '', aciklama: o.aciklama || '',
+      fisNo: '', sipno: '', yon: o.yon || YON_DEFAULT[varsayilan] || 'ALACAK'
+    };
+    var yon = row ? (Core.num(row.borc) > 0 ? 'BORC' : 'ALACAK') : (o.yon || r.yon || YON_DEFAULT[varsayilan] || 'ALACAK');
+
+    var body =
+      '<form id="ledgerForm" class="form-grid g2" autocomplete="off">' +
+      '  <div class="field span2"><label for="lfCari">Cari hesap</label>' +
+      '    <select id="lfCari" class="select"' + (S.ui.cariId ? ' disabled' : '') + '>' + cariOptions(row ? row.cariId : (S.ui.cariId || Core.defaultCariId(data)), false) + '</select></div>' +
+      '  <div class="field"><label for="lfTarih">Tarih</label><input id="lfTarih" name="tarih" type="date" class="input" value="' + esc(r.tarih) + '"></div>' +
+      '  <div class="field"><label for="lfTutar">Tutar</label><input id="lfTutar" name="tutar" class="input num" type="text" inputmode="decimal" required value="' + esc(isEdit ? r.tutar : '') + '" placeholder="0,00"></div>' +
+      '  <div class="field"><label for="lfIslem">İşlem türü</label><select id="lfIslem" name="islem" class="select">' +
+      ['TAHSİLAT', 'GİDER', 'SATIŞ', 'ALIŞ', 'GELİR', 'DEVRİ', 'DİĞER'].map(function (t) {
+        return '<option' + (r.islem === t ? ' selected' : '') + '>' + t + '</option>';
+      }).join('') + '</select></div>' +
+      '  <div class="field"><label for="lfYon">Yön</label><select id="lfYon" name="yon" class="select">' +
+      '<option value="ALACAK"' + (yon === 'ALACAK' ? ' selected' : '') + '>Alacak (tahsilat / ödeme)</option>' +
+      '<option value="BORC"' + (yon === 'BORC' ? ' selected' : '') + '>Borç (satış / gider)</option>' +
+      '</select></div>' +
+      '  <div class="field span2"><label for="lfAciklama">Açıklama</label><input id="lfAciklama" name="aciklama" class="input" value="' + esc(r.aciklama) + '" placeholder="Örn. Nakit tahsilat, kargo, kira…"></div>' +
+      '  <div class="field"><label for="lfFisNo">Fiş / belge no</label><input id="lfFisNo" name="fisNo" class="input" value="' + esc(r.fisNo) + '"></div>' +
+      '  <div class="field"><label for="lfSipno">Sipariş no <span class="hint">(isteğe bağlı)</span></label><input id="lfSipno" name="sipno" class="input" value="' + esc(r.sipno) + '"></div>' +
+      '</form>';
+
+    var m = openModal({
+      title: isEdit ? 'Cari hareketi düzenle' : (o.baslik || 'Cari hareket ekle'),
+      subtitle: isEdit ? 'Tahsilat, gider veya manuel satış kaydı' : (o.altBaslik || 'Tahsilat, gider veya manuel satış kaydı'),
+      body: body,
+      footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
+        '<button class="btn btn-primary" type="submit" form="ledgerForm">' + ICONS.check + ' Kaydet</button>'
+    });
+    var wrap = m.el;
+    $('#lfIslem', wrap).addEventListener('change', function () {
+      $('#lfYon', wrap).value = YON_DEFAULT[this.value] || 'BORC';
+    });
+
+    $('#ledgerForm', wrap).addEventListener('submit', function (e) {
+      e.preventDefault();
+      var payload = {
+        cariId: Core.num($('#lfCari', wrap).value) || S.ui.cariId || Core.defaultCariId(data),
+        tarih: $('#lfTarih', wrap).value,
+        tutar: $('#lfTutar', wrap).value,
+        islem: $('#lfIslem', wrap).value,
+        yon: $('#lfYon', wrap).value,
+        aciklama: $('#lfAciklama', wrap).value,
+        fisNo: $('#lfFisNo', wrap).value,
+        sipno: $('#lfSipno', wrap).value
+      };
+      try {
+        var lk = isEdit ? Core.updateLedgerEntry(data, row.id, payload) : Core.addLedgerEntry(data, payload);
+        log(isEdit ? 'HAREKET DÜZENLE' : 'HAREKET EKLE', lk.islem + ' · ' + money(lk.tutar) + ' · ' + cariAdi(lk.cariId));
+        setDirty(true);
+        m.close();
+        renderView();
+        toast(isEdit ? 'Hareket güncellendi' : 'Hareket eklendi', 'ok');
+      } catch (err) { toast(err.message, 'err'); }
     });
   }
 
