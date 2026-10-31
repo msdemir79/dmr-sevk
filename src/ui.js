@@ -408,6 +408,7 @@
     });
     if (!data.modelImages || typeof data.modelImages !== 'object') data.modelImages = {};
     try { Core.markaMigrate(data); } catch (e) { }
+    try { Matris.ensureLines(data); } catch (e) { }
     try { Core.trashTemizle(data, 30); } catch (e) { }
     S.file.name = fileName || 'DMR_VERI.xlsx';
     S.file.handle = handle || null;
@@ -1067,7 +1068,7 @@
         case 'order-new': openOrderForm(null); break;
         case 'order-edit': openOrderForm(findOrder(id)); break;
         case 'order-del': removeOrder(id); break;
-        case 'order-ship': addToCart(id, true); break;
+        case 'order-ship': shipOrder(id); break;
         case 'go-ship': go('ship'); break;
         case 'ledger-new': openLedgerForm(null); break;
         case 'ledger-del': removeLedger(id); break;
@@ -1500,30 +1501,71 @@
   /* ------------------------------------------------------------------ */
   /* Sevk işlemi                                                         */
   /* ------------------------------------------------------------------ */
+  function lineSub(l) { return [l.renk, lineLabel(l)].filter(Boolean).join(' · ') || '—'; }
+
+  function lineLabel(l) {
+    if (!l) return '';
+    if (l.mod === 'ACIK') return 'Açık' + (Core.num(l.beden) ? ' · ' + l.beden : '') + (Core.num(l.koliIci) ? ' · ' + nf0(l.koliIci) + "'lu" : '');
+    if (l.mod === 'ESKI') return '';
+    return 'Asortili';
+  }
+
+  function findLine(id) {
+    var lid = Core.num(id);
+    return (data.orderLines || []).filter(function (l) { return l.id === lid; })[0] || null;
+  }
+
+  function linePerBox(l) {
+    if (!l) return 1;
+    var p = Core.num(l.koliIci);
+    if (p) return p;
+    var o = findOrder(l.orderId);
+    var k = o ? Core.modelKart(data, o.model) : null;
+    var t = Matris.kartToplam(k);
+    if (t) return t;
+    return Core.num(l.koli) ? Core.num(l.cift) / Core.num(l.koli) : 1;
+  }
+
+  function normalizeCart() {
+    var out = [];
+    S.ui.cart.forEach(function (c) {
+      if (c.lineId) { out.push(c); return; }
+      var ls = Matris.orderLinesOf(data, c.orderId);
+      if (ls.length === 1) out.push({ lineId: ls[0].id, orderId: c.orderId, cift: c.cift, koli: c.koli, fiyat: c.fiyat });
+    });
+    S.ui.cart = out;
+  }
+
   function shipCandidates() {
     var q = S.ui.shipSearch.toLocaleLowerCase('tr-TR').trim();
-    var shipped = Core.shippedMap(data);
     var scid = shipCariId();
-    return data.orders.map(function (o) { return { o: o, i: Core.orderInfo(data, o, shipped) }; })
-      .filter(function (x) { return x.o.cariId === scid && x.i.kalan > 0; })
-      .filter(function (x) {
-        if (!q) return true;
-        return [x.o.model, x.o.renk, x.o.sipno, x.o.kod].join(' ').toLocaleLowerCase('tr-TR').indexOf(q) >= 0;
-      })
-      .sort(function (a, b) { return Core.num(b.i.kalan) - Core.num(a.i.kalan); });
+    var out = [];
+    data.orders.forEach(function (o) {
+      if (o.cariId !== scid) return;
+      Matris.orderLinesOf(data, o.id).forEach(function (l) {
+        var i = Core.lineInfo(data, l);
+        if (i.kalan <= 0) return;
+        if (q) {
+          var arama = [o.model, l.renk, l.beden, o.sipno, o.kod, lineLabel(l)].join(' ').toLocaleLowerCase('tr-TR');
+          if (arama.indexOf(q) < 0) return;
+        }
+        out.push({ o: o, l: l, i: i });
+      });
+    });
+    return out.sort(function (a, b) { return Core.num(b.i.kalan) - Core.num(a.i.kalan); });
   }
 
   function pickListHtml() {
     var list = shipCandidates();
-    if (!list.length) return emptyState('check', 'Sevk bekleyen sipariş yok', 'Bu cari için sevkiyatı bekleyen sipariş bulunmuyor.', '');
+    if (!list.length) return emptyState('check', 'Sevk bekleyen satır yok', 'Bu cari için kalanı olan renk/beden satırı bulunmuyor.', '');
     var inCart = {};
-    S.ui.cart.forEach(function (c) { inCart[c.orderId] = true; });
-    return list.slice(0, 60).map(function (x) {
-      return '<div class="pick-item' + (inCart[x.o.id] ? ' disabled' : '') + '" data-act="cart-add" data-id="' + x.o.id + '">' +
+    S.ui.cart.forEach(function (c) { inCart[c.lineId] = true; });
+    return list.slice(0, 80).map(function (x) {
+      return '<div class="pick-item' + (inCart[x.l.id] ? ' disabled' : '') + '" data-act="cart-add" data-id="' + x.l.id + '">' +
         thumbHtml(x.o) +
         '<div class="info"><b>' + esc(x.o.model) + '</b>' +
-        '<span>' + esc(x.o.renk || '—') + ' · kalan <b>' + nf0(x.i.kalan) + '</b> çift · ' + nf1(x.i.kalanKoli) + ' koli</span></div>' +
-        '<span class="add">' + (inCart[x.o.id] ? ICONS.check : '+') + '</span>' +
+        '<span>' + esc(lineSub(x.l)) + ' · kalan <b>' + nf0(x.i.kalan) + '</b> çift · ' + nf1(x.i.kalanKoli) + ' koli</span></div>' +
+        '<span class="add">' + (inCart[x.l.id] ? ICONS.check : '+') + '</span>' +
         '</div>';
     }).join('');
   }
@@ -1531,12 +1573,14 @@
   function cartTotals() {
     var t = { koli: 0, cift: 0, tutar: 0 };
     S.ui.cart.forEach(function (c) {
-      var o = findOrder(c.orderId);
-      if (!o) return;
+      var l = findLine(c.lineId);
+      if (!l) return;
+      var o = findOrder(c.orderId) || findOrder(l.orderId);
       var cift = Core.num(c.cift);
+      var per = linePerBox(l) || 1;
       t.cift += cift;
-      t.koli += cift / (Core.num(o.asorti) || 1);
-      t.tutar += cift * Core.num(c.fiyat !== undefined && c.fiyat !== '' ? c.fiyat : o.fiyat);
+      t.koli += Core.num(c.koli) || cift / per;
+      t.tutar += cift * Core.num(c.fiyat !== undefined && c.fiyat !== '' ? c.fiyat : (o ? o.fiyat : 0));
     });
     t.koli = Math.round(t.koli * 1000) / 1000;
     t.tutar = Core.round2(t.tutar);
@@ -1545,27 +1589,30 @@
 
   function cartHtml() {
     if (!S.ui.cart.length) {
-      return emptyState('truck', 'Henüz sevk satırı yok', 'Soldaki listeden sipariş seçerek sevk fişine ekleyin.', '');
+      return emptyState('truck', 'Henüz sevk satırı yok', 'Soldaki listeden renk/beden satırı seçerek sevk fişine ekleyin.', '');
     }
-    var shipped = Core.shippedMap(data);
     var rows = S.ui.cart.map(function (c) {
-      var o = findOrder(c.orderId);
+      var l = findLine(c.lineId);
+      if (!l) return '';
+      var o = findOrder(c.orderId) || findOrder(l.orderId);
       if (!o) return '';
-      var info = Core.orderInfo(data, o, shipped);
+      var info = Core.lineInfo(data, l);
+      var per = linePerBox(l) || 1;
       var cift = Core.num(c.cift);
+      var koli = Core.num(c.koli) || cift / per;
       var fiyat = Core.num(c.fiyat !== undefined && c.fiyat !== '' ? c.fiyat : o.fiyat);
       var hatali = cift > info.kalan + 0.001 || cift <= 0;
-      return '<tr data-line="' + o.id + '"' + (hatali ? ' style="background:#fff5f5"' : '') + '>' +
+      return '<tr data-line="' + l.id + '"' + (hatali ? ' style="background:#fff5f5"' : '') + '>' +
         '<td><div class="cell-model">' + thumbHtml(o) + '<div style="min-width:0"><div class="mname">' + esc(o.model) + '</div>' +
-        '<div class="mcolor">' + esc(o.renk || '') + ' · asorti ' + nf0(o.asorti) + '</div></div></div></td>' +
+        '<div class="mcolor">' + esc(lineSub(l)) + '</div></div></div></td>' +
         '<td class="right sub">' + nf0(info.kalan) + '</td>' +
-        '<td class="right"><input class="input sm num" type="text" inputmode="decimal" data-cart="koli" data-id="' + o.id + '" value="' + esc(nf1(cift / (Core.num(o.asorti) || 1)).replace('.', ',')) + '"></td>' +
-        '<td class="right"><input class="input sm num" type="text" inputmode="decimal" data-cart="cift" data-id="' + o.id + '" value="' + esc(nf0(cift)) + '"></td>' +
-        '<td class="right"><input class="input sm num" type="text" inputmode="decimal" data-cart="fiyat" data-id="' + o.id + '" value="' + esc(nf2(fiyat).replace('.', ',')) + '"></td>' +
-        '<td class="right strong" data-line-tutar="' + o.id + '">' + money(cift * fiyat) + '</td>' +
-        '<td class="right"><button class="btn btn-icon danger" data-act="cart-remove" data-id="' + o.id + '" title="Kaldır" aria-label="Kaldır">' + ICONS.x + '</button></td>' +
+        '<td class="right"><input class="input sm num" type="text" inputmode="decimal" data-cart="koli" data-id="' + l.id + '" value="' + esc(nf1(koli).replace('.', ',')) + '"></td>' +
+        '<td class="right"><input class="input sm num" type="text" inputmode="decimal" data-cart="cift" data-id="' + l.id + '" value="' + esc(nf0(cift)) + '"></td>' +
+        '<td class="right"><input class="input sm num" type="text" inputmode="decimal" data-cart="fiyat" data-id="' + l.id + '" value="' + esc(nf2(fiyat).replace('.', ',')) + '"></td>' +
+        '<td class="right strong" data-line-tutar="' + l.id + '">' + money(cift * fiyat) + '</td>' +
+        '<td class="right"><button class="btn btn-icon danger" data-act="cart-remove" data-id="' + l.id + '" title="Kaldır" aria-label="Kaldır">' + ICONS.x + '</button></td>' +
         '</tr>' +
-        (hatali ? '<tr data-line-error="' + o.id + '"><td colspan="7" style="padding-top:0;color:var(--danger);font-size:11.5px;border-bottom:1px solid #eef2f6">' +
+        (hatali ? '<tr data-line-error="' + l.id + '"><td colspan="7" style="padding-top:0;color:var(--danger);font-size:11.5px;border-bottom:1px solid #eef2f6">' +
           (cift <= 0 ? 'Çift adedi sıfırdan büyük olmalı.' : 'Kalandan fazla: en fazla ' + nf0(info.kalan) + ' çift sevk edilebilir.') + '</td></tr>' : '');
     }).join('');
 
@@ -1582,6 +1629,7 @@
   }
 
   function viewShip() {
+    normalizeCart();
     if (!S.ui.shipFisNo) S.ui.shipFisNo = Core.nextFisNo(data);
     if (!S.ui.shipTarih) S.ui.shipTarih = Core.todayISO();
     var scid = shipCariId();
@@ -2935,20 +2983,23 @@ function viewShipments() {
   function fillCart() {
     var cid = shipCariId();
     if (!cid) { toast('Önce cari hesap seçin.', 'err'); return; }
-    var shipped = Core.shippedMap(data);
+    normalizeCart();
     var mevcut = {};
-    S.ui.cart.forEach(function (c) { mevcut[c.orderId] = 1; });
+    S.ui.cart.forEach(function (c) { mevcut[c.lineId] = 1; });
     var eklenen = 0;
     data.orders.forEach(function (o) {
-      if (o.cariId !== cid || mevcut[o.id]) return;
-      var info = Core.orderInfo(data, o, shipped);
-      if (info.kalan <= 0) return;
-      S.ui.cart.push({ orderId: o.id, cift: info.kalan, koli: info.kalanKoli, fiyat: o.fiyat });
-      eklenen++;
+      if (o.cariId !== cid) return;
+      Matris.orderLinesOf(data, o.id).forEach(function (l) {
+        if (mevcut[l.id]) return;
+        var info = Core.lineInfo(data, l);
+        if (info.kalan <= 0) return;
+        S.ui.cart.push({ lineId: l.id, orderId: o.id, cift: info.kalan, koli: info.kalanKoli, fiyat: o.fiyat });
+        eklenen++;
+      });
     });
-    if (!eklenen) { toast('Eklenecek kalan sipariş yok.', ''); return; }
+    if (!eklenen) { toast('Eklenecek kalan satır yok.', ''); return; }
     renderView();
-    toast(eklenen + ' sipariş sepete eklendi', 'ok');
+    toast(eklenen + ' satır sepete eklendi', 'ok');
   }
 
   function trashRestore(id) {
@@ -3055,16 +3106,26 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sepet                                                               */
   /* ------------------------------------------------------------------ */
-  function addToCart(id, jump) {
+  function shipOrder(id) {
     var o = findOrder(id);
     if (!o) return;
-    var ls = Matris.orderLinesOf(data, id);
-    if (ls.length > 1) {
-      toast('Çok satırlı siparişlerin sevki aşama 3te bağlanacak. Şimdilik tek satırlı sipariş seçin.', 'err');
-      return;
-    }
-    var info = Core.orderInfo(data, o);
-    if (info.kalan <= 0) { toast('Bu siparişin kalanı yok.', 'err'); return; }
+    var ls = Matris.orderLinesOf(data, id).filter(function (l) { return Core.lineInfo(data, l).kalan > 0; });
+    if (!ls.length) { toast('Bu siparişin kalanı yok.', 'err'); return; }
+    if (ls.length === 1) { addToCart(ls[0].id, true); return; }
+    S.ui.shipCariId = o.cariId;
+    S.ui.shipSearch = o.model;
+    if (S.view === 'ship') renderView(); else go('ship');
+    toast('Siparişin renk/beden satırını listeden seçin.', '');
+  }
+
+  function addToCart(lineId, jump) {
+    normalizeCart();
+    var l = findLine(lineId);
+    if (!l) return;
+    var o = findOrder(l.orderId);
+    if (!o) return;
+    var info = Core.lineInfo(data, l);
+    if (info.kalan <= 0) { toast('Bu satırın kalanı yok.', 'err'); return; }
     var scid = shipCariId();
     if (o.cariId !== scid) {
       if (S.ui.cariId) {
@@ -3079,34 +3140,34 @@ function viewShipments() {
       S.ui.cart = [];
       toast('Cari ' + cariAdi(o.cariId) + ' olarak değiştirildi.', '');
     }
-    if (!S.ui.cart.some(function (c) { return c.orderId === id; })) {
-      S.ui.cart.push({ orderId: id, cift: info.kalan, koli: info.kalanKoli, fiyat: o.fiyat });
+    if (!S.ui.cart.some(function (c) { return c.lineId === l.id; })) {
+      S.ui.cart.push({ lineId: l.id, orderId: o.id, cift: info.kalan, koli: info.kalanKoli, fiyat: o.fiyat });
     }
     if (S.view !== 'ship') go('ship');
     else renderView();
   }
 
-  function removeFromCart(id) {
-    S.ui.cart = S.ui.cart.filter(function (c) { return c.orderId !== id; });
+  function removeFromCart(lineId) {
+    S.ui.cart = S.ui.cart.filter(function (c) { return c.lineId !== lineId; });
     renderView();
   }
 
   function updateCartField(input) {
-    var id = parseInt(input.dataset.id, 10);
+    var id = Core.num(input.dataset.id);
     var field = input.dataset.cart;
-    var line = S.ui.cart.filter(function (c) { return c.orderId === id; })[0];
-    var o = findOrder(id);
-    if (!line || !o) return;
+    var line = S.ui.cart.filter(function (c) { return c.lineId === id; })[0];
+    var l = findLine(id);
+    if (!line || !l) return;
+    var per = linePerBox(l) || 1;
     var val = Core.num(input.value);
-    var asorti = Core.num(o.asorti) || 1;
     if (field === 'koli') {
       line.koli = val;
-      line.cift = Math.round(val * asorti * 1000) / 1000;
+      line.cift = Math.round(val * per * 1000) / 1000;
       var ciftInput = $('[data-cart="cift"][data-id="' + id + '"]');
       if (ciftInput) ciftInput.value = nf1(line.cift);
     } else if (field === 'cift') {
       line.cift = val;
-      line.koli = Math.round((val / asorti) * 1000) / 1000;
+      line.koli = Math.round((val / per) * 1000) / 1000;
       var koliInput = $('[data-cart="koli"][data-id="' + id + '"]');
       if (koliInput) koliInput.value = nf1(line.koli);
     } else {
@@ -3133,11 +3194,10 @@ function viewShipments() {
   }
 
   function cartHasError() {
-    var shipped = Core.shippedMap(data);
     return S.ui.cart.some(function (c) {
-      var o = findOrder(c.orderId);
-      if (!o) return true;
-      var info = Core.orderInfo(data, o, shipped);
+      var l = findLine(c.lineId);
+      if (!l) return true;
+      var info = Core.lineInfo(data, l);
       var cift = Core.num(c.cift);
       return cift <= 0 || cift > info.kalan + 0.001;
     });
@@ -3187,6 +3247,7 @@ function viewShipments() {
   }
 
   function createShipmentFromCart() {
+    normalizeCart();
     if (!S.ui.cart.length) { toast('Önce sipariş ekleyin.', 'err'); return; }
     var tarih = $('#shipTarih') ? $('#shipTarih').value : S.ui.shipTarih;
     var fisNo = $('#shipFisNo') ? Core.num($('#shipFisNo').value) : S.ui.shipFisNo;
@@ -3200,7 +3261,7 @@ function viewShipments() {
         faturaNo: faturaNo, faturaTarih: faturaTarih,
         lines: S.ui.cart.map(function (c) {
           var o = findOrder(c.orderId);
-          return { orderId: c.orderId, cift: c.cift, fiyat: c.fiyat !== '' ? c.fiyat : o.fiyat };
+          return { orderId: c.orderId, orderLineId: c.lineId, cift: c.cift, koli: c.koli, fiyat: c.fiyat !== '' ? c.fiyat : o.fiyat };
         })
       });
       log('SEVK FİŞİ', '#' + res.shipment.fisNo + ' · ' + (res.shipment.cari || '') + ' · ' + nf0(res.shipment.cift) + ' çift');
@@ -3248,13 +3309,42 @@ function viewShipments() {
         if (src) img = '<img src="' + esc(src) + '" alt="">';
       }
       rows += '<tr><td class="imgcell">' + img + '</td>' +
-        '<td class="model">' + (l ? esc(l.model) : '') + (l && l.renk ? '<div style="font-weight:400;font-size:10px;color:#555">' + esc(l.renk) + '</div>' : '') + '</td>' +
+        '<td class="model">' + (l ? esc(l.model) : '') +
+        (l && (l.renk || l.mod) ? '<div style="font-weight:400;font-size:9.5px;color:#555">' + esc([l.renk, l.mod ? lineLabel(l) : ''].filter(Boolean).join(' · ')) + '</div>' : '') +
+        '</td>' +
         '<td class="n">' + (l ? nf1(l.koli) : '') + '</td>' +
         '<td class="n">' + (l ? nf0(l.cift) : '') + '</td></tr>';
     }
     var totalKoli = lines.reduce(function (a, l) { return a + Core.num(l.koli); }, 0);
     var totalCift = lines.reduce(function (a, l) { return a + Core.num(l.cift); }, 0);
     var totalTutar = lines.reduce(function (a, l) { return a + Core.num(l.tutar); }, 0);
+
+    // Beden dökümü: yalnızca sevk edilen, boş beden yok
+    var sizeSet = {};
+    lines.forEach(function (l) {
+      Object.keys(l.dagilim || {}).forEach(function (sz) { if (Core.num(l.dagilim[sz])) sizeSet[sz] = 1; });
+    });
+    var sizes = Object.keys(sizeSet).map(Number).sort(function (a, b) { return a - b; });
+    var sizeTable = '';
+    if (sizes.length) {
+      var colTotals = {};
+      var body = lines.filter(function (l) {
+        return Object.keys(l.dagilim || {}).some(function (sz) { return Core.num(l.dagilim[sz]); });
+      }).map(function (l) {
+        return '<tr><td>' + esc(l.renk || l.model) + '<div class="szsub">' + esc(lineLabel(l)) + '</div></td>' +
+          sizes.map(function (sz) {
+            var q = Core.num((l.dagilim || {})[sz]);
+            if (q) colTotals[sz] = (colTotals[sz] || 0) + q;
+            return '<td class="n">' + (q ? nf0(q) : '') + '</td>';
+          }).join('') + '<td class="n strong">' + nf0(l.cift) + '</td></tr>';
+      }).join('');
+      sizeTable = '<div class="pf-sizes"><div class="pf-sizes-title">BEDEN DÖKÜMÜ · SEVK EDİLEN</div>' +
+        '<table class="pf-table pf-mx"><thead><tr><th>RENK</th>' +
+        sizes.map(function (sz) { return '<th class="n">' + sz + '</th>'; }).join('') +
+        '<th class="n">TOPLAM</th></tr></thead><tbody>' + body + '</tbody>' +
+        '<tfoot><tr><td>TOPLAM</td>' + sizes.map(function (sz) { return '<td class="n">' + nf0(colTotals[sz] || 0) + '</td>'; }).join('') +
+        '<td class="n">' + nf0(totalCift) + '</td></tr></tfoot></table></div>';
+    }
 
     return '<div class="print-doc' + (a5 ? ' a5' : '') + '">' +
       docHeader(data.settings.sevkBaslik || 'SEVK FİŞİ', '') +
@@ -3269,6 +3359,7 @@ function viewShipments() {
       '<tbody>' + rows + '</tbody>' +
       '<tfoot><tr><td colspan="2">GENEL TOPLAM</td><td class="n">' + nf1(totalKoli) + '</td><td class="n">' + nf0(totalCift) + '</td></tr></tfoot>' +
       '</table>' +
+      sizeTable +
       '<div class="pf-note">' + (s.aciklama ? 'Not: ' + esc(s.aciklama) : '') + '</div>' +
       '<div class="pf-note" style="text-align:right;font-weight:600">Tutar: ' + money(totalTutar) + '</div>' +
       '<div class="pf-sign"><div class="line">TESLİM EDEN</div><div class="line">TESLİM ALAN</div></div>' +

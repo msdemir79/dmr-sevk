@@ -341,6 +341,21 @@
     return map;
   }
 
+  function lineInfo(data, line, kart) {
+    if (!line) return { toplam: 0, giden: 0, kalan: 0, koli: 0, kalanKoli: 0 };
+    var order = (data.orders || []).filter(function (o) { return o.id === line.orderId; })[0] || null;
+    var k = kart || (order ? modelKart(data, order.model) : null);
+    var toplam = num(line.cift) || Matris.lineCift(line, k);
+    var giden = (data.lines || []).filter(function (l) { return num(l.orderLineId) === line.id; })
+      .reduce(function (a, l) { return a + num(l.cift); }, 0);
+    var kalan = Math.max(0, toplam - giden);
+    var koli = num(line.koli) || (kalan ? toplam / (num(line.koliIci) || 1) : 0);
+    return {
+      line: line, order: order, kart: k, toplam: toplam, giden: giden, kalan: kalan,
+      koli: koli, kalanKoli: toplam ? kalan * (koli / toplam) : 0
+    };
+  }
+
   function orderInfo(data, order, shipped) {
     var giden = (shipped || shippedMap(data))[order.id] || 0;
     var satirlar = (data.orderLines || []).filter(function (l) { return l.orderId === order.id; });
@@ -483,6 +498,7 @@
     if (!order.sipno) order.sipno = nextOrderNo(data);
     if (order.sipno > num(data.settings.sonSiparisNo)) data.settings.sonSiparisNo = order.sipno;
     data.orders.push(order);
+    Matris.ensureLines(data);
     if (input.resim) data.images[order.id] = String(input.resim);
     return order;
   }
@@ -565,7 +581,19 @@
       var tutar = round2(cift * fiyat);
       var koli = num(item.koli) || cift / (num(order.asorti) || 1);
       var ols2 = (data.orderLines || []).filter(function (x) { return x.orderId === order.id; });
+      if (!item.orderLineId && ols2.length > 1) throw new Error(order.model + ' için renk/beden satırı seçin.');
       var ol2 = item.orderLineId ? ols2.filter(function (x) { return x.id === item.orderLineId; })[0] : ols2[0];
+      if (ol2 && ol2.mod !== 'ESKI' && Math.abs(koli - Math.round(koli)) > 0.001) throw new Error('Koli tam sayı olmalı.');
+      if (ol2) {
+        var satirToplam = num(ol2.cift) || Matris.lineCift(ol2, modelKart(data, order.model));
+        var satirGiden = data.lines.filter(function (l) { return num(l.orderLineId) === ol2.id; })
+          .concat(lines.filter(function (l) { return num(l.orderLineId) === ol2.id; }))
+          .reduce(function (a, l) { return a + num(l.cift); }, 0);
+        var satirKalan = satirToplam - satirGiden;
+        if (cift > satirKalan + 0.001) {
+          throw new Error((ol2.renk || order.model) + (ol2.mod === 'ACIK' && ol2.beden ? ' / ' + ol2.beden : '') + ' satırında kalan ' + satirKalan + ' çift; ' + cift + ' çift sevk edilemez.');
+        }
+      }
       var dag2 = {};
       if (ol2) {
         var gecici = Object.assign({}, ol2, { koli: koli, cift: cift });
@@ -596,8 +624,8 @@
         fisNo: String(fisNo),
         sipno: String(order.sipno || ''),
         islem: TYPES.SATIS,
-        aciklama: order.model + (order.renk ? ' / ' + order.renk : ''),
-        renk: order.renk || '',
+        aciklama: order.model + ((ol2 ? ol2.renk : order.renk) ? ' / ' + (ol2 ? ol2.renk : order.renk) : ''),
+        renk: (ol2 ? ol2.renk : order.renk) || '',
         koli: Math.round(koli * 1000) / 1000,
         cift: cift,
         fiyat: fiyat,
@@ -635,8 +663,13 @@
         id: l.id,
         sevkId: l.sevkId,
         orderId: l.orderId,
+        orderLineId: num(l.orderLineId),
         model: l.model || (o && o.model) || '',
         renk: l.renk || (o && o.renk) || '',
+        beden: num(l.beden),
+        mod: l.mod || '',
+        koliIci: num(l.koliIci),
+        dagilim: l.dagilim || {},
         koli: num(l.koli),
         cift: num(l.cift),
         fiyat: num(l.fiyat),
@@ -1911,6 +1944,7 @@
       hareketSayisi++;
     });
 
+    Matris.ensureLines(data);
     data.settings.sonFisNo = data.shipments.reduce(function (m, s) { return Math.max(m, num(s.fisNo)); }, num(data.settings.sonFisNo));
     data.settings.sonSiparisNo = data.orders.reduce(function (m, o) { return Math.max(m, num(o.sipno)); }, num(data.settings.sonSiparisNo));
 
@@ -1968,6 +2002,7 @@
     kodUret: kodUret,
     shippedMap: shippedMap,
     orderInfo: orderInfo,
+    lineInfo: lineInfo,
     ledgerSorted: ledgerSorted,
     ledgerWithBalance: ledgerWithBalance,
     balance: balance,

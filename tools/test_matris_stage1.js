@@ -71,6 +71,21 @@ const S = { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 };
   const sd = M.shipmentDagilim(d3, sh3.shipment.id);
   ok(sd['37'] === 4 && sd['38'] === 6, 'fiş dağılımı');
 
+  ok(Core.lineInfo(d3, d3.orderLines[0]).kalan === 30, 'asortili satır kalanı 30');
+  ok(Core.lineInfo(d3, d3.orderLines[1]).kalan === 36, 'açık satır kalanı 36');
+  const sh3b = Core.createShipment(d3, {
+    cariId: c3.id, tarih: '2026-10-03',
+    lines: [{ orderId: o3.id, orderLineId: 2, cift: 18, koli: 2 }]
+  });
+  ok(sh3b.lines[0].mod === 'ACIK' && sh3b.lines[0].beden === 40 && sh3b.lines[0].dagilim['40'] === 18, 'açık satır sevki 18 çift');
+  const sl3 = Core.shipmentLines(d3, sh3b.shipment.id)[0];
+  ok(sl3.beden === 40 && sl3.koliIci === 9 && sl3.mod === 'ACIK', 'fiş satırı beden/koli içi taşıyor');
+  ok(M.shipmentDagilim(d3, sh3b.shipment.id)['40'] === 18, 'fiş beden dökümü 42 = 18');
+  let fazla = false;
+  try { Core.createShipment(d3, { cariId: c3.id, tarih: '2026-10-04', lines: [{ orderId: o3.id, orderLineId: 1, cift: 31, koli: 3.1 }] }); }
+  catch (e) { fazla = true; }
+  ok(fazla, 'satır kalanından fazla sevk engellendi');
+
   const bytes3 = X.writeWorkbook(Core.buildWorkbook(d3));
   const wb3 = await X.readWorkbook(bytes3);
   const d4 = Core.readData(wb3.sheets);

@@ -73,6 +73,12 @@ BOOT = r"""
       if (x[7]) d.images[o.id] = svgImg(x[7], x[8]);
     });
 
+    var omm = Core.addOrder(d, { cariId: gns.id, sipno: 72, tarih: dt(1), model: '6049', renk: 'SİYAH', asorti: 10, adet: 48, fiyat: 75 });
+    d.orderLines = (d.orderLines || []).filter(function (l) { return l.orderId !== omm.id; });
+    var oml1 = Core.nextId(d.orderLines);
+    d.orderLines.push({ id: oml1, orderId: omm.id, renk: 'SİYAH', mod: 'ASORTILI', beden: 0, koli: 3, koliIci: 10, cift: 30 });
+    d.orderLines.push({ id: oml1 + 1, orderId: omm.id, renk: 'BEYAZ', mod: 'ACIK', beden: 42, koli: 2, koliIci: 9, cift: 18 });
+
     var o = d.orders;
     Core.createShipment(d, { cariId: gns.id, tarih: dt(30), fisNo: 242, aciklama: 'Kargo: Aras', lines: [
       { orderId: o[0].id, cift: 1200 }, { orderId: o[2].id, cift: 600 }
@@ -135,6 +141,37 @@ BOOT = r"""
       APP.S.view = 'ship';
       APP.S.ui.cart = [{ orderId: o[0].id, cift: 600, koli: 60, fiyat: 75 }, { orderId: o[1].id, cift: 400, koli: 50, fiyat: 62 }];
       APP.updateChrome(); APP.renderView();
+    }
+    if (h === 'ship-lines') {
+      var om3 = d.orders.filter(function (o) { return o.sipno === 72; })[0];
+      var ls3 = Matris.orderLinesOf(d, om3.id);
+      APP.S.ui.shipCariId = om3.cariId;
+      APP.S.ui.cart = ls3.map(function (l) {
+        return { lineId: l.id, orderId: om3.id, cift: Core.lineInfo(d, l).kalan, koli: Core.lineInfo(d, l).kalanKoli, fiyat: om3.fiyat };
+      });
+      APP.S.view = 'ship'; APP.updateChrome(); APP.renderView();
+    }
+    if (h === 'print-fis' || h === 'print-fis-a5') {
+      var om4 = d.orders.filter(function (o) { return o.sipno === 72; })[0];
+      var ls4 = Matris.orderLinesOf(d, om4.id);
+      var res4 = Core.createShipment(d, {
+        cariId: om4.cariId, tarih: om4.tarih,
+        lines: ls4.map(function (l) {
+          return { orderId: om4.id, orderLineId: l.id, cift: l.cift, koli: l.koli, fiyat: om4.fiyat };
+        })
+      });
+      APP.S.view = 'ship'; APP.renderView();
+      setTimeout(function () { APP.printShipment(res4.shipment.id, h === 'print-fis-a5' ? 'A5' : 'A4'); }, 250);
+    }
+    if (h === 'ship-matris') {
+      var om2 = d.orders.filter(function (o) { return o.sipno === 72; })[0];
+      var ls2 = Matris.orderLinesOf(d, om2.id);
+      APP.S.ui.shipCariId = om2.cariId;
+      APP.S.ui.cart = ls2.map(function (l) {
+        return { lineId: l.id, orderId: om2.id, cift: Matris.lineCift(l, Core.modelKart(d, om2.model)), koli: l.koli, fiyat: om2.fiyat };
+      });
+      APP.S.view = 'ship'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { document.querySelector('[data-act="ship-create"]').click(); }, 350);
     }
     if (h === 'flow-create') {
       APP.S.view = 'ship';

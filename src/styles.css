@@ -757,3 +757,10 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
 .order-lines input:focus, .order-lines select:focus { outline: 0; border-color: var(--brand-2, #14b8a6); box-shadow: 0 0 0 3px rgba(20,184,166,.15); }
 .order-lines .right { text-align: right; }
 .order-lines .btn-icon { width: 26px; height: 26px; padding: 0; }
+
+/* --- fiş beden dökümü --- */
+.pf-sizes { margin-top: 8px; }
+.pf-sizes-title { font-size: 8.5px; font-weight: 700; letter-spacing: .04em; color: #555; margin-bottom: 3px; }
+.pf-mx th, .pf-mx td { font-size: 8px; padding: 2px 3px; }
+.pf-mx .szsub { font-size: 7px; color: #666; font-weight: 400; }
+.pf-mx tfoot td { background: #f3f4f6; font-weight: 700; }
