@@ -1904,6 +1904,23 @@ function viewShipments() {
         : '<div class="card-body"><p class="muted small" style="margin:0">Henüz sevk edilmiş satır yok. Sevk yaptıkça ciro ve kâr burada görünür.</p></div>') +
       '<p class="muted small" style="padding:10px 16px 12px;margin:0">Maliyeti girilmemiş modeller kâr hesabında 0 maliyetle görünür; doğru sonuç için <b>Modeller</b> ekranından maliyet girin.</p></div>';
 
+    var beden = Core.sizeReport(data, ay, cid);
+    var bedenCard = '<div class="card" style="margin-top:16px"><div class="card-head"><div><h2>Beden dökümü</h2>' +
+      '<div class="sub">Sevk edilen · ' + monthName(ay) + (cid ? ' · ' + esc(cari.ad) : '') + '</div></div></div>' +
+      (beden.rows.length
+        ? '<div class="table-wrap"><table class="data"><thead><tr><th>Model / renk</th>' +
+          beden.sizes.map(function (sz) { return '<th class="right">' + sz + '</th>'; }).join('') +
+          '<th class="right">Toplam</th></tr></thead><tbody>' +
+          beden.rows.map(function (r) {
+            return '<tr><td><div class="strong">' + esc(r.model) + '</div><div class="sub">' + esc(r.renk || '—') + '</div></td>' +
+              beden.sizes.map(function (sz) { return '<td class="right">' + (Core.num(r.map[sz]) ? nf0(r.map[sz]) : '—') + '</td>'; }).join('') +
+              '<td class="right strong">' + nf0(r.toplam) + '</td></tr>';
+          }).join('') +
+          '</tbody><tfoot><tr><td>TOPLAM</td>' + beden.sizes.map(function (sz) { return '<td class="right">' + nf0(beden.totals[sz] || 0) + '</td>'; }).join('') +
+          '<td class="right">' + nf0(beden.toplam) + '</td></tr></tfoot></table></div>'
+        : '<div class="card-body"><p class="muted small" style="margin:0">Bu dönemde beden dökümü olan sevk yok. Renk/beden satırıyla sevk yapıldığında burada görünür.</p></div>') +
+      '</div>';
+
     return '<div class="card"><div class="toolbar">' +
       '<div class="field" style="max-width:190px"><label for="reportMonth">Dönem</label>' +
       '<input id="reportMonth" type="month" class="input" data-role="report-month" value="' + esc(ay) + '"></div>' +
@@ -1921,15 +1938,25 @@ function viewShipments() {
       '<div class="table-wrap"><table class="data"><thead><tr><th>' + (groupKey === 'model' ? 'Model' : 'Cari') + '</th><th class="right">Koli</th><th class="right">Çift</th><th class="right">Tutar</th></tr></thead><tbody>' + groupTable + '</tbody></table></div></div>' +
       '<div class="card"><div class="card-head"><div><h2>Bekleyen siparişler</h2><div class="sub">Kalan çifte göre ilk 10</div></div></div>' +
       '<div class="table-wrap"><table class="data"><thead><tr><th>Model</th><th class="right">Giden</th><th class="right">Kalan</th><th class="right">Tutar</th></tr></thead><tbody>' + kalanTable + '</tbody></table></div></div>' +
-      '</div>' + karCard;
+      '</div>' + karCard + bedenCard;
   }
 
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '1.8.0';
+  var SURUM = '2.0.0';
 
   var YENILIKLER = [
+    {
+      v: '2.0.0', t: '31.10.2026', m: [
+        'Renk–beden–asorti matrisi: model kartında kategori, renkler ve asorti şablonu',
+        'Siparişte renk/beden satırları; asortili veya açık; çok renkli sipariş',
+        'Satır bazlı sevk, kısmi sevk ve satır kalanı kontrolü',
+        'Fişte yalnızca sevk edilen bedenler; boş beden yok; “Açık · 9’lu”',
+        'Beden dökümü raporu; A4/A5 fiş',
+        'Eski dosyalar ESKI satırına taşınır; bakiye ve sevkler korunur'
+      ]
+    },
     {
       v: '1.8.0', t: '30.10.2026', m: [
         'Proje adı DMR AYAKKABI olarak güncellendi',

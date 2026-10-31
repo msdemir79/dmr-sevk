@@ -151,6 +151,19 @@ BOOT = r"""
       });
       APP.S.view = 'ship'; APP.updateChrome(); APP.renderView();
     }
+    if (h === 'report-matris') {
+      var om5 = d.orders.filter(function (o) { return o.sipno === 72; })[0];
+      var ls5 = Matris.orderLinesOf(d, om5.id);
+      Core.createShipment(d, {
+        cariId: om5.cariId, tarih: om5.tarih,
+        lines: ls5.map(function (l) {
+          return { orderId: om5.id, orderLineId: l.id, cift: l.cift, koli: l.koli, fiyat: om5.fiyat };
+        })
+      });
+      APP.S.view = 'reports';
+      APP.S.ui.reportMonth = (om5.tarih || '').slice(0, 7);
+      APP.updateChrome(); APP.renderView();
+    }
     if (h === 'print-fis' || h === 'print-fis-a5') {
       var om4 = d.orders.filter(function (o) { return o.sipno === 72; })[0];
       var ls4 = Matris.orderLinesOf(d, om4.id);

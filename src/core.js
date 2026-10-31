@@ -903,6 +903,46 @@
   }
 
   /** Aylık ciro / maliyet / kâr (sevk satırlarından). */
+  /**
+   * Sevk edilen beden dökümü: ay + cari filtresi.
+   * Yalnızca dagilim snapshot'ı olan satırlar (matris/renk-beden) girer.
+   */
+  function sizeReport(data, ay, cariId) {
+    var shipIds = {};
+    (data.shipments || []).forEach(function (s) {
+      if (ay && String(s.tarih || '').slice(0, 7) !== ay) return;
+      if (cariId && s.cariId !== cariId) return;
+      shipIds[s.id] = 1;
+    });
+    var groups = {}, sizeSet = {};
+    (data.lines || []).forEach(function (l) {
+      if (!shipIds[l.sevkId]) return;
+      var d = l.dagilim || {};
+      if (!Object.keys(d).length) return;
+      var key = normKey(l.model) + '|' + normKey(l.renk);
+      if (!groups[key]) groups[key] = { model: l.model || '', renk: l.renk || '', map: {}, toplam: 0 };
+      Object.keys(d).forEach(function (sz) {
+        var q = num(d[sz]);
+        if (!q) return;
+        var s2 = String(Math.round(num(sz)));
+        groups[key].map[s2] = round2((groups[key].map[s2] || 0) + q);
+        groups[key].toplam = round2(groups[key].toplam + q);
+        sizeSet[s2] = 1;
+      });
+    });
+    var sizes = Object.keys(sizeSet).map(Number).sort(function (a, b) { return a - b; });
+    var rows = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) {
+      var am = normKey(a.model), bm = normKey(b.model);
+      if (am !== bm) return am < bm ? -1 : 1;
+      return normKey(a.renk) < normKey(b.renk) ? -1 : 1;
+    });
+    var totals = {};
+    rows.forEach(function (r) {
+      sizes.forEach(function (sz) { totals[sz] = round2((totals[sz] || 0) + num(r.map[sz])); });
+    });
+    return { rows: rows, sizes: sizes, totals: totals, toplam: rows.reduce(function (a, r) { return a + r.toplam; }, 0) };
+  }
+
   function profitReport(data, from, to, cariId) {
     var byMonth = {};
     var kartByKey = {};
@@ -1987,6 +2027,7 @@
     deleteModel: deleteModel,
     modelSummary: modelSummary,
     profitReport: profitReport,
+    sizeReport: sizeReport,
     audit: audit,
     trashPush: trashPush,
     trashTemizle: trashTemizle,

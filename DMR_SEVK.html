@@ -2632,6 +2632,46 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
   }
 
   /** Aylık ciro / maliyet / kâr (sevk satırlarından). */
+  /**
+   * Sevk edilen beden dökümü: ay + cari filtresi.
+   * Yalnızca dagilim snapshot'ı olan satırlar (matris/renk-beden) girer.
+   */
+  function sizeReport(data, ay, cariId) {
+    var shipIds = {};
+    (data.shipments || []).forEach(function (s) {
+      if (ay && String(s.tarih || '').slice(0, 7) !== ay) return;
+      if (cariId && s.cariId !== cariId) return;
+      shipIds[s.id] = 1;
+    });
+    var groups = {}, sizeSet = {};
+    (data.lines || []).forEach(function (l) {
+      if (!shipIds[l.sevkId]) return;
+      var d = l.dagilim || {};
+      if (!Object.keys(d).length) return;
+      var key = normKey(l.model) + '|' + normKey(l.renk);
+      if (!groups[key]) groups[key] = { model: l.model || '', renk: l.renk || '', map: {}, toplam: 0 };
+      Object.keys(d).forEach(function (sz) {
+        var q = num(d[sz]);
+        if (!q) return;
+        var s2 = String(Math.round(num(sz)));
+        groups[key].map[s2] = round2((groups[key].map[s2] || 0) + q);
+        groups[key].toplam = round2(groups[key].toplam + q);
+        sizeSet[s2] = 1;
+      });
+    });
+    var sizes = Object.keys(sizeSet).map(Number).sort(function (a, b) { return a - b; });
+    var rows = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) {
+      var am = normKey(a.model), bm = normKey(b.model);
+      if (am !== bm) return am < bm ? -1 : 1;
+      return normKey(a.renk) < normKey(b.renk) ? -1 : 1;
+    });
+    var totals = {};
+    rows.forEach(function (r) {
+      sizes.forEach(function (sz) { totals[sz] = round2((totals[sz] || 0) + num(r.map[sz])); });
+    });
+    return { rows: rows, sizes: sizes, totals: totals, toplam: rows.reduce(function (a, r) { return a + r.toplam; }, 0) };
+  }
+
   function profitReport(data, from, to, cariId) {
     var byMonth = {};
     var kartByKey = {};
@@ -3716,6 +3756,7 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
     deleteModel: deleteModel,
     modelSummary: modelSummary,
     profitReport: profitReport,
+    sizeReport: sizeReport,
     audit: audit,
     trashPush: trashPush,
     trashTemizle: trashTemizle,
@@ -5663,6 +5704,23 @@ function viewShipments() {
         : '<div class="card-body"><p class="muted small" style="margin:0">Henüz sevk edilmiş satır yok. Sevk yaptıkça ciro ve kâr burada görünür.</p></div>') +
       '<p class="muted small" style="padding:10px 16px 12px;margin:0">Maliyeti girilmemiş modeller kâr hesabında 0 maliyetle görünür; doğru sonuç için <b>Modeller</b> ekranından maliyet girin.</p></div>';
 
+    var beden = Core.sizeReport(data, ay, cid);
+    var bedenCard = '<div class="card" style="margin-top:16px"><div class="card-head"><div><h2>Beden dökümü</h2>' +
+      '<div class="sub">Sevk edilen · ' + monthName(ay) + (cid ? ' · ' + esc(cari.ad) : '') + '</div></div></div>' +
+      (beden.rows.length
+        ? '<div class="table-wrap"><table class="data"><thead><tr><th>Model / renk</th>' +
+          beden.sizes.map(function (sz) { return '<th class="right">' + sz + '</th>'; }).join('') +
+          '<th class="right">Toplam</th></tr></thead><tbody>' +
+          beden.rows.map(function (r) {
+            return '<tr><td><div class="strong">' + esc(r.model) + '</div><div class="sub">' + esc(r.renk || '—') + '</div></td>' +
+              beden.sizes.map(function (sz) { return '<td class="right">' + (Core.num(r.map[sz]) ? nf0(r.map[sz]) : '—') + '</td>'; }).join('') +
+              '<td class="right strong">' + nf0(r.toplam) + '</td></tr>';
+          }).join('') +
+          '</tbody><tfoot><tr><td>TOPLAM</td>' + beden.sizes.map(function (sz) { return '<td class="right">' + nf0(beden.totals[sz] || 0) + '</td>'; }).join('') +
+          '<td class="right">' + nf0(beden.toplam) + '</td></tr></tfoot></table></div>'
+        : '<div class="card-body"><p class="muted small" style="margin:0">Bu dönemde beden dökümü olan sevk yok. Renk/beden satırıyla sevk yapıldığında burada görünür.</p></div>') +
+      '</div>';
+
     return '<div class="card"><div class="toolbar">' +
       '<div class="field" style="max-width:190px"><label for="reportMonth">Dönem</label>' +
       '<input id="reportMonth" type="month" class="input" data-role="report-month" value="' + esc(ay) + '"></div>' +
@@ -5680,15 +5738,25 @@ function viewShipments() {
       '<div class="table-wrap"><table class="data"><thead><tr><th>' + (groupKey === 'model' ? 'Model' : 'Cari') + '</th><th class="right">Koli</th><th class="right">Çift</th><th class="right">Tutar</th></tr></thead><tbody>' + groupTable + '</tbody></table></div></div>' +
       '<div class="card"><div class="card-head"><div><h2>Bekleyen siparişler</h2><div class="sub">Kalan çifte göre ilk 10</div></div></div>' +
       '<div class="table-wrap"><table class="data"><thead><tr><th>Model</th><th class="right">Giden</th><th class="right">Kalan</th><th class="right">Tutar</th></tr></thead><tbody>' + kalanTable + '</tbody></table></div></div>' +
-      '</div>' + karCard;
+      '</div>' + karCard + bedenCard;
   }
 
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '1.8.0';
+  var SURUM = '2.0.0';
 
   var YENILIKLER = [
+    {
+      v: '2.0.0', t: '31.10.2026', m: [
+        'Renk–beden–asorti matrisi: model kartında kategori, renkler ve asorti şablonu',
+        'Siparişte renk/beden satırları; asortili veya açık; çok renkli sipariş',
+        'Satır bazlı sevk, kısmi sevk ve satır kalanı kontrolü',
+        'Fişte yalnızca sevk edilen bedenler; boş beden yok; “Açık · 9’lu”',
+        'Beden dökümü raporu; A4/A5 fiş',
+        'Eski dosyalar ESKI satırına taşınır; bakiye ve sevkler korunur'
+      ]
+    },
     {
       v: '1.8.0', t: '30.10.2026', m: [
         'Proje adı DMR AYAKKABI olarak güncellendi',

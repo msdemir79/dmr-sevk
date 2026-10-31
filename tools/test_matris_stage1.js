@@ -86,6 +86,11 @@ const S = { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 };
   catch (e) { fazla = true; }
   ok(fazla, 'satır kalanından fazla sevk engellendi');
 
+  const sr = Core.sizeReport(d3, '', c3.id);
+  ok(sr.sizes.join(',') === '36,37,38,39,40', 'beden raporu boyutları');
+  ok(sr.toplam === 38 && sr.totals['40'] === 22, 'beden raporu 40 = 22, toplam 38');
+  ok(sr.rows.length === 2, 'beden raporu iki renk satırı');
+
   const bytes3 = X.writeWorkbook(Core.buildWorkbook(d3));
   const wb3 = await X.readWorkbook(bytes3);
   const d4 = Core.readData(wb3.sheets);
