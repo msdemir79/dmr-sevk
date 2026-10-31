@@ -5744,9 +5744,15 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '2.0.0';
+  var SURUM = '2.0.1';
 
   var YENILIKLER = [
+    {
+      v: '2.0.1', t: '31.10.2026', m: [
+        'Modeller sayfasında Düzenle, Sil ve Resim butonları düzeltildi',
+        'Model kartı yardımcı fonksiyonları geri eklendi (modelById, showModelImage, removeModel)'
+      ]
+    },
     {
       v: '2.0.0', t: '31.10.2026', m: [
         'Renk–beden–asorti matrisi: model kartında kategori, renkler ve asorti şablonu',
@@ -6315,6 +6321,40 @@ function viewShipments() {
         renderView();
         toast(isEdit ? 'Model güncellendi' : 'Model eklendi', 'ok');
       } catch (ex) { err.textContent = ex.message; }
+    });
+  }
+
+  function modelById(id) {
+    return (data.modeller || []).filter(function (m) { return m.id === id; })[0] || null;
+  }
+
+  function showModelImage(id) {
+    var kart = modelById(id);
+    var src = data.modelImages[id];
+    if (!kart || !src) return;
+    openModal({
+      title: kart.model,
+      subtitle: 'Model resmi',
+      body: '<div style="text-align:center"><img src="' + esc(src) + '" alt="" style="max-width:100%;max-height:62vh;border-radius:10px;border:1px solid var(--line)"></div>',
+      footer: '<button class="btn" data-modal-close>Kapat</button>'
+    });
+  }
+
+  function removeModel(id) {
+    var kart = modelById(id);
+    if (!kart) return;
+    var kullanim = data.orders.filter(function (o) { return Core.normKey(o.model) === Core.normKey(kart.model); }).length;
+    confirmDialog({
+      title: 'Model kartı silinsin mi?',
+      message: kart.model + ' kartı silinecek.' + (kullanim ? ' Bu modele ait ' + kullanim + ' sipariş etkilenmez, sadece fiyat/maliyet bilgisi silinir.' : ''),
+      confirmText: 'Sil', danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      Core.deleteModel(data, id);
+      log('MODEL SİL', kart.model);
+      setDirty(true);
+      renderView();
+      toast('Model kartı silindi', 'ok');
     });
   }
 

@@ -1,6 +1,6 @@
 # Renk–beden–asorti matrisi — üretim planı
 
-**Durum:** Aşama 1–3 tamamlandı; aşama 4 (beden raporu + sürüm) v2.0.0 release candidate olarak hazır. Kullanıcı testi/onayı bekliyor. `main`/v1.8.0 etkilenmedi.
+**Durum:** Renk–beden–asorti matrisi v2.0.1 olarak yayınlandı. Model kartı buton düzeltmesi dahil. `main` güncel.
 **Hedef sürüm:** v2.0.0 (veri şeması değişiyor).
 **Prototip:** [`prototype/matris.html`](../prototype/matris.html) · **Issue:** [#1](https://github.com/msdemir79/dmr-sevk/issues/1)
 

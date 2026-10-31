@@ -254,6 +254,24 @@ BOOT = r"""
         }, 200);
       }, 150);
     }
+    if (h === 'model-delete-yes') {
+      APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="model-del"]');
+        if (b) b.click();
+        setTimeout(function () {
+          var yes = document.querySelector('[data-yes]');
+          if (yes) yes.click();
+        }, 200);
+      }, 250);
+    }
+    if (h === 'model-edit' || h === 'model-delete') {
+      APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="' + (h === 'model-delete' ? 'model-del' : 'model-edit') + '"]');
+        if (b) b.click();
+      }, 250);
+    }
     if (h === 'model-save-matris') {
       APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
       setTimeout(function () {

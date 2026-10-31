@@ -49,7 +49,7 @@ Bu dosya, henüz uygulanmayan ama değerlendirilen geliştirmeleri tutar. Uygula
 4. ✅ Çekirdek — veri modeli, Excel, migration ve testler `feature/matris` dalında tamamlandı.
 eature/matris dalında tamamlandı (veri modeli, Excel, migration, testler); arayüz bekliyor.
 5. ✅ Arayüz — model kartı, sipariş satırları, satır bazlı sevk ve fiş beden dökümü tamamlandı.
-6. 🟡 Rapor + kabul — beden raporu ve v2.0.0 release candidate hazır; kullanıcı testi/onayı bekliyor.
+6. ✅ Rapor + kabul — beden raporu ve v2.0.0/v2.0.1 yayınlandı.
 
 **Neden önce prototip?** Veri modeli ve fiş yerleşimi değişiyor; mevcut dosyalarla uyumluluk riski var. Gerçek siparişlerle denemeden üretime almamak gerekiyor.
 

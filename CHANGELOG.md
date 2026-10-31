@@ -2,6 +2,11 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v2.0.1 — 31.10.2026
+
+### Düzeltildi
+- **Modeller sayfasında Düzenle / Sil / Resim butonları** çalışmıyordu; eksik `modelById`, `showModelImage` ve `removeModel` fonksiyonları geri eklendi.
+
 ## v2.0.0 — 31.10.2026
 
 ### Eklendi
