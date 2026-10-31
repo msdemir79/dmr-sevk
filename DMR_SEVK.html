@@ -6152,9 +6152,16 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '2.1.0';
+  var SURUM = '2.1.1';
 
   var YENILIKLER = [
+    {
+      v: '2.1.1', t: '31.10.2026', m: [
+        'Siparişte renk artık model kartındaki tanımlı renklerden seçilir; elle yazılamaz',
+        'Model değişince renk listesi güncellenir; geçersiz renk ilk tanımlı renge çekilir',
+        'Model seçilince satır otomatik Asortili/Açık moda geçer'
+      ]
+    },
     {
       v: '2.1.0', t: '31.10.2026', m: [
         'Renkler artık ayrı tabloda; model kartında çoklu renk seçimi',
@@ -7125,7 +7132,7 @@ function viewShipments() {
       if (kopya && lines.length === 1 && lines[0].mod === 'ESKI') lines = [];
     }
     if (!lines.length) {
-      lines = [{ id: 0, renk: o.renk || '', mod: 'ASORTILI', beden: 0, koli: 1, koliIci: Core.num(o.asorti) || 10, cift: 0 }];
+      lines = [{ id: 0, renk: o.renk || '', mod: 'ASORTILI', beden: 0, koli: 1, koliIci: Core.num(o.asorti) || 10, cift: 0, auto: true }];
     }
 
     var body =
@@ -7142,13 +7149,12 @@ function viewShipments() {
       '  <div class="field span2"><label for="ofKod">Kod <span class="hint">(boşsa otomatik)</span></label><input id="ofKod" class="input" value="' + esc(o.kod) + '"></div>' +
       '  <div class="span4" style="margin-top:2px">' +
       '    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">' +
-      '      <label class="f" style="margin:0">Renk / beden satırları <span class="hint">(her beden ayrı satır)</span></label>' +
+      '      <label class="f" style="margin:0">Renk / beden satırları <span class="hint">(renkler model kartından; her beden ayrı satır)</span></label>' +
       '      <button type="button" class="btn btn-sm" id="ofAddLine"' + (kilit ? ' disabled' : '') + '>' + ICONS.plus + ' Satır ekle</button>' +
       '    </div>' +
       '    <div style="overflow:auto;border:1px solid var(--line);border-radius:10px">' +
       '      <table class="order-lines"><thead><tr><th style="min-width:112px">Renk</th><th style="min-width:96px">Mod</th><th style="width:78px">Beden</th><th style="width:72px">Koli</th><th style="width:78px">Koli içi</th><th class="right" style="width:66px">Çift</th><th style="width:30px"></th></tr></thead><tbody id="ofLines"></tbody></table>' +
       '    </div>' +
-      '    <datalist id="dlORenk"></datalist>' +
       '  </div>' +
       '  <div class="span4" id="ofSummary" style="display:flex;gap:22px;font-size:12.5px;color:var(--ink-2);flex-wrap:wrap"></div>' +
       '  <div class="span4" style="display:flex;gap:14px;align-items:center;padding:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px">' +
@@ -7192,15 +7198,20 @@ function viewShipments() {
       if (l.mod === 'ACIK') return Core.num(l.koli) * Core.num(l.koliIci);
       return Core.num(l.koli) * (perBox() || Core.num(l.koliIci));
     }
-    function refreshColors() {
+    function renkSecenekleri(l) {
       var k = kart();
-      var list = uniq((k && k.renkler ? k.renkler : []).concat(renkler));
-      $('#dlORenk', wrap).innerHTML = list.map(function (r) { return '<option value="' + esc(r) + '">'; }).join('');
+      var list = (k && k.renkler ? k.renkler.slice() : []);
+      if (l.renk && list.indexOf(l.renk) < 0) list.push(l.renk);
+      if (!list.length) return '<option value="">Modelde renk yok</option>';
+      return '<option value="">Renk seçin…</option>' + list.map(function (r) {
+        return '<option value="' + esc(r) + '"' + (r === l.renk ? ' selected' : '') + '>' + esc(r) + '</option>';
+      }).join('');
     }
     function renderLines() {
       var pb = perBox();
       var sizes = bedenler();
       $('#ofLines', wrap).innerHTML = lines.map(function (l, i) {
+        var renk = '<select data-f="renk" data-i="' + i + '"' + (kilit ? ' disabled' : '') + '>' + renkSecenekleri(l) + '</select>';
         var beden = l.mod === 'ACIK'
           ? (sizes.length
             ? '<select data-f="beden" data-i="' + i + '"' + (kilit ? ' disabled' : '') + '>' + sizes.map(function (s) { return '<option value="' + s + '"' + (s === Core.num(l.beden) ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>'
@@ -7214,7 +7225,7 @@ function viewShipments() {
           '<option value="ACIK"' + (l.mod === 'ACIK' ? ' selected' : '') + '>Açık</option>' +
           (l.mod === 'ESKI' ? '<option value="ESKI" selected>Eski</option>' : '') + '</select>';
         return '<tr data-row="' + i + '">' +
-          '<td><input data-f="renk" data-i="' + i + '" list="dlORenk" value="' + esc(l.renk) + '"' + (kilit ? ' disabled' : '') + '></td>' +
+          '<td>' + renk + '</td>' +
           '<td>' + mod + '</td>' +
           '<td>' + beden + '</td>' +
           '<td><input data-f="koli" data-i="' + i + '" type="number" min="0" step="1" value="' + esc(l.koli || '') + '"' + (kilit || l.mod === 'ESKI' ? ' disabled' : '') + '></td>' +
@@ -7223,7 +7234,6 @@ function viewShipments() {
           '<td>' + (kilit ? '' : '<button type="button" class="btn btn-icon danger" data-del="' + i + '" title="Satırı kaldır">×</button>') + '</td>' +
           '</tr>';
       }).join('');
-      refreshColors();
       refresh();
     }
     function refresh() {
@@ -7278,6 +7288,7 @@ function viewShipments() {
       syncFromDom();
       if (el.getAttribute('data-f') === 'mod') {
         var i = Core.num(el.getAttribute('data-i'));
+        lines[i].auto = false;
         if (lines[i].mod === 'ACIK' && !lines[i].beden) lines[i].beden = bedenler()[0] || 0;
         if (lines[i].mod === 'ASORTILI') lines[i].koliIci = perBox();
         renderLines();
@@ -7298,13 +7309,25 @@ function viewShipments() {
       var sizes = bedenler();
       lines.push({
         id: 0, renk: (k && k.renkler && k.renkler[0]) || '', mod: perBox() ? 'ASORTILI' : 'ACIK',
-        beden: sizes[0] || 0, koli: 1, koliIci: perBox() || 10, cift: 0
+        beden: sizes[0] || 0, koli: 1, koliIci: perBox() || 10, cift: 0, auto: false
       });
       renderLines();
     });
 
+    var sonModel = $('#ofModel', wrap).value;
     function modelChanged() {
       var k = kart();
+      var yeniModel = $('#ofModel', wrap).value;
+      var modelDegisti = yeniModel !== sonModel;
+      sonModel = yeniModel;
+      if (modelDegisti && k && k.renkler && k.renkler.length) {
+        lines.forEach(function (l) { if (k.renkler.indexOf(l.renk) < 0) l.renk = k.renkler[0]; });
+      }
+      if (modelDegisti && lines.length === 1 && lines[0].auto) {
+        lines[0].mod = perBox() ? 'ASORTILI' : 'ACIK';
+        if (perBox()) lines[0].koliIci = perBox();
+        else { lines[0].beden = lines[0].beden || 40; lines[0].koliIci = lines[0].koliIci || 10; }
+      }
       if (k && Core.num(k.fiyat) && !$('#ofFiyat', wrap).value) $('#ofFiyat', wrap).value = String(k.fiyat).replace('.', ',');
       if (k && lines.length === 1 && !lines[0].renk && k.renkler && k.renkler.length) lines[0].renk = k.renkler[0];
       if (k && lines.length === 1 && lines[0].mod === 'ASORTILI' && !lines[0].koliIci) lines[0].koliIci = perBox();
@@ -7361,6 +7384,7 @@ function viewShipments() {
       for (var i = 0; i < lines.length; i++) {
         var l = lines[i];
         if (!l.renk) l.renk = (kart() && kart().renkler[0]) || o.renk || '';
+        if (!l.renk) { err.textContent = 'Her satırda renk seçin. Model kartında renk tanımlı değilse Modeller → renkler.'; return; }
         if (l.mod === 'ACIK' && !l.beden) { err.textContent = 'Açık satırda beden seçin.'; return; }
         if (l.mod === 'AÇIK' || l.mod === 'ACIK') { if (Core.num(l.koliIci) <= 0) { err.textContent = 'Açık satırda koli içi girin.'; return; } }
         if (l.mod === 'ASORTILI' && !pb) { err.textContent = 'Model kartında asorti tanımlı değil; açık satır kullanın.'; return; }

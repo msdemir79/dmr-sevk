@@ -268,6 +268,17 @@ BOOT = r"""
         }, 200);
       }, 250);
     }
+    if (h === 'order-color') {
+      APP.S.view = 'orders'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        document.querySelector('[data-act="order-new"]').click();
+        setTimeout(function () {
+          var model = document.getElementById('ofModel');
+          model.value = '6049';
+          model.dispatchEvent(new Event('change', { bubbles: true }));
+        }, 200);
+      }, 150);
+    }
     if (h === 'model-master-save') {
       APP.S.view = 'models'; APP.updateChrome(); APP.renderView();
       setTimeout(function () {

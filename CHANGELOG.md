@@ -2,6 +2,13 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v2.1.1 — 31.10.2026
+
+### Düzeltildi
+- Sipariş satırındaki **renk** artık serbest metin değil, model kartındaki tanımlı renklerden **seçim**.
+- Model değiştirildiğinde renk listesi güncellenir; modelde olmayan renk ilk tanımlı renge çekilir.
+- Model seçilince satır otomatik **Asortili/Açık** moda geçer.
+
 ## v2.1.0 — 31.10.2026
 
 ### Eklendi
