@@ -1,6 +1,6 @@
 # Renk–beden–asorti matrisi — üretim planı
 
-**Durum:** Renk–beden–asorti matrisi v2.0.1 olarak yayınlandı. Model kartı buton düzeltmesi dahil. `main` güncel.
+**Durum:** Renk–beden–asorti matrisi ve renk/şablon ustaları v2.1.0 olarak hazır. `main` güncel.
 **Hedef sürüm:** v2.0.0 (veri şeması değişiyor).
 **Prototip:** [`prototype/matris.html`](../prototype/matris.html) · **Issue:** [#1](https://github.com/msdemir79/dmr-sevk/issues/1)
 
@@ -96,3 +96,15 @@ Her aşama `feature/matris` dalında; `main`/v1.8.0 bozulmadan kalır. Gerçek v
 - Sevk satırı–sipariş satırı bağlantısı → foreign key kontrolü ve sağlık testi.
 - Fiş A4 yerleşimi (çok renk/beden) → yazdırma testi.
 - Model kartı sonradan değişirse eski fişler → `dagilim` snapshot’ı.
+
+## 8. Renk ve asorti şablonu ustaları (v2.1.0)
+
+- **RENKLER:** ad, kısa kod, aktif; model kartında çoklu seçim.
+- **ASORTİ ŞABLONLARI:** Ayarlar’da ad + kategori + beden dağılımı; modele atanır.
+- **MODEL RENKLERİ:** model ↔ renk ilişkisi.
+- Model kartında **renk × beden matrisi** önizlemesi.
+- Excel 16 sayfa; eski kartlar otomatik ustalara taşınır.
+
+![Ayarlar — renkler ve şablonlar](asama5-ayarlar.png)
+
+![Model kartı — renk × beden matrisi](asama5-model-matris.png)

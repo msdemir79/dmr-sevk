@@ -23,6 +23,9 @@
     KULLANICILAR: 'KULLANICILAR',
     MODELLER: 'MODEL KARTLARI',
     MODEL_IMAGES: 'MODEL RESİMLERİ',
+    RENKLER: 'RENKLER',
+    ASORTI_SABLONLARI: 'ASORTİ ŞABLONLARI',
+    MODEL_RENKLERI: 'MODEL RENKLERİ',
     ORDERS: 'SİPARİŞLER',
     ORDER_LINES: 'SİPARİŞ SATIRLARI',
     LEDGER: 'CARİ HESAP',
@@ -155,7 +158,7 @@
 
   function emptyData() {
     return {
-      cariler: [], kullanicilar: [], modeller: [], orders: [], orderLines: [], ledger: [], shipments: [],
+      cariler: [], kullanicilar: [], modeller: [], renkler: [], asortiSablonlari: [], modelRenkleri: [], orders: [], orderLines: [], ledger: [], shipments: [],
       lines: [], audit: [], trash: [], images: {}, modelImages: {}, settings: defaultSettings()
     };
   }
@@ -834,7 +837,9 @@
       model: String(input.model || '').trim(),
       kategori: m.kategori,
       renkler: m.renkler,
+      renkIds: Array.isArray(input.renkIds) ? input.renkIds.map(num).filter(Boolean) : [],
       asortiSablon: m.asortiSablon,
+      asortiSablonId: num(input.asortiSablonId),
       fiyat: input.fiyat === '' || input.fiyat === undefined || input.fiyat === null ? 0 : num(input.fiyat),
       maliyet: input.maliyet === '' || input.maliyet === undefined || input.maliyet === null ? 0 : num(input.maliyet),
       asorti: input.asorti === '' || input.asorti === undefined || input.asorti === null ? 0 : num(input.asorti),
@@ -850,6 +855,31 @@
     return (data.modeller || []).filter(function (m) { return normKey(m.model) === key; })[0] || null;
   }
 
+  function applyModelMaster(data, m, input) {
+    var tpl = input.asortiSablonId ? Matris.templateById(data, num(input.asortiSablonId)) : null;
+    if (tpl) {
+      m.asortiSablonId = tpl.id;
+      m.kategori = tpl.kategori;
+      m.asortiSablon = JSON.parse(JSON.stringify(tpl.dagilim));
+      m.asorti = Matris.asortiToplam(tpl.dagilim);
+    }
+    if (Array.isArray(input.renkIds)) {
+      Matris.setModelColors(data, m.id, input.renkIds.map(num).filter(Boolean));
+      var renkler = Matris.modelColors(data, m.id);
+      m.renkler = renkler.map(function (c) { return c.ad; });
+      m.renkIds = renkler.map(function (c) { return c.id; });
+    } else {
+      var mevcutRenkler = Matris.modelColors(data, m.id);
+      if (mevcutRenkler.length) {
+        m.renkler = mevcutRenkler.map(function (c) { return c.ad; });
+        m.renkIds = mevcutRenkler.map(function (c) { return c.id; });
+      } else {
+        m.renkIds = [];
+      }
+    }
+    return m;
+  }
+
   function addModel(data, input) {
     if (!data.modelImages) data.modelImages = {};
     var m = normalizeModel(input);
@@ -857,6 +887,7 @@
     if (modelKart(data, m.model)) throw new Error('Bu model kartı zaten var.');
     m.id = nextId(data.modeller || []);
     (data.modeller = data.modeller || []).push(m);
+    applyModelMaster(data, m, input);
     if (input.resim) data.modelImages[m.id] = String(input.resim);
     return m;
   }
@@ -872,12 +903,89 @@
     for (var k in next) mevcut[k] = next[k];
     if (input.resim) data.modelImages[id] = String(input.resim);
     else if (input.resim === null) delete data.modelImages[id];
+    applyModelMaster(data, mevcut, input);
     return mevcut;
   }
 
   function deleteModel(data, id) {
     data.modeller = (data.modeller || []).filter(function (m) { return m.id !== id; });
+    data.modelRenkleri = (data.modelRenkleri || []).filter(function (r) { return r.modelId !== id; });
     if (data.modelImages) delete data.modelImages[id];
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Renk ve asorti şablonu ustaları                                     */
+  /* ------------------------------------------------------------------ */
+  function addColor(data, input) {
+    Matris.ensureMasterArrays(data);
+    var ad = String(input.ad || '').trim();
+    if (!ad) throw new Error('Renk adı zorunlu.');
+    if ((data.renkler || []).some(function (c) { return normKey(c.ad) === normKey(ad); })) throw new Error('Bu renk zaten var.');
+    var c = { id: nextId(data.renkler || []), ad: ad, kod: String(input.kod || '').trim(), aktif: input.aktif !== false };
+    data.renkler.push(c);
+    return c;
+  }
+
+  function updateColor(data, id, input) {
+    var c = (data.renkler || []).filter(function (x) { return x.id === id; })[0];
+    if (!c) throw new Error('Renk bulunamadı.');
+    var ad = String(input.ad || '').trim();
+    if (!ad) throw new Error('Renk adı zorunlu.');
+    if ((data.renkler || []).some(function (x) { return x.id !== id && normKey(x.ad) === normKey(ad); })) throw new Error('Bu renk adı başka kayıtta var.');
+    c.ad = ad;
+    c.kod = String(input.kod || '').trim();
+    c.aktif = input.aktif !== false;
+    (data.modeller || []).forEach(function (m) { m.renkler = Matris.modelColors(data, m.id).map(function (x) { return x.ad; }); });
+    return c;
+  }
+
+  function deleteColor(data, id) {
+    var c = (data.renkler || []).filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    var kullanim = Matris.colorUsage(data, id);
+    if (kullanim) throw new Error('Bu renk ' + kullanim + ' modelde kullanılıyor; önce modelden çıkarın.');
+    data.renkler = data.renkler.filter(function (x) { return x.id !== id; });
+  }
+
+  function addAsortiSablon(data, input) {
+    Matris.ensureMasterArrays(data);
+    var ad = String(input.ad || '').trim();
+    if (!ad) throw new Error('Şablon adı zorunlu.');
+    if ((data.asortiSablonlari || []).some(function (t) { return normKey(t.ad) === normKey(ad); })) throw new Error('Bu şablon adı zaten var.');
+    var dagilim = Matris.normalizeSablon(input.dagilim);
+    if (!Object.keys(dagilim).length) throw new Error('En az bir bedene çift girin.');
+    var t = { id: nextId(data.asortiSablonlari || []), ad: ad, kategori: Matris.kategoriKodu(input.kategori), dagilim: dagilim, aktif: input.aktif !== false };
+    data.asortiSablonlari.push(t);
+    return t;
+  }
+
+  function updateAsortiSablon(data, id, input) {
+    var t = (data.asortiSablonlari || []).filter(function (x) { return x.id === id; })[0];
+    if (!t) throw new Error('Şablon bulunamadı.');
+    var ad = String(input.ad || '').trim();
+    if (!ad) throw new Error('Şablon adı zorunlu.');
+    if ((data.asortiSablonlari || []).some(function (x) { return x.id !== id && normKey(x.ad) === normKey(ad); })) throw new Error('Bu şablon adı başka kayıtta var.');
+    var dagilim = Matris.normalizeSablon(input.dagilim);
+    if (!Object.keys(dagilim).length) throw new Error('En az bir bedene çift girin.');
+    t.ad = ad;
+    t.kategori = Matris.kategoriKodu(input.kategori);
+    t.dagilim = dagilim;
+    t.aktif = input.aktif !== false;
+    (data.modeller || []).forEach(function (m) {
+      if (num(m.asortiSablonId) !== id) return;
+      m.kategori = t.kategori;
+      m.asortiSablon = JSON.parse(JSON.stringify(dagilim));
+      m.asorti = Matris.asortiToplam(dagilim);
+    });
+    return t;
+  }
+
+  function deleteAsortiSablon(data, id) {
+    var t = (data.asortiSablonlari || []).filter(function (x) { return x.id === id; })[0];
+    if (!t) return;
+    var kullanim = Matris.templateUsage(data, id);
+    if (kullanim) throw new Error('Bu şablon ' + kullanim + ' modelde kullanılıyor; önce modelde şablonu değiştirin.');
+    data.asortiSablonlari = data.asortiSablonlari.filter(function (x) { return x.id !== id; });
   }
 
   /** Model bazlı sipariş / sevk / kalan özeti (cariler arası). */
@@ -1114,6 +1222,7 @@
   }
 
   function buildWorkbook(data) {
+    Matris.migrateMaster(data);
     Matris.ensureLines(data);
     var shipped = shippedMap(data);
 
@@ -1165,8 +1274,19 @@
 
     var modelRows = (data.modeller || []).map(function (m) {
       return [m.id, m.model, m.kategori || '', Matris.formatRenkler(m.renkler), money(m.fiyat), num(m.asorti) || '',
-        Matris.formatAsorti(m.asortiSablon), money(m.maliyet), m.barkod || '', m.sezon || '', m.not || ''];
+        Matris.formatAsorti(m.asortiSablon), num(m.asortiSablonId) || '', money(m.maliyet), m.barkod || '', m.sezon || '', m.not || ''];
     });
+
+    var renkRows = (data.renkler || []).map(function (c) {
+      return [c.id, c.ad, c.kod || '', c.aktif === false ? 'HAYIR' : 'EVET'];
+    });
+    var sablonRows = (data.asortiSablonlari || []).map(function (t) {
+      return [t.id, t.ad, t.kategori || '', Matris.formatAsorti(t.dagilim), t.aktif === false ? 'HAYIR' : 'EVET'];
+    });
+    var modelRenkRows = (data.modelRenkleri || []).slice().sort(function (a, b) {
+      if (a.modelId !== b.modelId) return a.modelId - b.modelId;
+      return a.sira - b.sira;
+    }).map(function (r) { return [r.modelId, r.renkId, num(r.sira)]; });
 
     var orderById = {};
     data.orders.forEach(function (o) { orderById[o.id] = o; });
@@ -1214,10 +1334,32 @@
           columns: [
             { header: 'ID', width: 6 }, { header: 'MODEL', width: 38 }, { header: 'KATEGORİ', width: 11 },
             { header: 'RENKLER', width: 30 }, { header: 'FİYAT', width: 11 }, { header: 'ASORTİ', width: 8 },
-            { header: 'ASORTİ ŞABLONU', width: 24 }, { header: 'MALİYET', width: 11 },
+            { header: 'ASORTİ ŞABLONU', width: 24 }, { header: 'ASORTİ ŞABLON ID', width: 12 }, { header: 'MALİYET', width: 11 },
             { header: 'BARKOD', width: 18 }, { header: 'SEZON', width: 10 }, { header: 'NOT', width: 26 }
           ],
           rows: modelRows
+        },
+        {
+          name: SHEET.RENKLER,
+          columns: [
+            { header: 'ID', width: 6 }, { header: 'AD', width: 24 }, { header: 'KOD', width: 12 }, { header: 'AKTİF', width: 9 }
+          ],
+          rows: renkRows
+        },
+        {
+          name: SHEET.ASORTI_SABLONLARI,
+          columns: [
+            { header: 'ID', width: 6 }, { header: 'AD', width: 30 }, { header: 'KATEGORİ', width: 11 },
+            { header: 'DAĞILIM', width: 30 }, { header: 'AKTİF', width: 9 }
+          ],
+          rows: sablonRows
+        },
+        {
+          name: SHEET.MODEL_RENKLERI,
+          columns: [
+            { header: 'MODEL ID', width: 10 }, { header: 'RENK ID', width: 10 }, { header: 'SIRA', width: 7 }
+          ],
+          rows: modelRenkRows
         },
         {
           name: SHEET.ORDERS,
@@ -1326,7 +1468,7 @@
   };
   var MODEL_KEYS = {
     ID: 'id', MODEL: 'model', MODELBILGISI: 'model', FIYAT: 'fiyat', ASORTI: 'asorti', MALIYET: 'maliyet',
-    KATEGORI: 'kategori', RENKLER: 'renkler', ASORTISABLONU: 'asortiSablon',
+    KATEGORI: 'kategori', RENKLER: 'renkler', ASORTISABLONU: 'asortiSablon', ASORTISABLONID: 'asortiSablonId',
     BARKOD: 'barkod', SEZON: 'sezon', NOT: 'not'
   };
   var ORDER_KEYS = {
@@ -1472,6 +1614,7 @@
           kategori: pick(mrow, mkm, 'kategori'),
           renkler: pick(mrow, mkm, 'renkler'),
           asortiSablon: pick(mrow, mkm, 'asortiSablon'),
+          asortiSablonId: pick(mrow, mkm, 'asortiSablonId'),
           fiyat: pick(mrow, mkm, 'fiyat'),
           asorti: pick(mrow, mkm, 'asorti'),
           maliyet: pick(mrow, mkm, 'maliyet'),
@@ -1481,6 +1624,56 @@
         }));
       }
     }
+
+    // --- renkler
+    var rs = sheetByName(sheets, SHEET.RENKLER);
+    if (rs) {
+      var rkm = headerMap(rs.rows[0], { ID: 'id', AD: 'ad', RENK: 'ad', KOD: 'kod', AKTIF: 'aktif' });
+      for (var ri = 1; ri < rs.rows.length; ri++) {
+        var rrow = rs.rows[ri];
+        if (!rrow || !pick(rrow, rkm, 'ad')) continue;
+        data.renkler.push({
+          id: num(pick(rrow, rkm, 'id')) || nextId(data.renkler),
+          ad: String(pick(rrow, rkm, 'ad')).trim(),
+          kod: String(pick(rrow, rkm, 'kod') || '').trim(),
+          aktif: String(pick(rrow, rkm, 'aktif') || '').toLocaleUpperCase('tr-TR') !== 'HAYIR'
+        });
+      }
+    }
+
+    // --- asorti şablonları
+    var ts = sheetByName(sheets, SHEET.ASORTI_SABLONLARI);
+    if (ts) {
+      var tkm = headerMap(ts.rows[0], { ID: 'id', AD: 'ad', KATEGORI: 'kategori', DAGILIM: 'dagilim', AKTIF: 'aktif' });
+      for (var ti = 1; ti < ts.rows.length; ti++) {
+        var trow = ts.rows[ti];
+        if (!trow || !pick(trow, tkm, 'ad')) continue;
+        data.asortiSablonlari.push({
+          id: num(pick(trow, tkm, 'id')) || nextId(data.asortiSablonlari),
+          ad: String(pick(trow, tkm, 'ad')).trim(),
+          kategori: Matris.kategoriKodu(pick(trow, tkm, 'kategori')),
+          dagilim: Matris.parseAsorti(pick(trow, tkm, 'dagilim')),
+          aktif: String(pick(trow, tkm, 'aktif') || '').toLocaleUpperCase('tr-TR') !== 'HAYIR'
+        });
+      }
+    }
+
+    // --- model renkleri
+    var mrs = sheetByName(sheets, SHEET.MODEL_RENKLERI);
+    if (mrs) {
+      var mrm = headerMap(mrs.rows[0], { MODELID: 'modelId', RENKID: 'renkId', SIRA: 'sira' });
+      for (var mi = 1; mi < mrs.rows.length; mi++) {
+        var mrow2 = mrs.rows[mi];
+        if (!mrow2 || !num(pick(mrow2, mrm, 'modelId')) || !num(pick(mrow2, mrm, 'renkId'))) continue;
+        data.modelRenkleri.push({
+          modelId: num(pick(mrow2, mrm, 'modelId')),
+          renkId: num(pick(mrow2, mrm, 'renkId')),
+          sira: num(pick(mrow2, mrm, 'sira')) || data.modelRenkleri.length + 1
+        });
+      }
+    }
+
+    Matris.migrateMaster(data);
 
     // --- siparişler
     var om = headerMap(ordersSheet.rows[0], ORDER_KEYS);
@@ -1984,6 +2177,7 @@
       hareketSayisi++;
     });
 
+    Matris.migrateMaster(data);
     Matris.ensureLines(data);
     data.settings.sonFisNo = data.shipments.reduce(function (m, s) { return Math.max(m, num(s.fisNo)); }, num(data.settings.sonFisNo));
     data.settings.sonSiparisNo = data.orders.reduce(function (m, o) { return Math.max(m, num(o.sipno)); }, num(data.settings.sonSiparisNo));
@@ -2022,6 +2216,12 @@
     aktifYoneticiVar: aktifYoneticiVar,
     markaMigrate: markaMigrate,
     modelKart: modelKart,
+    addColor: addColor,
+    updateColor: updateColor,
+    deleteColor: deleteColor,
+    addAsortiSablon: addAsortiSablon,
+    updateAsortiSablon: updateAsortiSablon,
+    deleteAsortiSablon: deleteAsortiSablon,
     addModel: addModel,
     updateModel: updateModel,
     deleteModel: deleteModel,

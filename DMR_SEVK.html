@@ -774,6 +774,14 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
 .pf-mx .szsub { font-size: 7px; color: #666; font-weight: 400; }
 .pf-mx tfoot td { background: #f3f4f6; font-weight: 700; }
 
+/* --- renk seçimi ve matris önizleme --- */
+.color-pick { display: flex; flex-wrap: wrap; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: #fff; max-height: 170px; overflow: auto; }
+.color-pick-item { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; background: var(--surface-2); }
+.color-pick-item input { accent-color: var(--brand); width: auto; }
+.color-pick-item small { color: var(--muted); font-size: 9px; }
+.color-pick-item:has(input:checked) { border-color: var(--brand); background: var(--soft); }
+.data.mini th, .data.mini td { padding: 4px 6px; font-size: 11px; }
+
 </style>
 </head>
 <body>
@@ -1549,6 +1557,187 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
     };
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Renk ve asorti şablonu ustaları                                     */
+  /* ------------------------------------------------------------------ */
+  function ensureMasterArrays(data) {
+    if (!Array.isArray(data.renkler)) data.renkler = [];
+    if (!Array.isArray(data.asortiSablonlari)) data.asortiSablonlari = [];
+    if (!Array.isArray(data.modelRenkleri)) data.modelRenkleri = [];
+    return data;
+  }
+
+  function nextMasterId(arr) {
+    var m = 0;
+    (arr || []).forEach(function (x) { if (num(x.id) > m) m = num(x.id); });
+    return m + 1;
+  }
+
+  function colorById(data, id) {
+    return (data.renkler || []).filter(function (c) { return c.id === id; })[0] || null;
+  }
+
+  function templateById(data, id) {
+    return (data.asortiSablonlari || []).filter(function (t) { return t.id === id; })[0] || null;
+  }
+
+  function findColorByName(data, ad) {
+    var key = normKey(ad);
+    if (!key) return null;
+    return (data.renkler || []).filter(function (c) { return normKey(c.ad) === key; })[0] || null;
+  }
+
+  function uniqueColorName(data, ad) {
+    var base = String(ad || '').trim() || 'RENK';
+    var ad2 = base, n = 2;
+    while ((data.renkler || []).some(function (c) { return normKey(c.ad) === normKey(ad2); })) {
+      ad2 = base + ' ' + n;
+      n++;
+    }
+    return ad2;
+  }
+
+  function findOrCreateColor(data, ad, kod) {
+    ensureMasterArrays(data);
+    var mevcut = findColorByName(data, ad);
+    if (mevcut) {
+      if (kod && !mevcut.kod) mevcut.kod = String(kod).trim();
+      return mevcut;
+    }
+    var renk = {
+      id: nextMasterId(data.renkler),
+      ad: uniqueColorName(data, ad),
+      kod: String(kod || '').trim(),
+      aktif: true
+    };
+    data.renkler.push(renk);
+    return renk;
+  }
+
+  function templateKey(t) {
+    return normKey(t && t.kategori) + '|' + formatAsorti(t && t.dagilim);
+  }
+
+  function uniqueTemplateName(data, ad) {
+    var base = String(ad || '').trim() || 'ASORTİ';
+    var ad2 = base, n = 2;
+    while ((data.asortiSablonlari || []).some(function (t) { return normKey(t.ad) === normKey(ad2); })) {
+      ad2 = base + ' (' + n + ')';
+      n++;
+    }
+    return ad2;
+  }
+
+  function findOrCreateTemplate(data, opts) {
+    ensureMasterArrays(data);
+    var dagilim = normalizeSablon(opts && opts.dagilim);
+    if (!Object.keys(dagilim).length) return null;
+    var kategori = kategoriKodu(opts && opts.kategori);
+    var key = kategori + '|' + formatAsorti(dagilim);
+    var mevcut = (data.asortiSablonlari || []).filter(function (t) { return templateKey(t) === key; })[0];
+    if (mevcut) return mevcut;
+    var sablon = {
+      id: nextMasterId(data.asortiSablonlari),
+      ad: uniqueTemplateName(data, (opts && opts.ad) || (kategori || 'ASORTİ') + ' · ' + asortiToplam(dagilim) + "'li"),
+      kategori: kategori,
+      dagilim: dagilim,
+      aktif: true
+    };
+    data.asortiSablonlari.push(sablon);
+    return sablon;
+  }
+
+  function modelColorIds(data, modelId) {
+    return (data.modelRenkleri || []).filter(function (r) { return r.modelId === modelId; })
+      .sort(function (a, b) { return num(a.sira) - num(b.sira); })
+      .map(function (r) { return r.renkId; });
+  }
+
+  function modelColors(data, modelId) {
+    var byId = {};
+    (data.renkler || []).forEach(function (c) { byId[c.id] = c; });
+    return modelColorIds(data, modelId).map(function (id) { return byId[id]; }).filter(Boolean);
+  }
+
+  function setModelColors(data, modelId, colorIds) {
+    ensureMasterArrays(data);
+    data.modelRenkleri = (data.modelRenkleri || []).filter(function (r) { return r.modelId !== modelId; });
+    (colorIds || []).forEach(function (cid, i) {
+      var c = colorById(data, num(cid));
+      if (c) data.modelRenkleri.push({ modelId: modelId, renkId: c.id, sira: i + 1 });
+    });
+  }
+
+  function hydrateModel(data, kart) {
+    if (!kart) return kart;
+    ensureMasterArrays(data);
+    var tpl = templateById(data, kart.asortiSablonId);
+    if (!tpl && kart.asortiSablon && Object.keys(kart.asortiSablon).length) {
+      tpl = findOrCreateTemplate(data, { kategori: kart.kategori, dagilim: kart.asortiSablon, ad: kart.model + ' · asorti' });
+    }
+    if (tpl) {
+      kart.asortiSablonId = tpl.id;
+      kart.kategori = tpl.kategori || kart.kategori;
+      kart.asortiSablon = JSON.parse(JSON.stringify(tpl.dagilim));
+      kart.asorti = asortiToplam(tpl.dagilim);
+    } else {
+      kart.asortiSablonId = 0;
+      if (!kart.asortiSablon) kart.asortiSablon = {};
+    }
+
+    var ids = modelColorIds(data, kart.id);
+    if (!ids.length && Array.isArray(kart.renkler) && kart.renkler.length) {
+      var yeni = [];
+      kart.renkler.forEach(function (ad) {
+        var c = findOrCreateColor(data, ad);
+        if (c) yeni.push(c.id);
+      });
+      setModelColors(data, kart.id, yeni);
+    }
+    kart.renkler = modelColors(data, kart.id).map(function (c) { return c.ad; });
+    kart.renkIds = modelColors(data, kart.id).map(function (c) { return c.id; });
+    return kart;
+  }
+
+  /**
+   * Eski model kartlarını renk/şablon ustalarına taşır.
+   * Idempotent: tekrar çağrılması veriyi çoğaltmaz.
+   */
+  function migrateMaster(data) {
+    ensureMasterArrays(data);
+
+    data.renkler = data.renkler.map(function (c) {
+      return { id: num(c.id), ad: String(c.ad || '').trim(), kod: String(c.kod || '').trim(), aktif: c.aktif !== false };
+    }).filter(function (c) { return c.id > 0 && c.ad; });
+
+    data.asortiSablonlari = data.asortiSablonlari.map(function (t) {
+      return { id: num(t.id), ad: String(t.ad || '').trim(), kategori: kategoriKodu(t.kategori), dagilim: normalizeSablon(t.dagilim), aktif: t.aktif !== false };
+    }).filter(function (t) { return t.id > 0 && Object.keys(t.dagilim).length; });
+
+    var modelById = {};
+    (data.modeller || []).forEach(function (m) { modelById[m.id] = m; });
+    var gorulen = {};
+    data.modelRenkleri = data.modelRenkleri.filter(function (r) {
+      if (!modelById[r.modelId] || !colorById(data, r.renkId)) return false;
+      var k = r.modelId + '|' + r.renkId;
+      if (gorulen[k]) return false;
+      gorulen[k] = 1;
+      return true;
+    });
+
+    (data.modeller || []).forEach(function (m) { hydrateModel(data, m); });
+    return data;
+  }
+
+  function templateUsage(data, id) {
+    return (data.modeller || []).filter(function (m) { return num(m.asortiSablonId) === id; }).length;
+  }
+
+  function colorUsage(data, id) {
+    return (data.modelRenkleri || []).filter(function (r) { return r.renkId === id; }).length;
+  }
+
+
   function kartToplam(kart) {
     if (!kart) return 0;
     return asortiToplam(kart.asortiSablon) || num(kart.asorti);
@@ -1697,6 +1886,18 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
   }
 
   return {
+    ensureMasterArrays: ensureMasterArrays,
+    findOrCreateColor: findOrCreateColor,
+    findOrCreateTemplate: findOrCreateTemplate,
+    colorById: colorById,
+    templateById: templateById,
+    modelColorIds: modelColorIds,
+    modelColors: modelColors,
+    setModelColors: setModelColors,
+    hydrateModel: hydrateModel,
+    migrateMaster: migrateMaster,
+    templateUsage: templateUsage,
+    colorUsage: colorUsage,
     KATEGORILER: KATEGORILER,
     num: num,
     round3: round3,
@@ -1752,6 +1953,9 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
     KULLANICILAR: 'KULLANICILAR',
     MODELLER: 'MODEL KARTLARI',
     MODEL_IMAGES: 'MODEL RESİMLERİ',
+    RENKLER: 'RENKLER',
+    ASORTI_SABLONLARI: 'ASORTİ ŞABLONLARI',
+    MODEL_RENKLERI: 'MODEL RENKLERİ',
     ORDERS: 'SİPARİŞLER',
     ORDER_LINES: 'SİPARİŞ SATIRLARI',
     LEDGER: 'CARİ HESAP',
@@ -1884,7 +2088,7 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
 
   function emptyData() {
     return {
-      cariler: [], kullanicilar: [], modeller: [], orders: [], orderLines: [], ledger: [], shipments: [],
+      cariler: [], kullanicilar: [], modeller: [], renkler: [], asortiSablonlari: [], modelRenkleri: [], orders: [], orderLines: [], ledger: [], shipments: [],
       lines: [], audit: [], trash: [], images: {}, modelImages: {}, settings: defaultSettings()
     };
   }
@@ -2563,7 +2767,9 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
       model: String(input.model || '').trim(),
       kategori: m.kategori,
       renkler: m.renkler,
+      renkIds: Array.isArray(input.renkIds) ? input.renkIds.map(num).filter(Boolean) : [],
       asortiSablon: m.asortiSablon,
+      asortiSablonId: num(input.asortiSablonId),
       fiyat: input.fiyat === '' || input.fiyat === undefined || input.fiyat === null ? 0 : num(input.fiyat),
       maliyet: input.maliyet === '' || input.maliyet === undefined || input.maliyet === null ? 0 : num(input.maliyet),
       asorti: input.asorti === '' || input.asorti === undefined || input.asorti === null ? 0 : num(input.asorti),
@@ -2579,6 +2785,31 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
     return (data.modeller || []).filter(function (m) { return normKey(m.model) === key; })[0] || null;
   }
 
+  function applyModelMaster(data, m, input) {
+    var tpl = input.asortiSablonId ? Matris.templateById(data, num(input.asortiSablonId)) : null;
+    if (tpl) {
+      m.asortiSablonId = tpl.id;
+      m.kategori = tpl.kategori;
+      m.asortiSablon = JSON.parse(JSON.stringify(tpl.dagilim));
+      m.asorti = Matris.asortiToplam(tpl.dagilim);
+    }
+    if (Array.isArray(input.renkIds)) {
+      Matris.setModelColors(data, m.id, input.renkIds.map(num).filter(Boolean));
+      var renkler = Matris.modelColors(data, m.id);
+      m.renkler = renkler.map(function (c) { return c.ad; });
+      m.renkIds = renkler.map(function (c) { return c.id; });
+    } else {
+      var mevcutRenkler = Matris.modelColors(data, m.id);
+      if (mevcutRenkler.length) {
+        m.renkler = mevcutRenkler.map(function (c) { return c.ad; });
+        m.renkIds = mevcutRenkler.map(function (c) { return c.id; });
+      } else {
+        m.renkIds = [];
+      }
+    }
+    return m;
+  }
+
   function addModel(data, input) {
     if (!data.modelImages) data.modelImages = {};
     var m = normalizeModel(input);
@@ -2586,6 +2817,7 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
     if (modelKart(data, m.model)) throw new Error('Bu model kartı zaten var.');
     m.id = nextId(data.modeller || []);
     (data.modeller = data.modeller || []).push(m);
+    applyModelMaster(data, m, input);
     if (input.resim) data.modelImages[m.id] = String(input.resim);
     return m;
   }
@@ -2601,12 +2833,89 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
     for (var k in next) mevcut[k] = next[k];
     if (input.resim) data.modelImages[id] = String(input.resim);
     else if (input.resim === null) delete data.modelImages[id];
+    applyModelMaster(data, mevcut, input);
     return mevcut;
   }
 
   function deleteModel(data, id) {
     data.modeller = (data.modeller || []).filter(function (m) { return m.id !== id; });
+    data.modelRenkleri = (data.modelRenkleri || []).filter(function (r) { return r.modelId !== id; });
     if (data.modelImages) delete data.modelImages[id];
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Renk ve asorti şablonu ustaları                                     */
+  /* ------------------------------------------------------------------ */
+  function addColor(data, input) {
+    Matris.ensureMasterArrays(data);
+    var ad = String(input.ad || '').trim();
+    if (!ad) throw new Error('Renk adı zorunlu.');
+    if ((data.renkler || []).some(function (c) { return normKey(c.ad) === normKey(ad); })) throw new Error('Bu renk zaten var.');
+    var c = { id: nextId(data.renkler || []), ad: ad, kod: String(input.kod || '').trim(), aktif: input.aktif !== false };
+    data.renkler.push(c);
+    return c;
+  }
+
+  function updateColor(data, id, input) {
+    var c = (data.renkler || []).filter(function (x) { return x.id === id; })[0];
+    if (!c) throw new Error('Renk bulunamadı.');
+    var ad = String(input.ad || '').trim();
+    if (!ad) throw new Error('Renk adı zorunlu.');
+    if ((data.renkler || []).some(function (x) { return x.id !== id && normKey(x.ad) === normKey(ad); })) throw new Error('Bu renk adı başka kayıtta var.');
+    c.ad = ad;
+    c.kod = String(input.kod || '').trim();
+    c.aktif = input.aktif !== false;
+    (data.modeller || []).forEach(function (m) { m.renkler = Matris.modelColors(data, m.id).map(function (x) { return x.ad; }); });
+    return c;
+  }
+
+  function deleteColor(data, id) {
+    var c = (data.renkler || []).filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    var kullanim = Matris.colorUsage(data, id);
+    if (kullanim) throw new Error('Bu renk ' + kullanim + ' modelde kullanılıyor; önce modelden çıkarın.');
+    data.renkler = data.renkler.filter(function (x) { return x.id !== id; });
+  }
+
+  function addAsortiSablon(data, input) {
+    Matris.ensureMasterArrays(data);
+    var ad = String(input.ad || '').trim();
+    if (!ad) throw new Error('Şablon adı zorunlu.');
+    if ((data.asortiSablonlari || []).some(function (t) { return normKey(t.ad) === normKey(ad); })) throw new Error('Bu şablon adı zaten var.');
+    var dagilim = Matris.normalizeSablon(input.dagilim);
+    if (!Object.keys(dagilim).length) throw new Error('En az bir bedene çift girin.');
+    var t = { id: nextId(data.asortiSablonlari || []), ad: ad, kategori: Matris.kategoriKodu(input.kategori), dagilim: dagilim, aktif: input.aktif !== false };
+    data.asortiSablonlari.push(t);
+    return t;
+  }
+
+  function updateAsortiSablon(data, id, input) {
+    var t = (data.asortiSablonlari || []).filter(function (x) { return x.id === id; })[0];
+    if (!t) throw new Error('Şablon bulunamadı.');
+    var ad = String(input.ad || '').trim();
+    if (!ad) throw new Error('Şablon adı zorunlu.');
+    if ((data.asortiSablonlari || []).some(function (x) { return x.id !== id && normKey(x.ad) === normKey(ad); })) throw new Error('Bu şablon adı başka kayıtta var.');
+    var dagilim = Matris.normalizeSablon(input.dagilim);
+    if (!Object.keys(dagilim).length) throw new Error('En az bir bedene çift girin.');
+    t.ad = ad;
+    t.kategori = Matris.kategoriKodu(input.kategori);
+    t.dagilim = dagilim;
+    t.aktif = input.aktif !== false;
+    (data.modeller || []).forEach(function (m) {
+      if (num(m.asortiSablonId) !== id) return;
+      m.kategori = t.kategori;
+      m.asortiSablon = JSON.parse(JSON.stringify(dagilim));
+      m.asorti = Matris.asortiToplam(dagilim);
+    });
+    return t;
+  }
+
+  function deleteAsortiSablon(data, id) {
+    var t = (data.asortiSablonlari || []).filter(function (x) { return x.id === id; })[0];
+    if (!t) return;
+    var kullanim = Matris.templateUsage(data, id);
+    if (kullanim) throw new Error('Bu şablon ' + kullanim + ' modelde kullanılıyor; önce modelde şablonu değiştirin.');
+    data.asortiSablonlari = data.asortiSablonlari.filter(function (x) { return x.id !== id; });
   }
 
   /** Model bazlı sipariş / sevk / kalan özeti (cariler arası). */
@@ -2843,6 +3152,7 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
   }
 
   function buildWorkbook(data) {
+    Matris.migrateMaster(data);
     Matris.ensureLines(data);
     var shipped = shippedMap(data);
 
@@ -2894,8 +3204,19 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
 
     var modelRows = (data.modeller || []).map(function (m) {
       return [m.id, m.model, m.kategori || '', Matris.formatRenkler(m.renkler), money(m.fiyat), num(m.asorti) || '',
-        Matris.formatAsorti(m.asortiSablon), money(m.maliyet), m.barkod || '', m.sezon || '', m.not || ''];
+        Matris.formatAsorti(m.asortiSablon), num(m.asortiSablonId) || '', money(m.maliyet), m.barkod || '', m.sezon || '', m.not || ''];
     });
+
+    var renkRows = (data.renkler || []).map(function (c) {
+      return [c.id, c.ad, c.kod || '', c.aktif === false ? 'HAYIR' : 'EVET'];
+    });
+    var sablonRows = (data.asortiSablonlari || []).map(function (t) {
+      return [t.id, t.ad, t.kategori || '', Matris.formatAsorti(t.dagilim), t.aktif === false ? 'HAYIR' : 'EVET'];
+    });
+    var modelRenkRows = (data.modelRenkleri || []).slice().sort(function (a, b) {
+      if (a.modelId !== b.modelId) return a.modelId - b.modelId;
+      return a.sira - b.sira;
+    }).map(function (r) { return [r.modelId, r.renkId, num(r.sira)]; });
 
     var orderById = {};
     data.orders.forEach(function (o) { orderById[o.id] = o; });
@@ -2943,10 +3264,32 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
           columns: [
             { header: 'ID', width: 6 }, { header: 'MODEL', width: 38 }, { header: 'KATEGORİ', width: 11 },
             { header: 'RENKLER', width: 30 }, { header: 'FİYAT', width: 11 }, { header: 'ASORTİ', width: 8 },
-            { header: 'ASORTİ ŞABLONU', width: 24 }, { header: 'MALİYET', width: 11 },
+            { header: 'ASORTİ ŞABLONU', width: 24 }, { header: 'ASORTİ ŞABLON ID', width: 12 }, { header: 'MALİYET', width: 11 },
             { header: 'BARKOD', width: 18 }, { header: 'SEZON', width: 10 }, { header: 'NOT', width: 26 }
           ],
           rows: modelRows
+        },
+        {
+          name: SHEET.RENKLER,
+          columns: [
+            { header: 'ID', width: 6 }, { header: 'AD', width: 24 }, { header: 'KOD', width: 12 }, { header: 'AKTİF', width: 9 }
+          ],
+          rows: renkRows
+        },
+        {
+          name: SHEET.ASORTI_SABLONLARI,
+          columns: [
+            { header: 'ID', width: 6 }, { header: 'AD', width: 30 }, { header: 'KATEGORİ', width: 11 },
+            { header: 'DAĞILIM', width: 30 }, { header: 'AKTİF', width: 9 }
+          ],
+          rows: sablonRows
+        },
+        {
+          name: SHEET.MODEL_RENKLERI,
+          columns: [
+            { header: 'MODEL ID', width: 10 }, { header: 'RENK ID', width: 10 }, { header: 'SIRA', width: 7 }
+          ],
+          rows: modelRenkRows
         },
         {
           name: SHEET.ORDERS,
@@ -3055,7 +3398,7 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
   };
   var MODEL_KEYS = {
     ID: 'id', MODEL: 'model', MODELBILGISI: 'model', FIYAT: 'fiyat', ASORTI: 'asorti', MALIYET: 'maliyet',
-    KATEGORI: 'kategori', RENKLER: 'renkler', ASORTISABLONU: 'asortiSablon',
+    KATEGORI: 'kategori', RENKLER: 'renkler', ASORTISABLONU: 'asortiSablon', ASORTISABLONID: 'asortiSablonId',
     BARKOD: 'barkod', SEZON: 'sezon', NOT: 'not'
   };
   var ORDER_KEYS = {
@@ -3201,6 +3544,7 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
           kategori: pick(mrow, mkm, 'kategori'),
           renkler: pick(mrow, mkm, 'renkler'),
           asortiSablon: pick(mrow, mkm, 'asortiSablon'),
+          asortiSablonId: pick(mrow, mkm, 'asortiSablonId'),
           fiyat: pick(mrow, mkm, 'fiyat'),
           asorti: pick(mrow, mkm, 'asorti'),
           maliyet: pick(mrow, mkm, 'maliyet'),
@@ -3210,6 +3554,56 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
         }));
       }
     }
+
+    // --- renkler
+    var rs = sheetByName(sheets, SHEET.RENKLER);
+    if (rs) {
+      var rkm = headerMap(rs.rows[0], { ID: 'id', AD: 'ad', RENK: 'ad', KOD: 'kod', AKTIF: 'aktif' });
+      for (var ri = 1; ri < rs.rows.length; ri++) {
+        var rrow = rs.rows[ri];
+        if (!rrow || !pick(rrow, rkm, 'ad')) continue;
+        data.renkler.push({
+          id: num(pick(rrow, rkm, 'id')) || nextId(data.renkler),
+          ad: String(pick(rrow, rkm, 'ad')).trim(),
+          kod: String(pick(rrow, rkm, 'kod') || '').trim(),
+          aktif: String(pick(rrow, rkm, 'aktif') || '').toLocaleUpperCase('tr-TR') !== 'HAYIR'
+        });
+      }
+    }
+
+    // --- asorti şablonları
+    var ts = sheetByName(sheets, SHEET.ASORTI_SABLONLARI);
+    if (ts) {
+      var tkm = headerMap(ts.rows[0], { ID: 'id', AD: 'ad', KATEGORI: 'kategori', DAGILIM: 'dagilim', AKTIF: 'aktif' });
+      for (var ti = 1; ti < ts.rows.length; ti++) {
+        var trow = ts.rows[ti];
+        if (!trow || !pick(trow, tkm, 'ad')) continue;
+        data.asortiSablonlari.push({
+          id: num(pick(trow, tkm, 'id')) || nextId(data.asortiSablonlari),
+          ad: String(pick(trow, tkm, 'ad')).trim(),
+          kategori: Matris.kategoriKodu(pick(trow, tkm, 'kategori')),
+          dagilim: Matris.parseAsorti(pick(trow, tkm, 'dagilim')),
+          aktif: String(pick(trow, tkm, 'aktif') || '').toLocaleUpperCase('tr-TR') !== 'HAYIR'
+        });
+      }
+    }
+
+    // --- model renkleri
+    var mrs = sheetByName(sheets, SHEET.MODEL_RENKLERI);
+    if (mrs) {
+      var mrm = headerMap(mrs.rows[0], { MODELID: 'modelId', RENKID: 'renkId', SIRA: 'sira' });
+      for (var mi = 1; mi < mrs.rows.length; mi++) {
+        var mrow2 = mrs.rows[mi];
+        if (!mrow2 || !num(pick(mrow2, mrm, 'modelId')) || !num(pick(mrow2, mrm, 'renkId'))) continue;
+        data.modelRenkleri.push({
+          modelId: num(pick(mrow2, mrm, 'modelId')),
+          renkId: num(pick(mrow2, mrm, 'renkId')),
+          sira: num(pick(mrow2, mrm, 'sira')) || data.modelRenkleri.length + 1
+        });
+      }
+    }
+
+    Matris.migrateMaster(data);
 
     // --- siparişler
     var om = headerMap(ordersSheet.rows[0], ORDER_KEYS);
@@ -3713,6 +4107,7 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
       hareketSayisi++;
     });
 
+    Matris.migrateMaster(data);
     Matris.ensureLines(data);
     data.settings.sonFisNo = data.shipments.reduce(function (m, s) { return Math.max(m, num(s.fisNo)); }, num(data.settings.sonFisNo));
     data.settings.sonSiparisNo = data.orders.reduce(function (m, o) { return Math.max(m, num(o.sipno)); }, num(data.settings.sonSiparisNo));
@@ -3751,6 +4146,12 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
     aktifYoneticiVar: aktifYoneticiVar,
     markaMigrate: markaMigrate,
     modelKart: modelKart,
+    addColor: addColor,
+    updateColor: updateColor,
+    deleteColor: deleteColor,
+    addAsortiSablon: addAsortiSablon,
+    updateAsortiSablon: updateAsortiSablon,
+    deleteAsortiSablon: deleteAsortiSablon,
     addModel: addModel,
     updateModel: updateModel,
     deleteModel: deleteModel,
@@ -4208,6 +4609,7 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
     });
     if (!data.modelImages || typeof data.modelImages !== 'object') data.modelImages = {};
     try { Core.markaMigrate(data); } catch (e) { }
+    try { Matris.migrateMaster(data); } catch (e) { }
     try { Matris.ensureLines(data); } catch (e) { }
     try { Core.trashTemizle(data, 30); } catch (e) { }
     S.file.name = fileName || 'DMR_VERI.xlsx';
@@ -4897,6 +5299,12 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
         case 'user-del': removeKullanici(id); break;
         case 'change-pass': openPasswordForm(); break;
         case 'model-new': openModelForm(null, el.dataset.model || ''); break;
+        case 'color-new': openColorForm(null); break;
+        case 'color-edit': openColorForm((data.renkler || []).filter(function (c) { return c.id === id; })[0]); break;
+        case 'color-del': removeColorMaster(id); break;
+        case 'sablon-new': openSablonForm(null); break;
+        case 'sablon-edit': openSablonForm((data.asortiSablonlari || []).filter(function (t) { return t.id === id; })[0]); break;
+        case 'sablon-del': removeSablonMaster(id); break;
         case 'model-edit': openModelForm(modelById(id)); break;
         case 'model-del': removeModel(id); break;
         case 'model-image': showModelImage(id); break;
@@ -5744,9 +6152,18 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '2.0.1';
+  var SURUM = '2.1.0';
 
   var YENILIKLER = [
+    {
+      v: '2.1.0', t: '31.10.2026', m: [
+        'Renkler artık ayrı tabloda; model kartında çoklu renk seçimi',
+        'Asorti şablonları Ayarlar’da tanımlanır; modele atanır',
+        'Model kartında renk × beden matrisi önizlemesi',
+        'Excelde RENKLER, ASORTİ ŞABLONLARI ve MODEL RENKLERİ sayfaları',
+        'Eski kartlar otomatik renk/şablon kayıtlarına taşınır'
+      ]
+    },
     {
       v: '2.0.1', t: '31.10.2026', m: [
         'Modeller sayfasında Düzenle, Sil ve Resim butonları düzeltildi',
@@ -6188,31 +6605,46 @@ function viewShipments() {
   function openModelForm(model, modelAdi) {
     var isEdit = !!model;
     var m = model || {
-      model: modelAdi || '', kategori: '', renkler: [], asortiSablon: {},
-      fiyat: '', asorti: '', maliyet: '', barkod: '', sezon: '', not: ''
+      model: modelAdi || '', asortiSablonId: 0, renkIds: [], kategori: '',
+      fiyat: '', maliyet: '', barkod: '', sezon: '', not: ''
     };
     var currentImage = model ? (data.modelImages[model.id] || null) : null;
-    var kategoriOpts = '<option value="">Seçin…</option>' + Object.keys(Matris.KATEGORILER).map(function (k) {
-      return '<option value="' + k + '"' + (m.kategori === k ? ' selected' : '') + '>' + Matris.KATEGORILER[k].ad + ' (' + Matris.KATEGORILER[k].min + '–' + Matris.KATEGORILER[k].max + ')</option>';
+    var templates = (data.asortiSablonlari || []).filter(function (t) { return t.aktif !== false || Core.num(m.asortiSablonId) === t.id; });
+    var colors = (data.renkler || []);
+    var secili = {};
+    (m.renkIds || Matris.modelColorIds(data, m.id) || []).forEach(function (id) { secili[id] = 1; });
+    if (!Object.keys(secili).length && m.renkler) {
+      m.renkler.forEach(function (ad) { var c = colors.filter(function (x) { return Core.normKey(x.ad) === Core.normKey(ad); })[0]; if (c) secili[c.id] = 1; });
+    }
+
+    var tOpts = '<option value="">Şablon seçin…</option>' + templates.map(function (t) {
+      var kat = Matris.kategori(t.kategori);
+      return '<option value="' + t.id + '"' + (Core.num(m.asortiSablonId) === t.id ? ' selected' : '') + '>' +
+        esc(t.ad) + ' · ' + esc(kat ? kat.ad : '—') + ' · ' + nf0(Matris.asortiToplam(t.dagilim)) + ' çift/koli</option>';
+    }).join('');
+
+    var colorHtml = colors.filter(function (c) { return c.aktif !== false || secili[c.id]; }).map(function (c) {
+      return '<label class="color-pick-item"><input type="checkbox" data-color-id="' + c.id + '"' + (secili[c.id] ? ' checked' : '') + '>' +
+        '<span>' + esc(c.ad) + '</span>' + (c.kod ? '<small>' + esc(c.kod) + '</small>' : '') + '</label>';
     }).join('');
 
     var modal = openModal({
       title: isEdit ? 'Model kartını düzenle' : 'Yeni model kartı',
-      subtitle: 'Kategori, renkler, asorti ve fiyat',
+      subtitle: 'Asorti şablonu + renkler; beden dağılımı şablondan gelir',
       size: 'wide',
       body:
         '<form id="modelForm" class="form-grid g2" autocomplete="off">' +
         '  <div class="field span2"><label for="mfModel">Model *</label><input id="mfModel" class="input" required value="' + esc(m.model) + '"></div>' +
-        '  <div class="field"><label for="mfKategori">Kategori *</label><select id="mfKategori" class="select" required>' + kategoriOpts + '</select></div>' +
+        '  <div class="field"><label for="mfSablon">Asorti şablonu *</label><select id="mfSablon" class="select" required>' + tOpts + '</select></div>' +
+        '  <div class="field"><label>Kategori</label><div class="input" id="mfKategori" style="background:var(--surface-2)">—</div></div>' +
+        '  <div class="field span2"><label>Renkler * <span class="hint">(' + colors.length + ' renk tanımlı)</span></label>' +
+        '    <div id="mfRenkler" class="color-pick">' + (colorHtml || '<span class="muted small">Önce <b>Ayarlar → Renkler</b> bölümünden renk ekleyin.</span>') + '</div></div>' +
+        '  <div class="span2"><label class="f">Renk × beden matrisi <span class="hint">(koli içi çift)</span></label><div id="mfMatrix" class="table-wrap" style="max-height:none"></div></div>' +
         '  <div class="field"><label for="mfFiyat">Liste fiyatı</label><input id="mfFiyat" class="input num" type="text" inputmode="decimal" value="' + esc(m.fiyat || '') + '"></div>' +
-        '  <div class="field span2"><label for="mfRenkler">Renkler <span class="hint">(virgülle ayırın)</span></label><textarea id="mfRenkler" class="input" rows="2" spellcheck="false">' + esc((m.renkler || []).join(', ')) + '</textarea></div>' +
-        '  <div class="span2"><label class="f">Koli içi asorti <span class="hint">(her numaradan kaç çift)</span></label>' +
-        '    <div id="mfAsortiGrid" class="m-sz-grid"></div>' +
-        '    <div class="muted small" id="mfAsortiToplam" style="margin-top:5px"></div></div>' +
         '  <div class="field"><label for="mfMaliyet">Maliyet</label><input id="mfMaliyet" class="input num" type="text" inputmode="decimal" value="' + esc(m.maliyet || '') + '"></div>' +
         '  <div class="field"><label for="mfBarkod">Barkod</label><input id="mfBarkod" class="input" value="' + esc(m.barkod || '') + '"></div>' +
         '  <div class="field"><label for="mfSezon">Sezon</label><input id="mfSezon" class="input" value="' + esc(m.sezon || '') + '"></div>' +
-        '  <div class="field"><label for="mfNot">Not</label><input id="mfNot" class="input" value="' + esc(m.not || '') + '"></div>' +
+        '  <div class="field span2"><label for="mfNot">Not</label><input id="mfNot" class="input" value="' + esc(m.not || '') + '"></div>' +
         '  <div class="span2" style="display:flex;gap:14px;align-items:center;padding:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px">' +
         '    <div class="thumb lg" id="mfThumb" style="' + (currentImage ? 'background-image:url(&quot;' + esc(currentImage) + '&quot;)' : '') + '">' + (currentImage ? '' : 'RESİM') + '</div>' +
         '    <div style="flex:1;min-width:0">' +
@@ -6220,7 +6652,7 @@ function viewShipments() {
         '        <button type="button" class="btn btn-sm" data-mimg-pick>' + ICONS.image + ' Resim seç</button>' +
         '        <button type="button" class="btn btn-sm btn-ghost" data-mimg-clear>Kaldır</button>' +
         '      </div>' +
-        '      <p class="muted small" style="margin:8px 0 0">Resmi yapıştırabilir (Ctrl+V) veya sürükleyebilirsiniz. Küçük önizleme Excel dosyasına gömülür.</p>' +
+        '      <p class="muted small" style="margin:8px 0 0">Resmi yapıştırabilir (Ctrl+V) veya sürükleyebilirsiniz.</p>' +
         '    </div>' +
         '    <input type="file" accept="image/*" id="mfImage" class="hidden">' +
         '  </div>' +
@@ -6231,35 +6663,45 @@ function viewShipments() {
     });
 
     var wrap = modal.el;
-    var sablon = Object.assign({}, m.asortiSablon || {});
 
-    function renderAsorti() {
-      var kat = $('#mfKategori', wrap).value;
-      var list = Matris.bedenler(kat);
-      var grid = $('#mfAsortiGrid', wrap);
-      if (!list.length) {
-        grid.innerHTML = '<span class="muted small">Önce kategori seçin.</span>';
-        $('#mfAsortiToplam', wrap).textContent = '';
-        return;
-      }
-      grid.innerHTML = list.map(function (size) {
-        var q = Core.num(sablon[size]);
-        return '<label class="m-sz"><span>' + size + '</span><input type="number" min="0" step="1" data-size="' + size + '" value="' + (q ? q : '') + '" placeholder="0"></label>';
-      }).join('');
-      updateToplam();
+    function seciliTpl() {
+      return Matris.templateById(data, Core.num($('#mfSablon', wrap).value));
     }
-
-    function updateToplam() {
-      var t = 0;
-      $$('#mfAsortiGrid [data-size]', wrap).forEach(function (inp) { t += Core.num(inp.value); });
-      $('#mfAsortiToplam', wrap).textContent = 'Koli içi toplam: ' + nf0(t) + ' çift';
+    function seciliRenkler() {
+      return $$('#mfRenkler input[data-color-id]:checked', wrap).map(function (i) { return Core.num(i.getAttribute('data-color-id')); });
     }
+    function renderKategori() {
+      var t = seciliTpl();
+      var k = t ? Matris.kategori(t.kategori) : null;
+      $('#mfKategori', wrap).textContent = k ? k.ad + ' (' + k.min + '–' + k.max + ')' : '—';
+    }
+    function renderMatrix() {
+      var t = seciliTpl();
+      var ids = seciliRenkler();
+      var box = $('#mfMatrix', wrap);
+      if (!t) { box.innerHTML = '<div class="empty">Asorti şablonu seçin.</div>'; return; }
+      if (!ids.length) { box.innerHTML = '<div class="empty">En az bir renk seçin.</div>'; return; }
+      var sizes = Object.keys(t.dagilim).map(Number).sort(function (a, b) { return a - b; });
+      var byId = {};
+      colors.forEach(function (c) { byId[c.id] = c; });
+      var total = Matris.asortiToplam(t.dagilim);
+      box.innerHTML = '<table class="data mini"><thead><tr><th>Renk</th>' +
+        sizes.map(function (sz) { return '<th class="right">' + sz + '</th>'; }).join('') +
+        '<th class="right">Koli içi</th></tr></thead><tbody>' +
+        ids.map(function (id) {
+          var c = byId[id] || { ad: '—' };
+          return '<tr><td><div class="strong">' + esc(c.ad) + '</div><div class="sub">' + esc(c.kod || '') + '</div></td>' +
+            sizes.map(function (sz) { var q = Core.num(t.dagilim[sz]); return '<td class="right">' + (q ? nf0(q) : '—') + '</td>'; }).join('') +
+            '<td class="right strong">' + nf0(total) + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    }
+    function renderAll() { renderKategori(); renderMatrix(); }
 
-    $('#mfKategori', wrap).addEventListener('change', renderAsorti);
-    $('#mfAsortiGrid', wrap).addEventListener('input', updateToplam);
-    renderAsorti();
+    $('#mfSablon', wrap).addEventListener('change', renderAll);
+    $('#mfRenkler', wrap).addEventListener('change', renderMatrix);
+    renderAll();
 
-    // ---- model resmi ----
+    // ---- resim ----
     function setModelImage(dataUrl) {
       currentImage = dataUrl;
       var th = $('#mfThumb', wrap);
@@ -6292,20 +6734,14 @@ function viewShipments() {
     $('#modelForm', wrap).addEventListener('submit', function (e) {
       e.preventDefault();
       var err = $('#mfErr', wrap);
-      var kategori = $('#mfKategori', wrap).value;
-      if (!kategori) { err.textContent = 'Kategori seçin.'; return; }
-      var yeniSablon = {};
-      $$('#mfAsortiGrid [data-size]', wrap).forEach(function (inp) {
-        var q = Core.num(inp.value);
-        if (q > 0) yeniSablon[inp.getAttribute('data-size')] = Math.round(q);
-      });
-      var toplam = Matris.asortiToplam(yeniSablon);
+      var t = seciliTpl();
+      if (!t) { err.textContent = 'Asorti şablonu seçin. Ayarlar → Asorti şablonları.'; return; }
+      var ids = seciliRenkler();
+      if (!ids.length) { err.textContent = 'En az bir renk seçin. Ayarlar → Renkler.'; return; }
       var payload = {
         model: $('#mfModel', wrap).value,
-        kategori: kategori,
-        renkler: $('#mfRenkler', wrap).value,
-        asortiSablon: yeniSablon,
-        asorti: toplam || Core.num(m.asorti),
+        asortiSablonId: t.id,
+        renkIds: ids,
         fiyat: $('#mfFiyat', wrap).value.replace(',', '.'),
         maliyet: $('#mfMaliyet', wrap).value.replace(',', '.'),
         barkod: $('#mfBarkod', wrap).value,
@@ -6315,7 +6751,7 @@ function viewShipments() {
       };
       try {
         var kayit = isEdit ? Core.updateModel(data, m.id, payload) : Core.addModel(data, payload);
-        log(isEdit ? 'MODEL DÜZENLE' : 'MODEL EKLE', kayit.model + ' · ' + kategori + ' · ' + toplam + ' çift/koli');
+        log(isEdit ? 'MODEL DÜZENLE' : 'MODEL EKLE', kayit.model + ' · ' + t.ad + ' · ' + ids.length + ' renk');
         setDirty(true);
         modal.close();
         renderView();
@@ -6362,6 +6798,118 @@ function viewShipments() {
   /* Ayarlar  /* ------------------------------------------------------------------ */
   /* Ayarlar                                                             */
   /* ------------------------------------------------------------------ */
+  function openColorForm(renk) {
+    var isEdit = !!renk;
+    var c = renk || { ad: '', kod: '', aktif: true };
+    var m = openModal({
+      title: isEdit ? 'Rengi düzenle' : 'Yeni renk',
+      subtitle: 'Model kartlarında bu renk seçilir',
+      body: '<form id="colorForm" class="form-grid g2" autocomplete="off">' +
+        '  <div class="field span2"><label for="cfAd">Renk adı *</label><input id="cfAd" class="input" required value="' + esc(c.ad) + '"></div>' +
+        '  <div class="field"><label for="cfKod">Kısa kod</label><input id="cfKod" class="input" maxlength="8" value="' + esc(c.kod || '') + '"></div>' +
+        '  <div class="field" style="display:flex;align-items:flex-end"><label class="check"><input type="checkbox" id="cfAktif"' + (c.aktif !== false ? ' checked' : '') + '> Aktif</label></div>' +
+        '  <div class="auth-err span2" id="cfErr"></div>' +
+        '</form>',
+      footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
+        '<button class="btn btn-primary" type="submit" form="colorForm">' + ICONS.check + ' Kaydet</button>'
+    });
+    $('#colorForm', m.el).addEventListener('submit', function (e) {
+      e.preventDefault();
+      try {
+        var payload = { ad: $('#cfAd', m.el).value, kod: $('#cfKod', m.el).value, aktif: $('#cfAktif', m.el).checked };
+        var kayit = isEdit ? Core.updateColor(data, c.id, payload) : Core.addColor(data, payload);
+        log(isEdit ? 'RENK DÜZENLE' : 'RENK EKLE', kayit.ad);
+        setDirty(true); m.close(); renderView();
+        toast(isEdit ? 'Renk güncellendi' : 'Renk eklendi', 'ok');
+      } catch (ex) { $('#cfErr', m.el).textContent = ex.message; }
+    });
+  }
+
+  function removeColorMaster(id) {
+    var c = (data.renkler || []).filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    confirmDialog({
+      title: 'Renk silinsin mi?', message: c.ad + ' rengi silinecek. Kullanılan model varsa silinmez.', confirmText: 'Sil', danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      try {
+        Core.deleteColor(data, id);
+        log('RENK SİL', c.ad); setDirty(true); renderView(); toast('Renk silindi', 'ok');
+      } catch (ex) { toast(ex.message, 'err'); }
+    });
+  }
+
+  function openSablonForm(sablon) {
+    var isEdit = !!sablon;
+    var t = sablon || { ad: '', kategori: 'MERDANE', dagilim: {} };
+    var dagilim = Object.assign({}, t.dagilim || {});
+    var katOpts = '<option value="">Kategori seçin</option>' + Object.keys(Matris.KATEGORILER).map(function (k) {
+      return '<option value="' + k + '"' + (t.kategori === k ? ' selected' : '') + '>' + Matris.KATEGORILER[k].ad + ' (' + Matris.KATEGORILER[k].min + '–' + Matris.KATEGORILER[k].max + ')</option>';
+    }).join('');
+    var m = openModal({
+      title: isEdit ? 'Asorti şablonunu düzenle' : 'Yeni asorti şablonu',
+      subtitle: 'Koli içi beden dağılımı; modele atanır',
+      size: 'wide',
+      body: '<form id="sablonForm" class="form-grid g2" autocomplete="off">' +
+        '  <div class="field span2"><label for="sfAd">Şablon adı *</label><input id="sfAd" class="input" required value="' + esc(t.ad) + '" placeholder="Örn. Merdane 10\'lu 40-45"></div>' +
+        '  <div class="field"><label for="sfKat">Kategori *</label><select id="sfKat" class="select" required>' + katOpts + '</select></div>' +
+        '  <div class="field"><label>Koli içi toplam</label><div class="input" id="sfToplam" style="background:var(--surface-2)">0 çift</div></div>' +
+        '  <div class="span2"><label class="f">Beden dağılımı <span class="hint">(her numaradan kaç çift)</span></label><div id="sfGrid" class="m-sz-grid"></div></div>' +
+        '  <div class="auth-err span2" id="sfErr"></div>' +
+        '</form>',
+      footer: '<button class="btn" data-modal-close>Vazgeç</button>' +
+        '<button class="btn btn-primary" type="submit" form="sablonForm">' + ICONS.check + ' Kaydet</button>'
+    });
+
+    function renderGrid() {
+      var kat = $('#sfKat', m.el).value;
+      var list = Matris.bedenler(kat);
+      if (!list.length) { $('#sfGrid', m.el).innerHTML = '<span class="muted small">Önce kategori seçin.</span>'; updateTotal(); return; }
+      $('#sfGrid', m.el).innerHTML = list.map(function (sz) {
+        return '<label class="m-sz"><span>' + sz + '</span><input type="number" min="0" step="1" data-size="' + sz + '" value="' + (Core.num(dagilim[sz]) || '') + '" placeholder="0"></label>';
+      }).join('');
+      updateTotal();
+    }
+    function updateTotal() {
+      var total = 0;
+      $$('#sfGrid [data-size]', m.el).forEach(function (inp) { total += Core.num(inp.value); });
+      $('#sfToplam', m.el).textContent = nf0(total) + ' çift';
+    }
+    $('#sfKat', m.el).addEventListener('change', renderGrid);
+    $('#sfGrid', m.el).addEventListener('input', updateTotal);
+    renderGrid();
+
+    $('#sablonForm', m.el).addEventListener('submit', function (e) {
+      e.preventDefault();
+      var yeni = {};
+      $$('#sfGrid [data-size]', m.el).forEach(function (inp) {
+        var q = Core.num(inp.value);
+        if (q > 0) yeni[inp.getAttribute('data-size')] = Math.round(q);
+      });
+      try {
+        var payload = { ad: $('#sfAd', m.el).value, kategori: $('#sfKat', m.el).value, dagilim: yeni, aktif: true };
+        var kayit = isEdit ? Core.updateAsortiSablon(data, t.id, payload) : Core.addAsortiSablon(data, payload);
+        log(isEdit ? 'ŞABLON DÜZENLE' : 'ŞABLON EKLE', kayit.ad);
+        setDirty(true); m.close(); renderView();
+        toast(isEdit ? 'Şablon güncellendi' : 'Şablon eklendi', 'ok');
+      } catch (ex) { $('#sfErr', m.el).textContent = ex.message; }
+    });
+  }
+
+  function removeSablonMaster(id) {
+    var t = (data.asortiSablonlari || []).filter(function (x) { return x.id === id; })[0];
+    if (!t) return;
+    confirmDialog({
+      title: 'Şablon silinsin mi?', message: t.ad + ' şablonu silinecek. Kullanan model varsa silinmez.', confirmText: 'Sil', danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      try {
+        Core.deleteAsortiSablon(data, id);
+        log('ŞABLON SİL', t.ad); setDirty(true); renderView(); toast('Şablon silindi', 'ok');
+      } catch (ex) { toast(ex.message, 'err'); }
+    });
+  }
+
   function viewSettings() {
     if (!isAdmin()) return viewSettingsKullanici();
     var s = data.settings;
@@ -6376,6 +6924,25 @@ function viewShipments() {
         '<button class="btn btn-icon" data-act="user-pass" data-id="' + u.id + '" title="Şifre sıfırla" aria-label="Şifre sıfırla">' + ICONS.lock + '</button>' +
         '<button class="btn btn-icon" data-act="user-edit" data-id="' + u.id + '" title="Düzenle" aria-label="Düzenle">' + ICONS.edit + '</button>' +
         '<button class="btn btn-icon danger" data-act="user-del" data-id="' + u.id + '" title="Sil" aria-label="Sil">' + ICONS.trash + '</button>' +
+        '</div></td></tr>';
+    }).join('');
+
+    var renkRows = (data.renkler || []).map(function (c) {
+      return '<tr><td><div class="strong">' + esc(c.ad) + '</div><div class="sub">' + esc(c.kod || '—') + '</div></td>' +
+        '<td class="right sub">' + Matris.colorUsage(data, c.id) + '</td>' +
+        '<td><div class="row-actions">' +
+        '<button class="btn btn-icon" data-act="color-edit" data-id="' + c.id + '" title="Düzenle" aria-label="Düzenle">' + ICONS.edit + '</button>' +
+        '<button class="btn btn-icon danger" data-act="color-del" data-id="' + c.id + '" title="Sil" aria-label="Sil">' + ICONS.trash + '</button>' +
+        '</div></td></tr>';
+    }).join('');
+    var sablonRows = (data.asortiSablonlari || []).map(function (t) {
+      var top = Matris.asortiToplam(t.dagilim);
+      return '<tr><td><div class="strong">' + esc(t.ad) + '</div><div class="sub">' + esc(Matris.bedenler(t.kategori).length ? (Matris.kategori(t.kategori) || {}).ad : '—') + '</div></td>' +
+        '<td class="right">' + nf0(top) + '</td>' +
+        '<td class="right sub">' + Matris.templateUsage(data, t.id) + '</td>' +
+        '<td><div class="row-actions">' +
+        '<button class="btn btn-icon" data-act="sablon-edit" data-id="' + t.id + '" title="Düzenle" aria-label="Düzenle">' + ICONS.edit + '</button>' +
+        '<button class="btn btn-icon danger" data-act="sablon-del" data-id="' + t.id + '" title="Sil" aria-label="Sil">' + ICONS.trash + '</button>' +
         '</div></td></tr>';
     }).join('');
 
@@ -6427,6 +6994,16 @@ function viewShipments() {
       '      </div>' +
       '      <p class="muted small" style="margin:12px 0 0">Excel dosyasını bu ekran açıkken de açabilirsiniz; ancak kaydetmeden önce Excel\'de kapatın.</p>' +
       '    </div></div>' +
+      '  <div class="card"><div class="card-head"><div><h2>Renkler</h2><div class="sub">Model kartlarında seçilir</div></div>' +
+      '    <button class="btn btn-sm" data-act="color-new">' + ICONS.plus + ' Renk</button></div>' +
+      '    <div class="table-wrap" style="max-height:none"><table class="data"><thead><tr><th>Renk</th><th class="right">Model</th><th></th></tr></thead><tbody>' +
+      (renkRows || '<tr><td colspan="3">' + emptyState('tag', 'Renk yok', 'Model kartlarında kullanmak için renk ekleyin.', '') + '</td></tr>') +
+      '    </tbody></table></div></div>' +
+      '  <div class="card"><div class="card-head"><div><h2>Asorti şablonları</h2><div class="sub">Modele atanır; beden dağılımı burada tanımlanır</div></div>' +
+      '    <button class="btn btn-sm" data-act="sablon-new">' + ICONS.plus + ' Şablon</button></div>' +
+      '    <div class="table-wrap" style="max-height:none"><table class="data"><thead><tr><th>Şablon</th><th class="right">Çift</th><th class="right">Model</th><th></th></tr></thead><tbody>' +
+      (sablonRows || '<tr><td colspan="4">' + emptyState('tag', 'Şablon yok', 'Asorti şablonu ekleyip modele atayın.', '') + '</td></tr>') +
+      '    </tbody></table></div></div>' +
       '  <div class="card"><div class="card-head"><div><h2>Yedekler</h2><div class="sub">Günde bir otomatik · son 7 gün</div></div></div>' +
       '    <div class="card-body">' +
       '      <div style="display:flex;gap:8px;flex-wrap:wrap">' +

@@ -764,3 +764,11 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
 .pf-mx th, .pf-mx td { font-size: 8px; padding: 2px 3px; }
 .pf-mx .szsub { font-size: 7px; color: #666; font-weight: 400; }
 .pf-mx tfoot td { background: #f3f4f6; font-weight: 700; }
+
+/* --- renk seçimi ve matris önizleme --- */
+.color-pick { display: flex; flex-wrap: wrap; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: #fff; max-height: 170px; overflow: auto; }
+.color-pick-item { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; background: var(--surface-2); }
+.color-pick-item input { accent-color: var(--brand); width: auto; }
+.color-pick-item small { color: var(--muted); font-size: 9px; }
+.color-pick-item:has(input:checked) { border-color: var(--brand); background: var(--soft); }
+.data.mini th, .data.mini td { padding: 4px 6px; font-size: 11px; }

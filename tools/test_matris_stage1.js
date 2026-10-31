@@ -97,6 +97,37 @@ const S = { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 };
   ok(d4.orderLines.length === 2, 'iki sipariş satırı Excelden okundu');
   ok(d4.orderLines[1].mod === 'ACIK' && d4.orderLines[1].beden === 40, 'açık satır bedeni korundu');
 
+  // ---- renk / asorti şablonu ustaları ----
+  const dm = Core.newData();
+  const syh = Core.addColor(dm, { ad: 'SİYAH', kod: 'SYH' });
+  const byz = Core.addColor(dm, { ad: 'BEYAZ' });
+  const sab = Core.addAsortiSablon(dm, { ad: 'Merdane 10 lu', kategori: 'MERDANE', dagilim: S });
+  const mm = Core.addModel(dm, { model: '7001', asortiSablonId: sab.id, renkIds: [syh.id, byz.id], fiyat: 100 });
+  ok(mm.kategori === 'MERDANE' && mm.asortiSablonId === sab.id, 'model şablonu referans alıyor');
+  ok(mm.renkler.length === 2 && mm.renkIds.length === 2, 'model iki renk bağlı');
+  ok(M.templateUsage(dm, sab.id) === 1, 'şablon kullanımı 1');
+  let renkSilindi = false;
+  try { Core.deleteColor(dm, syh.id); } catch (e) { renkSilindi = true; }
+  ok(renkSilindi, 'kullanılan renk silinemiyor');
+
+  const dmOld = Core.newData();
+  Core.addModel(dmOld, { model: '7002', kategori: 'MERDANE', renkler: ['SİYAH', 'MAVİ'], asortiSablon: S, fiyat: 90 });
+  Core.addModel(dmOld, { model: '7003', kategori: 'MERDANE', renkler: ['SİYAH'], asortiSablon: S, fiyat: 95 });
+  M.migrateMaster(dmOld);
+  ok(dmOld.renkler.length === 2, 'eski kartlardan 2 renk üretildi');
+  ok(dmOld.asortiSablonlari.length === 1, 'aynı asorti tek şablonda toplandı');
+  ok(dmOld.modeller[0].asortiSablonId === dmOld.asortiSablonlari[0].id, 'eski model şablona bağlandı');
+  const once = { r: dmOld.renkler.length, t: dmOld.asortiSablonlari.length, m: dmOld.modelRenkleri.length };
+  M.migrateMaster(dmOld);
+  ok(dmOld.renkler.length === once.r && dmOld.asortiSablonlari.length === once.t && dmOld.modelRenkleri.length === once.m, 'migration idempotent');
+
+  const wbm = X.writeWorkbook(Core.buildWorkbook(dm));
+  const wbmm = await X.readWorkbook(wbm);
+  ok(wbmm.sheets.length === 16 && wbmm.sheets.some(x => x.name === 'RENKLER') && wbmm.sheets.some(x => x.name === 'ASORTİ ŞABLONLARI') && wbmm.sheets.some(x => x.name === 'MODEL RENKLERİ'), 'renk/şablon sayfaları Excelde');
+  const dm2 = Core.readData(wbmm.sheets);
+  const mm2 = dm2.modeller.filter(x => x.model === '7001')[0];
+  ok(mm2 && mm2.asortiSablonId === sab.id && mm2.renkler.length === 2, 'model şablon/renk Excelden okundu');
+
   // ---- eski dosya: satır sayfası yok ----
   const eskiSheets = wb.sheets.filter(s => s.name !== 'SİPARİŞ SATIRLARI');
   const d5 = Core.readData(eskiSheets);
