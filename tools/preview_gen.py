@@ -79,6 +79,7 @@ BOOT = r"""
     d.orderLines.push({ id: oml1, orderId: omm.id, renk: 'SİYAH', mod: 'ASORTILI', beden: 0, koli: 3, koliIci: 10, cift: 30 });
     d.orderLines.push({ id: oml1 + 1, orderId: omm.id, renk: 'BEYAZ', mod: 'ACIK', beden: 42, koli: 2, koliIci: 9, cift: 18 });
 
+
     var o = d.orders;
     Core.createShipment(d, { cariId: gns.id, tarih: dt(30), fisNo: 242, aciklama: 'Kargo: Aras', lines: [
       { orderId: o[0].id, cift: 1200 }, { orderId: o[2].id, cift: 600 }
@@ -103,7 +104,7 @@ BOOT = r"""
     Core.addModel(d, { model: 'TALKIEN SİYAH HUC', fiyat: 62, maliyet: 45, asorti: 10, barkod: '8680000000042', sezon: '2026', resim: svgImg('#7c2d12', 'TALK') });
     Core.addModel(d, { model: 'BENZEMA FÜME RSZ', fiyat: 62, maliyet: 43, asorti: 10, barkod: '8680000000059', sezon: '2026' });
     Core.addModel(d, { model: 'BİRCE BEJ', fiyat: 62, maliyet: 40, asorti: 10, sezon: '2025' });
-    Core.addModel(d, { model: '6049', kategori: 'MERDANE', renkler: ['SİYAH', 'BEYAZ', 'LACİVERT', 'KAHVE'], asortiSablon: { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 }, fiyat: 75, maliyet: 48, asorti: 10, sezon: '2026' });
+    Core.addModel(d, { model: '6049', kategori: 'MERDANE', renkler: ['SİYAH', 'BEYAZ', 'LACİVERT', 'KAHVE'], asortiSablon: { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 }, fiyat: 75, maliyet: 48, asorti: 10, sezon: '2026', resim: svgImg('#0f766e', '6049') });
 
     Core.audit(d, 'Ali Veli', 'SEVK FİŞİ', '#246 · YILDIZ SPOR · 400 çift');
     Core.audit(d, 'Ali Veli', 'SİPARİŞ EKLE', 'RUNNER LACİVERT · 800 çift · YILDIZ SPOR');
@@ -208,6 +209,9 @@ BOOT = r"""
         var b = document.querySelector('[data-act="change-pass"]');
         if (b) b.click();
       }, 250);
+    }
+    if (h === 'orders-table') {
+      APP.S.ui.orderView = 'table'; APP.S.view = 'orders'; APP.updateChrome(); APP.renderView();
     }
     if (h === 'orders') { APP.S.view = 'orders'; APP.updateChrome(); APP.renderView(); }
     if (h === 'reports') { APP.S.view = 'reports'; APP.updateChrome(); APP.renderView(); }

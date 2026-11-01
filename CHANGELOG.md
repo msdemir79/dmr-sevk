@@ -2,6 +2,15 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v2.7.0 — 01.11.2026
+
+### Eklendi
+- **Model kartı görseli** sipariş ekranında, sevk listesinde ve sevk fişinde otomatik kullanılıyor; tekrar resim eklemek gerekmiyor.
+- Sipariş ekranında **ürün kartı görünümü**; **Kart / Tablo** geçişi.
+- Kartlarda **92 px**, tabloda **52 px** ürün görseli.
+- Model formu görseli **92 px**, sevk fişi görseli **64 px**.
+- Siparişe özel görsel yalnızca gerektiğinde ekleniyor; kaldırılınca model görseli görünüyor.
+
 ## v2.6.1 — 31.10.2026
 
 ### Düzeltildi

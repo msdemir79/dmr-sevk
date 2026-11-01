@@ -790,8 +790,8 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
 
 
 /* Ana fiş tablosu: 5 kolon */
-table.pf-main td.imgcell { width: 64px; height: 58px; }
-table.pf-main td.imgcell img { width: 58px; height: 52px; object-fit: contain; }
+table.pf-main td.imgcell { width: 70px; height: 62px; }
+table.pf-main td.imgcell img { width: 64px; height: 56px; object-fit: contain; }
 table.pf-main td.n { font-weight: 700; }
 @media print {
   table.pf-main th, table.pf-main td { padding: 6px 8px; font-size: 13px; }
@@ -806,3 +806,27 @@ table.pf-main td.n { font-weight: 700; }
 .modal-backdrop.screen .preview-wrap { max-height: none; min-height: 100%; background: #eef2f6; }
 .modal-backdrop.screen .print-doc { width: 210mm; max-width: 100%; margin: 0 auto; }
 .modal-backdrop.screen .print-doc.a5 { width: 148mm; }
+
+/* --- sipariş ürün kartları --- */
+.thumb.xl { width: 92px; height: 92px; border-radius: 14px; font-size: 20px; }
+.thumb.md { width: 52px; height: 52px; border-radius: 10px; font-size: 13px; }
+.order-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; padding: 12px; }
+.order-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 9px; transition: box-shadow .15s, border-color .15s; }
+.order-card:hover { border-color: #cbd5e1; box-shadow: 0 6px 18px rgba(15,27,45,.08); }
+.oc-head { display: flex; gap: 12px; align-items: flex-start; }
+.oc-info { flex: 1; min-width: 0; }
+.oc-line { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.oc-code { font-size: 10.5px; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oc-model { font-size: 15px; font-weight: 800; line-height: 1.25; margin-top: 3px; overflow-wrap: anywhere; }
+.oc-sub { font-size: 11.5px; color: var(--muted); margin-top: 3px; overflow-wrap: anywhere; }
+.oc-price { font-size: 11.5px; color: var(--ink-2); margin-top: 4px; font-weight: 600; }
+.oc-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; }
+.oc-metrics span { display: block; font-size: 9px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.oc-metrics b { font-size: 13px; font-weight: 800; }
+.oc-metrics small { font-size: 9.5px; color: var(--muted); margin-left: 2px; }
+.oc-progress { display: flex; align-items: center; gap: 8px; }
+.oc-progress .progress { flex: 1; margin: 0; }
+.oc-progress > span { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.oc-actions { display: flex; gap: 3px; justify-content: flex-end; border-top: 1px solid var(--line); padding-top: 7px; margin-top: auto; }
+.seg [data-order-view] { display: inline-flex; align-items: center; gap: 4px; }
+.seg [data-order-view] svg { width: 12px; height: 12px; }
