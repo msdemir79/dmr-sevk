@@ -239,6 +239,16 @@ BOOT = r"""
       }, 300);
     }
     if (h === 'orders') { APP.S.view = 'orders'; APP.updateChrome(); APP.renderView(); }
+    if (h === 'report-print') {
+      APP.S.view = 'reports'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="print-report"]');
+        if (b) b.click();
+      }, 300);
+    }
+    if (['report-kar', 'report-cari', 'report-sevk', 'report-urun'].indexOf(h) >= 0) {
+      APP.S.ui.reportTab = h.slice(7); APP.S.view = 'reports'; APP.updateChrome(); APP.renderView();
+    }
     if (h === 'reports') { APP.S.view = 'reports'; APP.updateChrome(); APP.renderView(); }
     if (h === 'ledger-all') { APP.S.ui.cariId = 0; APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView(); }
     if (h === 'orders-all') { APP.S.ui.cariId = 0; APP.S.view = 'orders'; APP.updateChrome(); APP.renderView(); }

@@ -2,6 +2,22 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.1.0 — 01.11.2026
+
+### Rapor Merkezi
+- **Sekmeler:** Özet · Kârlılık · Cari · Sevkiyat · Ürün.
+- **Tarih aralığı:** Son 30 gün, bu ay, geçen ay, çeyrek, yıl başı, özel aralık.
+- **Karşılaştırma:** önceki dönem ve geçen yıl; ciro, çift, tahsilat, gider.
+- **Kârlılık:** model ve renk bazlı ciro/maliyet/kâr/marj; maliyetsiz ve kartsız satır uyarısı.
+- **Cari:** 0–30/31–60/61–90/90+ yaşlandırma, FIFO tahsilat, ortalama tahsil süresi.
+- **Sevkiyat:** ortalama sevk süresi, karşılama oranı, kısmi sevk, geciken siparişler.
+- **Ürün:** beden dökümü, renk dağılımı, asorti sapması, hareketsiz modeller.
+- **Gider/net kâr** ve GİDER dökümü.
+- **Veri kalitesi:** maliyetsiz model/satır, kartsız satır, fiyatsız sipariş, cari/sevk farkı.
+- Satırlardan sipariş/cari detayına geçiş; gelişmiş rapor yazdırma.
+
+![Rapor Merkezi](docs/asama9-rapor.png)
+
 ## v3.0.0 — 01.11.2026
 
 ### Görsel / UX

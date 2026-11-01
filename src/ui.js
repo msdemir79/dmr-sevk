@@ -188,7 +188,10 @@
       shipSearch: '', cart: [], shipTarih: Core.todayISO(), shipFisNo: null, shipAciklama: '',
       shipFaturaNo: '', shipFaturaTarih: '',
       shipListSearch: '', shipListPage: 1,
-      reportMonth: Core.todayISO().slice(0, 7)
+      reportMonth: Core.todayISO().slice(0, 7),
+    reportTab: 'ozet', reportPreset: 'last30',
+    reportFrom: (function () { var d = new Date(); d.setDate(d.getDate() - 29); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(),
+    reportTo: Core.todayISO(),
     },
     cacheTimer: null,
     saveTimer: null
@@ -876,7 +879,7 @@
     shipments: { title: 'Sevk Fişleri', sub: 'Oluşturulan sevk fişleri' },
     cariler: { title: 'Cari Hesaplar', sub: 'Müşteri kartları, bakiyeler ve açık siparişler' },
     models: { title: 'Modeller', sub: 'Fiyat, maliyet, barkod ve model özeti' },
-    reports: { title: 'Raporlar', sub: 'Aylık sevkiyat ve model özeti' },
+    reports: { title: 'Raporlar', sub: 'Dönem, kârlılık, cari ve sevkiyat analizi' },
     settings: { title: 'Ayarlar', sub: 'Firma bilgileri, dosya ve tercihler' }
   };
 
@@ -1105,6 +1108,7 @@
         case 'order-del': removeOrder(id); break;
         case 'order-ship': shipOrder(id); break;
         case 'go-ship': go('ship'); break;
+        case 'go-reports': go('reports'); break;
         case 'ledger-tahsilat': openLedgerForm(null, { islem: 'TAHSİLAT', yon: 'ALACAK', baslik: 'Tahsilat ekle', altBaslik: 'Cariye alacak / tahsilat kaydı' }); break;
         case 'ledger-gider': openLedgerForm(null, { islem: 'GİDER', yon: 'BORC', baslik: 'Gider ekle', altBaslik: 'Cariye borç / masraf kaydı' }); break;
         case 'ledger-new': openLedgerForm(null); break;
@@ -1155,6 +1159,9 @@
         case 'order-filter-sheet': openOrderFilterSheet(); break;
         case 'toggle-theme': toggleTheme(); break;
         case 'go-models': go('models'); break;
+        case 'report-model': S.ui.orderSearch = el.dataset.model || ''; S.ui.orderFilter = 'all'; go('orders'); break;
+        case 'report-cari': setActiveCari(id); go('ledger'); break;
+        case 'report-order': var ro = findOrder(id); if (ro) openOrderForm(ro); break;
         case 'backup-now':
           try { backupSnapshot(writeBytes(), true).then(function (ok) { toast(ok ? 'Yedek alındı' : 'Yedek alınamadı', ok ? 'ok' : 'err'); }); }
           catch (e) { toast('Yedek alınamadı: ' + e.message, 'err'); }
@@ -2046,109 +2053,591 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Raporlar                                                            */
   /* ------------------------------------------------------------------ */
-  function viewReports() {
-    var ay = S.ui.reportMonth;
-    var cid = S.ui.cariId;
-    var cari = activeCari();
-    var rows = data.ledger.filter(function (r) {
-      return (r.tarih || '').slice(0, 7) === ay && (!cid || r.cariId === cid);
-    });
-    var sevk = rows.filter(function (r) { return r.islem === 'SATIŞ'; });
-    var tahsilat = rows.filter(function (r) { return r.islem === 'TAHSİLAT'; });
-    var sevkAdet = sevk.reduce(function (a, r) { return a + Core.num(r.cift); }, 0);
-    var sevkTutar = sevk.reduce(function (a, r) { return a + Core.num(r.tutar); }, 0);
-    var tahsilatTutar = tahsilat.reduce(function (a, r) { return a + Core.num(r.tutar); }, 0);
+  /* ------------------------------------------------------------------ */
+  /* Rapor merkezi                                                       */
+  /* ------------------------------------------------------------------ */
+  function rp2(n) { return String(n).padStart(2, '0'); }
+  function rISO(d) { return d.getFullYear() + '-' + rp2(d.getMonth() + 1) + '-' + rp2(d.getDate()); }
+  function rParse(s) { var a = String(s || '').split('-'); return new Date(Number(a[0] || 1970), Number(a[1] || 1) - 1, Number(a[2] || 1)); }
+  function rAdd(s, n) { var d = rParse(s); d.setDate(d.getDate() + n); return rISO(d); }
+  function rDays(a, b) { return Math.round((rParse(b) - rParse(a)) / 86400000); }
+  function rMonthStart(s) { return String(s).slice(0, 8) + '01'; }
+  function rMonthEnd(s) { var d = rParse(s); d.setMonth(d.getMonth() + 1, 0); return rISO(d); }
+  function rValid(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
 
-    var groupKey = cid ? 'model' : 'cari';
-    var groups = {};
-    sevk.forEach(function (r) {
-      var k = cid ? r.aciklama : String(r.cariId);
-      groups[k] = groups[k] || { label: cid ? k : cariAdi(r.cariId), koli: 0, cift: 0, tutar: 0 };
-      groups[k].cift += Core.num(r.cift);
-      groups[k].tutar += Core.num(r.tutar);
-      groups[k].koli += Core.num(r.koli);
-    });
-    var groupRows = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return b.tutar - a.tutar; });
-    var groupTable = groupRows.length ? groupRows.map(function (m) {
-      return '<tr><td class="strong">' + esc(m.label) + '</td><td class="right">' + nf1(m.koli) + '</td>' +
-        '<td class="right">' + nf0(m.cift) + '</td><td class="right strong">' + money(m.tutar) + '</td></tr>';
-    }).join('') : '<tr><td colspan="4">' + emptyState('chart', 'Bu ay sevkiyat yok', 'Seçtiğiniz ayda oluşturulmuş sevk fişi bulunmuyor.', '') + '</td></tr>';
+  function rRange() {
+    var f = rValid(S.ui.reportFrom) ? S.ui.reportFrom : rMonthStart(Core.todayISO());
+    var t = rValid(S.ui.reportTo) ? S.ui.reportTo : Core.todayISO();
+    if (f > t) { var x = f; f = t; t = x; }
+    return { from: f, to: t };
+  }
 
+  function rPresetRange(p) {
+    var today = Core.todayISO();
+    if (p === 'last') {
+      var d = rParse(today); d.setMonth(d.getMonth() - 1, 1);
+      var f = rISO(d); return { from: f, to: rMonthEnd(f) };
+    }
+    if (p === 'quarter') {
+      var q = Math.floor(rParse(today).getMonth() / 3) * 3;
+      return { from: String(today.slice(0, 4)) + '-' + rp2(q + 1) + '-01', to: today };
+    }
+    if (p === 'ytd') return { from: today.slice(0, 4) + '-01-01', to: today };
+    return { from: rMonthStart(today), to: today };
+  }
+
+  function rApplyPreset(p) {
+    S.ui.reportPreset = p;
+    if (p === 'custom') return;
+    var r = rPresetRange(p);
+    S.ui.reportFrom = r.from;
+    S.ui.reportTo = r.to;
+  }
+
+  function rPrev(r) {
+    var len = rDays(r.from, r.to) + 1;
+    var to = rAdd(r.from, -1);
+    return { from: rAdd(to, -(len - 1)), to: to };
+  }
+
+  function rLastYear(r) {
+    var a = rParse(r.from), b = rParse(r.to);
+    a.setFullYear(a.getFullYear() - 1); b.setFullYear(b.getFullYear() - 1);
+    return { from: rISO(a), to: rISO(b) };
+  }
+
+  function rLabel(r) { return dateTR(r.from) + ' — ' + dateTR(r.to); }
+
+  function reportCollect(from, to, cid) {
+    var shipments = (data.shipments || []).filter(function (s) {
+      return s.tarih >= from && s.tarih <= to && (!cid || s.cariId === cid);
+    });
+    var orderById = {};
+    data.orders.forEach(function (o) { orderById[o.id] = o; });
+    var lines = [];
+    shipments.forEach(function (s) {
+      Core.shipmentLines(data, s.id).forEach(function (l) {
+        var x = {};
+        Object.keys(l).forEach(function (k) { x[k] = l[k]; });
+        x.tarih = s.tarih; x.cariId = s.cariId; x.fisNo = s.fisNo; x.sevkId = s.id;
+        x.orderTarih = orderById[l.orderId] ? orderById[l.orderId].tarih : '';
+        lines.push(x);
+      });
+    });
+    var ledger = data.ledger.filter(function (r) {
+      return r.tarih >= from && r.tarih <= to && (!cid || r.cariId === cid);
+    });
+    var orders = data.orders.filter(function (o) {
+      return o.tarih >= from && o.tarih <= to && (!cid || o.cariId === cid);
+    });
+    var sales = ledger.filter(function (r) { return r.islem === 'SATIŞ'; });
+    var collections = ledger.filter(function (r) { return r.islem === 'TAHSİLAT'; });
+    var expenses = ledger.filter(function (r) { return r.islem === 'GİDER'; });
+    var revenue = lines.reduce(function (a, l) { return a + Core.num(l.tutar || (Core.num(l.fiyat) * Core.num(l.cift))); }, 0);
+    var cift = lines.reduce(function (a, l) { return a + Core.num(l.cift); }, 0);
+    var koli = lines.reduce(function (a, l) { return a + Core.num(l.koli); }, 0);
+    var cariSet = {};
+    shipments.forEach(function (s) { cariSet[s.cariId] = 1; });
+    return {
+      from: from, to: to, cid: cid, shipments: shipments, lines: lines, ledger: ledger,
+      orders: orders, sales: sales, collections: collections, expenses: expenses,
+      revenue: Core.round2(revenue), cift: cift, koli: koli, cariCount: Object.keys(cariSet).length,
+      collection: Core.round2(collections.reduce(function (a, r) { return a + Core.num(r.tutar); }, 0)),
+      expense: Core.round2(expenses.reduce(function (a, r) { return a + Core.num(r.tutar); }, 0))
+    };
+  }
+
+  function reportProfit(lines) {
+    var map = {};
+    lines.forEach(function (l) {
+      var kart = Core.modelKart(data, l.model);
+      var maliyet = kart ? Core.num(kart.maliyet) : 0;
+      var key = Core.normKey(l.model) + '|' + Core.normKey(l.renk);
+      if (!map[key]) map[key] = { model: l.model || '—', renk: l.renk || '—', cift: 0, ciro: 0, maliyet: 0, maliyetsiz: 0, kartsiz: 0 };
+      var x = map[key];
+      x.cift += Core.num(l.cift);
+      x.ciro += Core.num(l.tutar || (Core.num(l.fiyat) * Core.num(l.cift)));
+      x.maliyet += maliyet * Core.num(l.cift);
+      if (!maliyet) x.maliyetsiz++;
+      if (!kart) x.kartsiz++;
+    });
+    return Object.keys(map).map(function (k) {
+      var x = map[k];
+      x.ciro = Core.round2(x.ciro); x.maliyet = Core.round2(x.maliyet);
+      x.kar = Core.round2(x.ciro - x.maliyet);
+      x.marj = x.ciro ? Core.round2(x.kar / x.ciro * 100) : 0;
+      return x;
+    }).sort(function (a, b) { return b.kar - a.kar; });
+  }
+
+  function reportModelProfit(rows) {
+    var map = {};
+    rows.forEach(function (r) {
+      var k = Core.normKey(r.model);
+      if (!map[k]) map[k] = { model: r.model, cift: 0, ciro: 0, maliyet: 0, maliyetsiz: 0 };
+      var x = map[k];
+      x.cift += r.cift; x.ciro += r.ciro; x.maliyet += r.maliyet; x.maliyetsiz += r.maliyetsiz;
+    });
+    return Object.keys(map).map(function (k) {
+      var x = map[k];
+      x.ciro = Core.round2(x.ciro); x.maliyet = Core.round2(x.maliyet);
+      x.kar = Core.round2(x.ciro - x.maliyet);
+      x.marj = x.ciro ? Core.round2(x.kar / x.ciro * 100) : 0;
+      return x;
+    }).sort(function (a, b) { return b.kar - a.kar; });
+  }
+
+  function reportAging(to, cid) {
+    var map = {};
+    data.ledger.filter(function (r) { return r.tarih <= to && (!cid || r.cariId === cid); })
+      .sort(function (a, b) { return a.tarih < b.tarih ? -1 : a.tarih > b.tarih ? 1 : (a.id || 0) - (b.id || 0); })
+      .forEach(function (r) {
+        var id = r.cariId || 0;
+        if (!map[id]) map[id] = { cariId: id, ad: cariAdi(id) || '—', queue: [], bakiye: 0, collected: 0, weighted: 0, buckets: [0, 0, 0, 0] };
+        var c = map[id];
+        var borc = Core.num(r.borc), alacak = Core.num(r.alacak);
+        if (borc) c.queue.push({ date: r.tarih, amount: borc });
+        var pay = alacak;
+        while (pay > 0 && c.queue.length) {
+          var q = c.queue[0];
+          var take = Math.min(pay, q.amount);
+          q.amount -= take; pay -= take;
+          c.collected += take;
+          c.weighted += take * Math.max(0, rDays(q.date, r.tarih));
+          if (q.amount <= 0.0001) c.queue.shift();
+        }
+        c.bakiye += borc - alacak;
+      });
+    var rows = Object.keys(map).map(function (k) {
+      var c = map[k];
+      c.queue.forEach(function (q) {
+        var age = Math.max(0, rDays(q.date, to));
+        c.buckets[age <= 30 ? 0 : age <= 60 ? 1 : age <= 90 ? 2 : 3] += q.amount;
+      });
+      c.bakiye = Core.round2(c.bakiye);
+      c.collected = Core.round2(c.collected);
+      c.avgDays = c.collected ? Core.round2(c.weighted / c.collected, 0) : 0;
+      return c;
+    }).filter(function (c) { return Math.abs(c.bakiye) > 0.01 || c.collected > 0; })
+      .sort(function (a, b) { return b.bakiye - a.bakiye; });
+    var totals = [0, 0, 0, 0];
+    rows.forEach(function (c) { c.buckets.forEach(function (v, i) { totals[i] += v; }); });
+    var collected = rows.reduce(function (a, c) { return a + c.collected; }, 0);
+    var weighted = rows.reduce(function (a, c) { return a + c.weighted; }, 0);
+    return {
+      rows: rows, totals: totals.map(Core.round2),
+      total: Core.round2(totals.reduce(function (a, b) { return a + b; }, 0)),
+      collected: Core.round2(collected), avgDays: collected ? Core.round2(weighted / collected, 0) : 0
+    };
+  }
+
+  function reportPerf(orders, lines, cid) {
+    var orderById = {};
+    data.orders.forEach(function (o) { orderById[o.id] = o; });
     var shipped = Core.shippedMap(data);
-    var kalanList = data.orders.map(function (o) { return { o: o, i: Core.orderInfo(data, o, shipped) }; })
+    var days = [], buckets = [0, 0, 0, 0];
+    lines.forEach(function (l) {
+      var o = orderById[l.orderId];
+      if (!o || !o.tarih) return;
+      var d = rDays(o.tarih, l.tarih);
+      if (d < 0) return;
+      days.push({ d: d, cift: Core.num(l.cift) });
+      buckets[d <= 3 ? 0 : d <= 7 ? 1 : d <= 14 ? 2 : 3] += Core.num(l.cift);
+    });
+    var totalCift = days.reduce(function (a, x) { return a + x.cift; }, 0);
+    var avgDays = totalCift ? Core.round2(days.reduce(function (a, x) { return a + x.d * x.cift; }, 0) / totalCift, 1) : 0;
+    var ordered = 0, sent = 0, partial = 0;
+    orders.forEach(function (o) {
+      var i = Core.orderInfo(data, o, shipped);
+      ordered += Core.num(o.adet);
+      sent += i.giden;
+      if (i.giden > 0 && i.kalan > 0) partial++;
+    });
+    var pending = data.orders.map(function (o) { return { o: o, i: Core.orderInfo(data, o, shipped) }; })
       .filter(function (x) { return (!cid || x.o.cariId === cid) && x.i.kalan > 0; })
       .sort(function (a, b) { return b.i.kalan - a.i.kalan; });
+    var today = Core.todayISO();
+    var overdue = { d7: 0, d15: 0, d30: 0 };
+    pending.forEach(function (x) {
+      var age = rDays(x.o.tarih, today);
+      if (age > 7) overdue.d7++;
+      if (age > 15) overdue.d15++;
+      if (age > 30) overdue.d30++;
+    });
+    return {
+      avgDays: avgDays, buckets: buckets, orderCount: orders.length, partial: partial,
+      fill: ordered ? Math.min(100, Core.round2(sent / ordered * 100, 1)) : 0,
+      pending: pending, overdue: overdue
+    };
+  }
 
-    var kalanTable = kalanList.length ? kalanList.slice(0, 10).map(function (x) {
-      return '<tr><td><div class="strong">' + esc(x.o.model) + '</div><div class="sub">' +
-        esc(cid ? (x.o.renk || '') : cariAdi(x.o.cariId)) + ' · #' + esc(x.o.sipno) + '</div></td>' +
-        '<td class="right">' + nf0(x.i.giden) + '</td>' +
-        '<td class="right strong">' + nf0(x.i.kalan) + '</td><td class="right">' + money(x.i.kalanTutar) + '</td></tr>';
+  function reportSize(lines) {
+    var groups = {}, sizeSet = {};
+    lines.forEach(function (l) {
+      var d = l.dagilim || {};
+      if (!Object.keys(d).length) return;
+      var key = Core.normKey(l.model) + '|' + Core.normKey(l.renk);
+      if (!groups[key]) groups[key] = { model: l.model || '—', renk: l.renk || '—', map: {}, toplam: 0 };
+      Object.keys(d).forEach(function (sz) {
+        var q = Core.num(d[sz]);
+        if (!q) return;
+        var s = String(Math.round(Core.num(sz)));
+        groups[key].map[s] = Core.round2((groups[key].map[s] || 0) + q);
+        groups[key].toplam = Core.round2(groups[key].toplam + q);
+        sizeSet[s] = 1;
+      });
+    });
+    var sizes = Object.keys(sizeSet).map(Number).sort(function (a, b) { return a - b; });
+    var rows = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) {
+      return a.model < b.model ? -1 : a.model > b.model ? 1 : 0;
+    });
+    var totals = {};
+    rows.forEach(function (r) { sizes.forEach(function (s) { totals[s] = Core.round2((totals[s] || 0) + Core.num(r.map[s])); }); });
+    return { rows: rows, sizes: sizes, totals: totals, total: rows.reduce(function (a, r) { return a + r.toplam; }, 0) };
+  }
+
+  function reportColors(lines) {
+    var map = {};
+    lines.forEach(function (l) {
+      var k = l.renk || '—';
+      if (!map[k]) map[k] = { renk: k, cift: 0, tutar: 0 };
+      map[k].cift += Core.num(l.cift);
+      map[k].tutar += Core.num(l.tutar || (Core.num(l.fiyat) * Core.num(l.cift)));
+    });
+    return Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return b.cift - a.cift; });
+  }
+
+  function reportAsorti(lines) {
+    var map = {};
+    lines.forEach(function (l) {
+      if (l.mod !== 'ASORTILI') return;
+      var d = l.dagilim || {};
+      var actual = Object.keys(d).reduce(function (a, s) { return a + Core.num(d[s]); }, 0);
+      if (!actual) return;
+      var kart = Core.modelKart(data, l.model);
+      var tpl = kart && kart.asortiSablon;
+      var tplTotal = tpl ? Matris.asortiToplam(tpl) : 0;
+      if (!tplTotal) return;
+      var dev = 0;
+      Object.keys(tpl).forEach(function (sz) {
+        var expected = actual * Core.num(tpl[sz]) / tplTotal;
+        dev += Math.abs(Core.num(d[sz]) - expected);
+      });
+      var pct = Math.min(100, Core.round2(dev / actual / 2 * 100, 1));
+      var key = Core.normKey(l.model) + '|' + Core.normKey(l.renk);
+      if (!map[key]) map[key] = { model: l.model, renk: l.renk, cift: 0, dev: 0, adet: 0 };
+      map[key].cift += actual;
+      map[key].dev += dev;
+      map[key].adet += actual;
+    });
+    return Object.keys(map).map(function (k) {
+      var x = map[k];
+      x.sapma = x.adet ? Core.round2(x.dev / x.adet / 2 * 100, 1) : 0;
+      return x;
+    }).sort(function (a, b) { return b.sapma - a.sapma; });
+  }
+
+  function reportQuality(ctx, profitRows) {
+    var missingCost = (data.modeller || []).filter(function (k) { return !Core.num(k.maliyet); });
+    var noCard = ctx.orders.filter(function (o) { return !Core.modelKart(data, o.model); });
+    var noPrice = ctx.orders.filter(function (o) { return !Core.num(o.fiyat); });
+    var ledgerSales = ctx.sales.reduce(function (a, r) { return a + Core.num(r.tutar); }, 0);
+    var fark = Core.round2(ctx.revenue - ledgerSales);
+    return {
+      missingCost: missingCost, noCard: noCard, noPrice: noPrice,
+      maliyetsiz: profitRows.reduce(function (a, r) { return a + r.maliyetsiz; }, 0),
+      kartsiz: profitRows.reduce(function (a, r) { return a + (r.kartsiz || 0); }, 0),
+      recon: fark
+    };
+  }
+
+  function reportBuild() {
+    var r = rRange(), cid = S.ui.cariId;
+    var cur = reportCollect(r.from, r.to, cid);
+    var prevR = rPrev(r), lastR = rLastYear(r);
+    var prev = reportCollect(prevR.from, prevR.to, cid);
+    var last = reportCollect(lastR.from, lastR.to, cid);
+    var profit = reportProfit(cur.lines);
+    return {
+      r: r, prevR: prevR, lastR: lastR, cid: cid, cur: cur, prev: prev, last: last,
+      profit: profit, modelProfit: reportModelProfit(profit),
+      aging: reportAging(r.to, cid), perf: reportPerf(cur.orders, cur.lines, cid),
+      size: reportSize(cur.lines), colors: reportColors(cur.lines), asorti: reportAsorti(cur.lines),
+      quality: reportQuality(cur, profit)
+    };
+  }
+
+  function rCmp(v, base) {
+    if (!base) return '<span class="cmp flat">—</span>';
+    var p = (v - base) / Math.abs(base) * 100;
+    var cls = p > 0.5 ? 'up' : p < -0.5 ? 'down' : 'flat';
+    return '<span class="cmp ' + cls + '">' + (p > 0 ? '+' : '') + nf1(p) + '%</span>';
+  }
+
+  function rKpi(label, value, foot, cls, cmp) {
+    return '<div class="kpi ' + (cls || '') + '"><div class="kpi-label">' + label + '</div>' +
+      '<div class="kpi-value">' + value + '</div><div class="kpi-foot">' + (foot || '') + (cmp || '') + '</div></div>';
+  }
+
+  function rBars(rows, valueKey, labelKey, fmt) {
+    var max = Math.max.apply(null, rows.map(function (x) { return Math.abs(Core.num(x[valueKey])); }).concat([1]));
+    return rows.map(function (x) {
+      return '<div class="hbar"><div class="hbar-head"><b>' + esc(x[labelKey] || '—') + '</b><span>' + fmt(Core.num(x[valueKey])) + '</span></div>' +
+        '<div class="hbar-track"><i style="width:' + Math.max(3, Math.round(Math.abs(Core.num(x[valueKey])) / max * 100)) + '%"></i></div></div>';
+    }).join('');
+  }
+
+  function reportTrend(ctx) {
+    var span = rDays(ctx.r.from, ctx.r.to);
+    var map = {};
+    ctx.cur.lines.forEach(function (l) {
+      var k = span <= 62 ? l.tarih : l.tarih.slice(0, 7);
+      map[k] = (map[k] || 0) + Core.num(l.tutar || (Core.num(l.fiyat) * Core.num(l.cift)));
+    });
+    var keys = Object.keys(map).sort();
+    if (!keys.length) return emptyState('chart', 'Bu dönemde sevkiyat yok', 'Seçtiğiniz aralıkta oluşturulmuş sevk fişi bulunmuyor.', '');
+    var max = Math.max.apply(null, keys.map(function (k) { return map[k]; }).concat([1]));
+    return '<div class="bars">' + keys.map(function (k) {
+      var h = Math.max(3, Math.round(map[k] / max * 100));
+      return '<div class="bar-item" title="' + esc(k) + ': ' + money(map[k]) + '"><div class="bar-value">' + (map[k] ? nf0(map[k] / 1000) + 'b' : '') + '</div>' +
+        '<div class="bar-track"><div class="bar-fill" style="height:' + h + '%"></div></div><div class="bar-label">' + esc(span <= 62 ? k.slice(5) : monthName(k)) + '</div></div>';
+    }).join('') + '</div>';
+  }
+
+  function reportTopModels(lines) {
+    var map = {};
+    lines.forEach(function (l) {
+      var k = l.model || '—';
+      if (!map[k]) map[k] = { model: k, cift: 0, tutar: 0 };
+      map[k].cift += Core.num(l.cift);
+      map[k].tutar += Core.num(l.tutar || (Core.num(l.fiyat) * Core.num(l.cift)));
+    });
+    return Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return b.cift - a.cift; }).slice(0, 5);
+  }
+
+  function reportCompareHtml(ctx) {
+    var rows = [
+      ['Sevk tutarı', ctx.cur.revenue, ctx.prev.revenue, ctx.last.revenue, 'money'],
+      ['Sevk edilen çift', ctx.cur.cift, ctx.prev.cift, ctx.last.cift, 'number'],
+      ['Tahsilat', ctx.cur.collection, ctx.prev.collection, ctx.last.collection, 'money'],
+      ['Gider', ctx.cur.expense, ctx.prev.expense, ctx.last.expense, 'money']
+    ];
+    return '<div class="card report-compare"><div class="card-head"><div><h2>Dönem karşılaştırması</h2><div class="sub">Önceki dönem ve geçen yıl</div></div></div>' +
+      '<div class="table-wrap"><table class="data"><thead><tr><th>Metrik</th><th class="right">Bu dönem</th><th class="right">Önceki dönem</th><th class="right">Geçen yıl</th><th class="right">Önceki</th><th class="right">Geçen yıl</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        var f = r[4] === 'money' ? money : nf0;
+        return '<tr><td class="strong">' + r[0] + '</td><td class="right">' + f(r[1]) + '</td><td class="right">' + f(r[2]) + '</td><td class="right">' + f(r[3]) + '</td><td class="right">' + rCmp(r[1], r[2]) + '</td><td class="right">' + rCmp(r[1], r[3]) + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>';
+  }
+
+  function reportToolbar(ctx) {
+    var tabs = [['ozet', 'Özet'], ['kar', 'Kârlılık'], ['cari', 'Cari'], ['sevk', 'Sevkiyat'], ['urun', 'Ürün']];
+    return '<div class="card report-shell"><div class="report-toolbar">' +
+      '<div class="field"><label for="reportPreset">Hızlı dönem</label><select id="reportPreset" class="select" data-role="report-preset">' +
+      [['last30', 'Son 30 gün'], ['month', 'Bu ay'], ['last', 'Geçen ay'], ['quarter', 'Bu çeyrek'], ['ytd', 'Yıl başından'], ['custom', 'Özel aralık']].map(function (x) {
+        return '<option value="' + x[0] + '"' + (S.ui.reportPreset === x[0] ? ' selected' : '') + '>' + x[1] + '</option>';
+      }).join('') + '</select></div>' +
+      '<div class="field"><label for="reportFrom">Başlangıç</label><input id="reportFrom" type="date" class="input" data-role="report-from" value="' + esc(ctx.r.from) + '"></div>' +
+      '<div class="field"><label for="reportTo">Bitiş</label><input id="reportTo" type="date" class="input" data-role="report-to" value="' + esc(ctx.r.to) + '"></div>' +
+      '<div class="report-range">' + esc(rLabel(ctx.r)) + (ctx.cid ? ' · ' + esc(activeCari().ad) : ' · tüm cariler') + '</div>' +
+      '<button class="btn" data-act="print-report">' + ICONS.print + ' Raporu yazdır</button></div>' +
+      '<div class="report-tabs">' + tabs.map(function (t) {
+        return '<button class="report-tab' + (S.ui.reportTab === t[0] ? ' active' : '') + '" data-report-tab="' + t[0] + '">' + t[1] + '</button>';
+      }).join('') + '</div></div>';
+  }
+
+  function reportOverview(ctx) {
+    var q = ctx.quality;
+    var top = reportTopModels(ctx.cur.lines);
+    var groups = {};
+    if (ctx.cid) {
+      ctx.cur.lines.forEach(function (l) { groups[l.model] = groups[l.model] || { label: l.model, koli: 0, cift: 0, tutar: 0 }; groups[l.model].koli += Core.num(l.koli); groups[l.model].cift += Core.num(l.cift); groups[l.model].tutar += Core.num(l.tutar); });
+    } else {
+      ctx.cur.shipments.forEach(function (s) { groups[s.cariId] = groups[s.cariId] || { label: cariAdi(s.cariId), koli: 0, cift: 0, tutar: 0 }; });
+      ctx.cur.lines.forEach(function (l) { var g = groups[l.cariId]; if (g) { g.koli += Core.num(l.koli); g.cift += Core.num(l.cift); g.tutar += Core.num(l.tutar); } });
+    }
+    var groupRows = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return b.tutar - a.tutar; });
+    var groupHtml = groupRows.length ? groupRows.map(function (g) {
+      return '<tr><td class="strong">' + esc(g.label) + '</td><td class="right">' + nf1(g.koli) + '</td><td class="right">' + nf0(g.cift) + '</td><td class="right strong">' + money(g.tutar) + '</td></tr>';
+    }).join('') : '<tr><td colspan="4">' + emptyState('chart', 'Sevkiyat yok', 'Seçili dönemde sevk fişi bulunmuyor.', '') + '</td></tr>';
+
+    var pending = ctx.perf.pending.slice(0, 8);
+    var pendingHtml = pending.length ? pending.map(function (x) {
+      return '<tr class="clickable" data-act="report-order" data-id="' + x.o.id + '"><td><div class="strong">' + esc(x.o.model) + '</div><div class="sub">' + esc(cariAdi(x.o.cariId)) + ' · #' + esc(x.o.sipno) + '</div></td>' +
+        '<td class="right">' + nf0(x.i.giden) + '</td><td class="right strong">' + nf0(x.i.kalan) + '</td><td class="right">' + money(x.i.kalanTutar) + '</td></tr>';
     }).join('') : '<tr><td colspan="4">' + emptyState('check', 'Bekleyen yok', 'Tüm siparişler sevk edilmiş.', '') + '</td></tr>';
 
-    var kar = Core.profitReport(data, '', '', cid);
-    var karRows = kar.slice().reverse().slice(0, 6);
-    var karCard =
-      '<div class="card" style="margin-top:16px"><div class="card-head"><div><h2>Kârlılık</h2>' +
-      '<div class="sub">Sevk edilen satırlar · maliyet, model kartlarından</div></div>' +
-      '<button class="btn btn-sm" data-act="go-models">' + ICONS.tag + ' Model kartları</button></div>' +
-      (karRows.length
-        ? '<div class="table-wrap"><table class="data"><thead><tr><th>Dönem</th><th class="right">Ciro</th><th class="right">Maliyet</th><th class="right">Kâr</th><th class="right">Marj</th><th class="right">Maliyetsiz satır</th></tr></thead><tbody>' +
-        karRows.map(function (r) {
-          return '<tr><td class="strong">' + monthName(r.ay) + '</td>' +
-            '<td class="right">' + nf2(r.ciro) + '</td>' +
-            '<td class="right">' + nf2(r.maliyet) + '</td>' +
-            '<td class="right strong" style="color:' + (r.kar < 0 ? 'var(--alacak)' : 'var(--borc)') + '">' + nf2(r.kar) + '</td>' +
-            '<td class="right">' + nf1(r.marj) + '%</td>' +
-            '<td class="right sub">' + (r.maliyetsiz || '—') + '</td></tr>';
-        }).join('') +
-        '</tbody></table></div>'
-        : '<div class="card-body"><p class="muted small" style="margin:0">Henüz sevk edilmiş satır yok. Sevk yaptıkça ciro ve kâr burada görünür.</p></div>') +
-      '<p class="muted small" style="padding:10px 16px 12px;margin:0">Maliyeti girilmemiş modeller kâr hesabında 0 maliyetle görünür; doğru sonuç için <b>Modeller</b> ekranından maliyet girin.</p></div>';
-
-    var beden = Core.sizeReport(data, ay, cid);
-    var bedenCard = '<div class="card" style="margin-top:16px"><div class="card-head"><div><h2>Beden dökümü</h2>' +
-      '<div class="sub">Sevk edilen · ' + monthName(ay) + (cid ? ' · ' + esc(cari.ad) : '') + '</div></div></div>' +
-      (beden.rows.length
-        ? '<div class="table-wrap"><table class="data"><thead><tr><th>Model / renk</th>' +
-          beden.sizes.map(function (sz) { return '<th class="right">' + sz + '</th>'; }).join('') +
-          '<th class="right">Toplam</th></tr></thead><tbody>' +
-          beden.rows.map(function (r) {
-            return '<tr><td><div class="strong">' + esc(r.model) + '</div><div class="sub">' + esc(r.renk || '—') + '</div></td>' +
-              beden.sizes.map(function (sz) { return '<td class="right">' + (Core.num(r.map[sz]) ? nf0(r.map[sz]) : '—') + '</td>'; }).join('') +
-              '<td class="right strong">' + nf0(r.toplam) + '</td></tr>';
-          }).join('') +
-          '</tbody><tfoot><tr><td>TOPLAM</td>' + beden.sizes.map(function (sz) { return '<td class="right">' + nf0(beden.totals[sz] || 0) + '</td>'; }).join('') +
-          '<td class="right">' + nf0(beden.toplam) + '</td></tr></tfoot></table></div>'
-        : '<div class="card-body"><p class="muted small" style="margin:0">Bu dönemde beden dökümü olan sevk yok. Renk/beden satırıyla sevk yapıldığında burada görünür.</p></div>') +
-      '</div>';
-
-    return '<div class="card"><div class="toolbar">' +
-      '<div class="field" style="max-width:190px"><label for="reportMonth">Dönem</label>' +
-      '<input id="reportMonth" type="month" class="input" data-role="report-month" value="' + esc(ay) + '"></div>' +
-      '<div style="flex:1"></div>' +
-      '<button class="btn" data-act="print-report">' + ICONS.print + ' Raporu yazdır</button>' +
+    return '<div class="kpis report-kpis">' +
+      rKpi('Sevk edilen çift', nf0(ctx.cur.cift), ctx.cur.shipments.length + ' fiş', '', rCmp(ctx.cur.cift, ctx.prev.cift)) +
+      rKpi('Sevk tutarı', money(ctx.cur.revenue), 'önceki dönem ' + money(ctx.prev.revenue), 'info', rCmp(ctx.cur.revenue, ctx.prev.revenue)) +
+      rKpi('Tahsilat', money(ctx.cur.collection), ctx.cur.collections.length + ' kayıt', 'ok', rCmp(ctx.cur.collection, ctx.prev.collection)) +
+      rKpi('Brüt kâr', money(ctx.profit.reduce(function (a, r) { return a + r.kar; }, 0)), 'maliyet bazlı', 'warn', '') +
+      rKpi('Gider', money(ctx.cur.expense), ctx.cur.expenses.length + ' gider kaydı', 'danger', '') +
+      rKpi('Net kâr', money(ctx.profit.reduce(function (a, r) { return a + r.kar; }, 0) - ctx.cur.expense), 'gider sonrası', 'ok', '') +
       '</div>' +
-      '<div class="card-body"><div class="kpis" style="margin:0">' +
-      '<div class="kpi"><div class="kpi-label">Sevk edilen çift</div><div class="kpi-value">' + nf0(sevkAdet) + '</div><div class="kpi-foot">' + sevk.length + ' fiş satırı</div></div>' +
-      '<div class="kpi info"><div class="kpi-label">Sevk tutarı</div><div class="kpi-value">' + nf0(sevkTutar) + '<small>' + (data.settings.para || '₺') + '</small></div><div class="kpi-foot">' + monthName(ay) + (cid ? ' · ' + esc(cari.ad) : '') + '</div></div>' +
-      '<div class="kpi"><div class="kpi-label">Tahsilat</div><div class="kpi-value" style="color:var(--alacak)">' + nf0(tahsilatTutar) + '<small>' + (data.settings.para || '₺') + '</small></div><div class="kpi-foot">' + tahsilat.length + ' tahsilat kaydı</div></div>' +
-      '<div class="kpi warn"><div class="kpi-label">Bekleyen sipariş</div><div class="kpi-value">' + nf0(kalanList.length) + '</div><div class="kpi-foot">' + nf0(kalanList.reduce(function (a, x) { return a + x.i.kalan; }, 0)) + ' çift</div></div>' +
-      '</div></div></div>' +
-      '<div class="grid-2 even" style="margin-top:16px">' +
-      '<div class="card"><div class="card-head"><div><h2>' + (groupKey === 'model' ? 'Model bazlı sevkiyat' : 'Cari bazlı sevkiyat') + '</h2><div class="sub">' + monthName(ay) + ' · ' + (cid ? esc(cari.ad) : 'tüm cariler') + '</div></div></div>' +
-      '<div class="table-wrap"><table class="data"><thead><tr><th>' + (groupKey === 'model' ? 'Model' : 'Cari') + '</th><th class="right">Koli</th><th class="right">Çift</th><th class="right">Tutar</th></tr></thead><tbody>' + groupTable + '</tbody></table></div></div>' +
-      '<div class="card"><div class="card-head"><div><h2>Bekleyen siparişler</h2><div class="sub">Kalan çifte göre ilk 10</div></div></div>' +
-      '<div class="table-wrap"><table class="data"><thead><tr><th>Model</th><th class="right">Giden</th><th class="right">Kalan</th><th class="right">Tutar</th></tr></thead><tbody>' + kalanTable + '</tbody></table></div></div>' +
-      '</div>' + karCard + bedenCard;
+      reportCompareHtml(ctx) +
+      (q.missingCost.length || q.maliyetsiz || q.noCard.length || q.noPrice.length || Math.abs(q.recon) > 1
+        ? '<div class="report-alert">' + ICONS.alert + ' <b>Veri kalitesi:</b> ' +
+          [q.missingCost.length ? q.missingCost.length + ' modelde maliyet yok' : '', q.maliyetsiz ? q.maliyetsiz + ' maliyetsiz satır' : '', q.kartsiz ? q.kartsiz + ' kartsız satır' : '', q.noCard.length ? q.noCard.length + ' siparişte model kartı yok' : '', q.noPrice.length ? q.noPrice.length + ' siparişte fiyat yok' : '', Math.abs(q.recon) > 1 ? 'cari/sevk farkı ' + money(q.recon) : ''].filter(Boolean).join(' · ') + '</div>'
+        : '') +
+      '<div class="grid-2 even" style="margin-top:14px">' +
+      '<div class="card"><div class="card-head"><div><h2>Dönem sevkiyatı</h2><div class="sub">' + esc(rLabel(ctx.r)) + '</div></div></div><div class="card-body">' + reportTrend(ctx) + '</div></div>' +
+      '<div class="card"><div class="card-head"><div><h2>En çok satan 5 model</h2><div class="sub">Sevk edilen çift</div></div><button class="btn btn-sm" data-act="go-models">Modeller ' + ICONS.right + '</button></div><div class="card-body">' +
+      (top.length ? rBars(top, 'cift', 'model', function (v) { return nf0(v) + ' çift'; }) : emptyState('tag', 'Model verisi yok', '', '')) + '</div></div></div>' +
+      '<div class="grid-2 even" style="margin-top:14px">' +
+      '<div class="card"><div class="card-head"><div><h2>' + (ctx.cid ? 'Model bazlı sevkiyat' : 'Cari bazlı sevkiyat') + '</h2><div class="sub">' + esc(rLabel(ctx.r)) + '</div></div></div><div class="table-wrap"><table class="data"><thead><tr><th>' + (ctx.cid ? 'Model' : 'Cari') + '</th><th class="right">Koli</th><th class="right">Çift</th><th class="right">Tutar</th></tr></thead><tbody>' + groupHtml + '</tbody></table></div></div>' +
+      '<div class="card"><div class="card-head"><div><h2>Bekleyen siparişler</h2><div class="sub">Kalan çifte göre ilk 8</div></div><button class="btn btn-sm" data-act="go-orders">Siparişler ' + ICONS.right + '</button></div><div class="table-wrap"><table class="data"><thead><tr><th>Model</th><th class="right">Giden</th><th class="right">Kalan</th><th class="right">Tutar</th></tr></thead><tbody>' + pendingHtml + '</tbody></table></div></div></div>';
+  }
+
+  function reportProfitHtml(ctx) {
+    var totalKar = ctx.profit.reduce(function (a, r) { return a + r.kar; }, 0);
+    var totalCiro = ctx.profit.reduce(function (a, r) { return a + r.ciro; }, 0);
+    var totalMal = ctx.profit.reduce(function (a, r) { return a + r.maliyet; }, 0);
+    var marj = totalCiro ? Core.round2(totalKar / totalCiro * 100, 1) : 0;
+    var modelRows = ctx.modelProfit.slice(0, 15);
+    var colorRows = ctx.profit.slice(0, 12);
+    return '<div class="kpis report-kpis">' +
+      rKpi('Ciro', money(totalCiro), 'sevk edilen satırlar', 'info', '') +
+      rKpi('Maliyet', money(totalMal), 'model kartlarından', '', '') +
+      rKpi('Brüt kâr', money(totalKar), 'marj %' + nf1(marj), 'ok', '') +
+      rKpi('Gider', money(ctx.cur.expense), 'dönem giderleri', 'danger', '') +
+      rKpi('Net kâr', money(totalKar - ctx.cur.expense), 'brüt kâr − gider', 'ok', '') +
+      '</div>' +
+      ((ctx.quality.missingCost.length || ctx.quality.maliyetsiz || ctx.quality.kartsiz) ? '<div class="report-alert">' + ICONS.alert + ' <b>Maliyet/veri eksiği:</b> ' + [ctx.quality.missingCost.length ? ctx.quality.missingCost.length + ' modelde maliyet yok' : '', ctx.quality.maliyetsiz ? ctx.quality.maliyetsiz + ' maliyetsiz satır' : '', ctx.quality.kartsiz ? ctx.quality.kartsiz + ' kartsız sevk satırı' : ''].filter(Boolean).join(' · ') + ' <button class="btn btn-sm" data-act="go-models">Modeller</button></div>' : '') +
+      '<div class="grid-2 even" style="margin-top:14px">' +
+      '<div class="card"><div class="card-head"><div><h2>Model kârlılığı</h2><div class="sub">Kâra göre ilk 15</div></div></div><div class="table-wrap"><table class="data"><thead><tr><th>Model</th><th class="right">Çift</th><th class="right">Ciro</th><th class="right">Kâr</th><th class="right">Marj</th></tr></thead><tbody>' +
+      (modelRows.length ? modelRows.map(function (r) {
+        return '<tr class="clickable" data-act="report-model" data-model="' + esc(r.model) + '"><td class="strong">' + esc(r.model) + '</td><td class="right">' + nf0(r.cift) + '</td><td class="right">' + money(r.ciro) + '</td><td class="right strong" style="color:' + (r.kar < 0 ? 'var(--alacak)' : 'var(--borc)') + '">' + money(r.kar) + '</td><td class="right">' + (r.maliyetsiz || r.kartsiz ? '<span class="pill warn">maliyetsiz</span>' : '%' + nf1(r.marj)) + '</td></tr>';
+      }).join('') : '<tr><td colspan="5">' + emptyState('chart', 'Kâr verisi yok', 'Sevkiyat yapıldıkça oluşur.', '') + '</td></tr>') +
+      '</tbody></table></div></div>' +
+      '<div class="card"><div class="card-head"><div><h2>Renk kârlılığı</h2><div class="sub">Kâra göre ilk 12</div></div></div><div class="table-wrap"><table class="data"><thead><tr><th>Model / renk</th><th class="right">Çift</th><th class="right">Kâr</th><th class="right">Marj</th></tr></thead><tbody>' +
+      (colorRows.length ? colorRows.map(function (r) {
+        return '<tr><td><div class="strong">' + esc(r.model) + '</div><div class="sub">' + esc(r.renk) + '</div></td><td class="right">' + nf0(r.cift) + '</td><td class="right strong">' + money(r.kar) + '</td><td class="right">' + (r.maliyetsiz || r.kartsiz ? '<span class="pill warn">maliyetsiz</span>' : '%' + nf1(r.marj)) + '</td></tr>';
+      }).join('') : '<tr><td colspan="4">' + emptyState('tag', 'Renk verisi yok', '', '') + '</td></tr>') +
+      '</tbody></table></div></div></div>' +
+      '<div class="card" style="margin-top:14px"><div class="card-head"><div><h2>Giderler</h2><div class="sub">Dönem GİDER hareketleri · net kâr hesabı</div></div><button class="btn btn-sm" data-act="go-ledger">Cari hesap ' + ICONS.right + '</button></div>' +
+      '<div class="table-wrap"><table class="data"><thead><tr><th>Tarih</th><th>Cari</th><th>Açıklama</th><th class="right">Tutar</th></tr></thead><tbody>' +
+      (ctx.cur.expenses.length ? ctx.cur.expenses.slice().reverse().map(function (r) {
+        return '<tr><td>' + dateTR(r.tarih) + '</td><td>' + esc(cariAdi(r.cariId)) + '</td><td>' + esc(r.aciklama || r.islem) + '</td><td class="right">' + money(r.tutar) + '</td></tr>';
+      }).join('') : '<tr><td colspan="4">' + emptyState('wallet', 'Gider yok', 'Bu dönemde GİDER kaydı bulunmuyor.', '') + '</td></tr>') +
+      '</tbody></table></div></div>';
+  }
+
+  function reportCariHtml(ctx) {
+    var a = ctx.aging;
+    var labels = ['0–30 gün', '31–60 gün', '61–90 gün', '90+ gün'];
+    var max = Math.max.apply(null, a.totals.concat([1]));
+    var debtors = a.rows.filter(function (r) { return r.bakiye > 0; }).slice(0, 12);
+    return '<div class="kpis report-kpis">' +
+      rKpi('Toplam bakiye', money(a.total), a.rows.length + ' cari', 'warn', '') +
+      rKpi('Tahsilat', money(a.collected), 'FIFO ile tahsil edilen', 'ok', '') +
+      rKpi('Ortalama tahsil süresi', nf1(a.avgDays) + ' gün', 'tahsil edilen borçlar', 'info', '') +
+      rKpi('Vadesi geçen', money(a.totals[2] + a.totals[3]), '61+ gün', 'danger', '') +
+      '</div>' +
+      '<div class="card" style="margin-top:14px"><div class="card-head"><div><h2>Yaşlandırma</h2><div class="sub">' + dateTR(ctx.r.to) + ' itibarıyla kalan bakiye</div></div></div><div class="card-body">' +
+      labels.map(function (l, i) {
+        return '<div class="hbar"><div class="hbar-head"><b>' + l + '</b><span>' + money(a.totals[i]) + '</span></div><div class="hbar-track"><i style="width:' + Math.max(2, Math.round(a.totals[i] / max * 100)) + '%"></i></div></div>';
+      }).join('') + '</div></div>' +
+      '<div class="card" style="margin-top:14px"><div class="card-head"><div><h2>Cari bakiye ve yaşlandırma</h2><div class="sub">Borçlu cariler · ilk 12</div></div><button class="btn btn-sm" data-act="go-cariler">Cariler ' + ICONS.right + '</button></div><div class="table-wrap"><table class="data"><thead><tr><th>Cari</th><th class="right">Bakiye</th><th class="right">0–30</th><th class="right">31–60</th><th class="right">61–90</th><th class="right">90+</th><th class="right">Ort. gün</th></tr></thead><tbody>' +
+      (debtors.length ? debtors.map(function (r) {
+        return '<tr class="clickable" data-act="report-cari" data-id="' + r.cariId + '"><td class="strong">' + esc(r.ad) + '</td><td class="right">' + money(r.bakiye) + '</td>' +
+          r.buckets.map(function (v) { return '<td class="right">' + (v ? money(v) : '—') + '</td>'; }).join('') +
+          '<td class="right">' + nf0(r.avgDays) + '</td></tr>';
+      }).join('') : '<tr><td colspan="7">' + emptyState('wallet', 'Borçlu cari yok', 'Tüm bakiyeler kapalı görünüyor.', '') + '</td></tr>') +
+      '</tbody></table></div></div>';
+  }
+
+  function reportSevkHtml(ctx) {
+    var p = ctx.perf;
+    var labels = ['0–3 gün', '4–7 gün', '8–14 gün', '15+ gün'];
+    var max = Math.max.apply(null, p.buckets.concat([1]));
+    return '<div class="kpis report-kpis">' +
+      rKpi('Ortalama sevk süresi', nf1(p.avgDays) + ' gün', 'sipariş → sevk', 'info', '') +
+      rKpi('Karşılama oranı', '%' + nf1(p.fill), 'dönem siparişleri', 'ok', '') +
+      rKpi('Kısmi sevk', nf0(p.partial), 'sipariş', 'warn', '') +
+      rKpi('Geciken', nf0(p.overdue.d15), '15+ gün açık', 'danger', '') +
+      '</div>' +
+      '<div class="card" style="margin-top:14px"><div class="card-head"><div><h2>Sevk süresi dağılımı</h2><div class="sub">Çift bazında</div></div></div><div class="card-body">' +
+      labels.map(function (l, i) {
+        return '<div class="hbar"><div class="hbar-head"><b>' + l + '</b><span>' + nf0(p.buckets[i]) + ' çift</span></div><div class="hbar-track"><i style="width:' + Math.max(2, Math.round(p.buckets[i] / max * 100)) + '%"></i></div></div>';
+      }).join('') + '</div></div>' +
+      '<div class="card" style="margin-top:14px"><div class="card-head"><div><h2>Bekleyen siparişler</h2><div class="sub">Kalan çifte göre</div></div><button class="btn btn-sm" data-act="go-orders">Siparişler ' + ICONS.right + '</button></div><div class="table-wrap"><table class="data"><thead><tr><th>Model</th><th>Cari</th><th class="right">Giden</th><th class="right">Kalan</th><th class="right">Tutar</th></tr></thead><tbody>' +
+      (p.pending.length ? p.pending.slice(0, 15).map(function (x) {
+        return '<tr><td class="strong">' + esc(x.o.model) + '</td><td>' + esc(cariAdi(x.o.cariId)) + '</td><td class="right">' + nf0(x.i.giden) + '</td><td class="right strong">' + nf0(x.i.kalan) + '</td><td class="right">' + money(x.i.kalanTutar) + '</td></tr>';
+      }).join('') : '<tr><td colspan="5">' + emptyState('check', 'Bekleyen yok', 'Tüm siparişler sevk edilmiş.', '') + '</td></tr>') +
+      '</tbody></table></div></div>';
+  }
+
+  function reportUrunHtml(ctx) {
+    var sz = ctx.size;
+    var colorRows = ctx.colors.slice(0, 8);
+    var slow = (data.modeller || []).filter(function (k) {
+      return !ctx.cur.lines.some(function (l) { return Core.normKey(l.model) === Core.normKey(k.model); });
+    }).slice(0, 10);
+    return '<div class="card"><div class="card-head"><div><h2>Beden dökümü</h2><div class="sub">Sevk edilen · ' + esc(rLabel(ctx.r)) + '</div></div></div>' +
+      (sz.rows.length ? '<div class="table-wrap"><table class="data"><thead><tr><th>Model / renk</th>' + sz.sizes.map(function (s) { return '<th class="right">' + s + '</th>'; }).join('') + '<th class="right">Toplam</th></tr></thead><tbody>' +
+        sz.rows.map(function (r) {
+          return '<tr><td><div class="strong">' + esc(r.model) + '</div><div class="sub">' + esc(r.renk) + '</div></td>' + sz.sizes.map(function (s) { return '<td class="right">' + (Core.num(r.map[s]) ? nf0(r.map[s]) : '—') + '</td>'; }).join('') + '<td class="right strong">' + nf0(r.toplam) + '</td></tr>';
+        }).join('') + '</tbody><tfoot><tr><td>TOPLAM</td>' + sz.sizes.map(function (s) { return '<td class="right">' + nf0(sz.totals[s] || 0) + '</td>'; }).join('') + '<td class="right">' + nf0(sz.total) + '</td></tr></tfoot></table></div>'
+        : '<div class="card-body"><p class="muted small" style="margin:0">Bu dönemde beden dökümü olan sevk yok.</p></div>') + '</div>' +
+      '<div class="grid-2 even" style="margin-top:14px">' +
+      '<div class="card"><div class="card-head"><div><h2>Renk dağılımı</h2><div class="sub">Sevk edilen çift</div></div></div><div class="card-body">' +
+      (colorRows.length ? rBars(colorRows, 'cift', 'renk', function (v) { return nf0(v) + ' çift'; }) : emptyState('tag', 'Renk verisi yok', '', '')) + '</div></div>' +
+      '<div class="card"><div class="card-head"><div><h2>Asorti sapması</h2><div class="sub">Şablona göre beden dağılımı</div></div></div><div class="table-wrap"><table class="data"><thead><tr><th>Model / renk</th><th class="right">Çift</th><th class="right">Sapma</th></tr></thead><tbody>' +
+      (ctx.asorti.length ? ctx.asorti.slice(0, 10).map(function (r) {
+        return '<tr><td><div class="strong">' + esc(r.model) + '</div><div class="sub">' + esc(r.renk) + '</div></td><td class="right">' + nf0(r.cift) + '</td><td class="right"><span class="pill ' + (r.sapma > 15 ? 'warn' : 'ok') + '">%' + nf1(r.sapma) + '</span></td></tr>';
+      }).join('') : '<tr><td colspan="3">' + emptyState('tag', 'Asorti verisi yok', 'Asortili sevk yapıldıkça oluşur.', '') + '</td></tr>') +
+      '</tbody></table></div></div></div>' +
+      '<div class="card" style="margin-top:14px"><div class="card-head"><div><h2>Hareketsiz modeller</h2><div class="sub">Bu dönemde sevkiyatı olmayan kartlar</div></div></div><div class="card-body flush">' +
+      (slow.length ? slow.map(function (k) { return '<div class="feed-item"><div class="feed-main"><b>' + esc(k.model) + '</b><span>' + esc(k.kategori || '') + ' · liste ' + money(k.fiyat) + '</span></div></div>'; }).join('') : '<p class="muted small" style="padding:12px">Tüm modellerde hareket var.</p>') + '</div></div>';
+  }
+
+  function reportQualityHtml(ctx) {
+    var q = ctx.quality;
+    return '<div class="card" style="margin-top:14px"><div class="card-head"><div><h2>Veri kalitesi ve mutabakat</h2><div class="sub">Rapor güvenilirliği</div></div></div><div class="card-body">' +
+      '<div class="quality-grid">' +
+      '<div class="quality-item ' + (q.missingCost.length ? 'bad' : 'good') + '"><b>' + q.missingCost.length + '</b><span>maliyetsiz model</span></div>' +
+      '<div class="quality-item ' + (q.maliyetsiz ? 'bad' : 'good') + '"><b>' + q.maliyetsiz + '</b><span>maliyetsiz satır</span></div>' +
+      '<div class="quality-item ' + (q.kartsiz ? 'bad' : 'good') + '"><b>' + q.kartsiz + '</b><span>kartsız sevk satırı</span></div>' +
+      '<div class="quality-item ' + (q.noPrice.length ? 'bad' : 'good') + '"><b>' + q.noPrice.length + '</b><span>fiyatsız sipariş</span></div>' +
+      '<div class="quality-item ' + (Math.abs(q.recon) > 1 ? 'bad' : 'good') + '"><b>' + money(q.recon) + '</b><span>cari/sevk farkı</span></div>' +
+      '</div>' +
+      '<p class="muted small" style="margin:10px 0 0">Cari/sevk farkı, sevk satırı tutarı ile cari SATIŞ hareketleri arasındaki farktır. Maliyet ve fiyat eksikleri kâr/marj raporlarını etkiler.</p>' +
+      '</div></div>';
+  }
+
+  function reportTabHtml(ctx) {
+    if (S.ui.reportTab === 'kar') return reportProfitHtml(ctx);
+    if (S.ui.reportTab === 'cari') return reportCariHtml(ctx) + reportQualityHtml(ctx);
+    if (S.ui.reportTab === 'sevk') return reportSevkHtml(ctx) + reportQualityHtml(ctx);
+    if (S.ui.reportTab === 'urun') return reportUrunHtml(ctx) + reportQualityHtml(ctx);
+    return reportOverview(ctx) + reportQualityHtml(ctx);
+  }
+
+  function viewReports() {
+    var ctx = reportBuild();
+    return reportToolbar(ctx) + '<div class="report-body">' + reportTabHtml(ctx) + '</div>';
   }
 
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.0.0';
+  var SURUM = '3.1.0';
 
   var YENILIKLER = [
+    {
+      v: '3.1.0', t: '01.11.2026', m: [
+        'Rapor Merkezi: Özet, Kârlılık, Cari, Sevkiyat, Ürün sekmeleri',
+        'Son 30 gün / bu ay / geçen ay / çeyrek / yıl / özel tarih aralığı',
+        'Önceki dönem ve geçen yıl karşılaştırması',
+        'Model ve renk kârlılığı, maliyetsiz satır uyarısı',
+        'Cari yaşlandırma, tahsilat hızı ve gider/net kâr',
+        'Sevkiyat süresi, karşılama oranı, kısmi sevk ve gecikenler',
+        'Beden/renk/asorti analizi, hareketsiz modeller',
+        'Veri kalitesi ve cari/sevk mutabakatı',
+        'Detaylı rapor yazdırma'
+      ]
+    },
     {
       v: '3.0.0', t: '01.11.2026', m: [
         'Dashboard: en çok satan 5 model, sevk durumu ve cari dağılımı grafikleri',
@@ -4617,32 +5106,45 @@ function viewShipments() {
   }
 
   function printReport() {
-    var ay = S.ui.reportMonth;
-    var cid = S.ui.cariId;
-    var rows = data.ledger.filter(function (r) {
-      return (r.tarih || '').slice(0, 7) === ay && r.islem === 'SATIŞ' && (!cid || r.cariId === cid);
-    });
-    var byModel = {};
-    rows.forEach(function (r) {
-      var k = cid ? r.aciklama : String(r.cariId);
-      byModel[k] = byModel[k] || { model: cid ? r.aciklama : cariAdi(r.cariId), koli: 0, cift: 0, tutar: 0 };
-      byModel[k].koli += Core.num(r.koli);
-      byModel[k].cift += Core.num(r.cift);
-      byModel[k].tutar += Core.num(r.tutar);
-    });
-    var list = Object.keys(byModel).map(function (k) { return byModel[k]; });
-    var toplamTutar = list.reduce(function (a, m) { return a + m.tutar; }, 0);
-    var toplamCift = list.reduce(function (a, m) { return a + m.cift; }, 0);
-    var body = list.map(function (m) {
-      return '<tr><td>' + esc(m.model) + '</td><td class="n">' + nf1(m.koli) + '</td><td class="n">' + nf0(m.cift) + '</td><td class="n">' + nf2(m.tutar) + '</td></tr>';
-    }).join('');
-    printHtml('<div class="print-doc">' + docHeader('AYLIK SEVKİYAT RAPORU', monthName(ay)) +
-      '<div class="pf-meta"><div class="row"><span class="k">DÖNEM</span><span class="v">' + monthName(ay) + '</span></div>' +
-      '<div class="row"><span class="k">CARİ</span><span class="v">' + (cid ? esc(activeCari().ad) : 'Tüm cariler') + '</span></div>' +
-      '<div class="row"><span class="k">TOPLAM</span><span class="v">' + money(toplamTutar) + '</span></div></div>' +
-      '<table class="pf-table"><thead><tr><th>' + (cid ? 'MODEL' : 'CARİ') + '</th><th style="width:70px">KOLİ</th><th style="width:70px">ÇİFT</th><th style="width:100px">TUTAR</th></tr></thead><tbody>' + body + '</tbody>' +
-      '<tfoot><tr><td>TOPLAM</td><td class="n">' + nf1(list.reduce(function (a, m) { return a + m.koli; }, 0)) + '</td><td class="n">' + nf0(toplamCift) + '</td><td class="n">' + nf2(toplamTutar) + '</td></tr></tfoot></table>' +
-      '<div class="pf-foot"><span>' + esc(data.settings.firmaAdi) + '</span><span>DMR Sevk</span></div></div>');
+    var ctx = reportBuild();
+    var kar = ctx.profit.reduce(function (a, r) { return a + r.kar; }, 0);
+    var ciro = ctx.profit.reduce(function (a, r) { return a + r.ciro; }, 0);
+    var mal = ctx.profit.reduce(function (a, r) { return a + r.maliyet; }, 0);
+    var top = reportTopModels(ctx.cur.lines);
+    var karRows = ctx.modelProfit.slice(0, 10);
+    var agingRows = ctx.aging.rows.filter(function (r) { return r.bakiye > 0; }).slice(0, 10);
+    var modelHtml = top.length ? top.map(function (m) {
+      return '<tr><td>' + esc(m.model) + '</td><td class="n">' + nf0(m.cift) + '</td><td class="n">' + nf2(m.tutar) + '</td></tr>';
+    }).join('') : '<tr><td colspan="3">Sevkiyat yok</td></tr>';
+    var karHtml = karRows.length ? karRows.map(function (r) {
+      return '<tr><td>' + esc(r.model) + '</td><td class="n">' + nf0(r.cift) + '</td><td class="n">' + nf2(r.ciro) + '</td><td class="n">' + nf2(r.kar) + '</td><td class="n">%' + nf1(r.marj) + '</td></tr>';
+    }).join('') : '<tr><td colspan="5">Kâr verisi yok</td></tr>';
+    var ageHtml = agingRows.length ? agingRows.map(function (r) {
+      return '<tr><td>' + esc(r.ad) + '</td><td class="n">' + nf2(r.bakiye) + '</td><td class="n">' + nf2(r.buckets[0]) + '</td><td class="n">' + nf2(r.buckets[1]) + '</td><td class="n">' + nf2(r.buckets[2]) + '</td><td class="n">' + nf2(r.buckets[3]) + '</td></tr>';
+    }).join('') : '<tr><td colspan="6">Borçlu cari yok</td></tr>';
+    var q = ctx.quality;
+    var note = [
+      q.missingCost.length ? q.missingCost.length + ' modelde maliyet yok' : '',
+      q.maliyetsiz ? q.maliyetsiz + ' maliyetsiz satır' : '',
+      q.noCard.length ? q.noCard.length + ' siparişte model kartı yok' : '',
+      q.noPrice.length ? q.noPrice.length + ' siparişte fiyat yok' : '',
+      Math.abs(q.recon) > 1 ? 'cari/sevk farkı ' + money(q.recon) : ''
+    ].filter(Boolean).join(' · ') || 'Veri kalitesi uygun.';
+
+    printHtml('<div class="print-doc">' +
+      docHeader('SEVKİYAT RAPORU', rLabel(ctx.r)) +
+      '<div class="pf-meta">' +
+      '<div class="row"><span class="k">DÖNEM</span><span class="v">' + esc(rLabel(ctx.r)) + '</span></div>' +
+      '<div class="row"><span class="k">CARİ</span><span class="v">' + (ctx.cid ? esc(activeCari().ad) : 'Tüm cariler') + '</span></div>' +
+      '<div class="row"><span class="k">SEVK</span><span class="v">' + nf0(ctx.cur.cift) + ' çift · ' + money(ctx.cur.revenue) + '</span></div>' +
+      '<div class="row"><span class="k">KÂR</span><span class="v">' + money(kar) + ' · net ' + money(kar - ctx.cur.expense) + '</span></div>' +
+      '</div>' +
+      '<div class="pf-kpis"><div><span>SEVK ÇİFT</span><b>' + nf0(ctx.cur.cift) + '</b></div><div><span>CİRO</span><b>' + money(ctx.cur.revenue) + '</b></div><div><span>TAHSİLAT</span><b>' + money(ctx.cur.collection) + '</b></div><div><span>BRÜT KÂR</span><b>' + money(kar) + '</b></div><div><span>GİDER</span><b>' + money(ctx.cur.expense) + '</b></div><div><span>NET KÂR</span><b>' + money(kar - ctx.cur.expense) + '</b></div></div>' +
+      '<h3 class="pf-h">Sevkiyat · model</h3><table class="pf-table"><thead><tr><th>MODEL</th><th class="n">ÇİFT</th><th class="n">TUTAR</th></tr></thead><tbody>' + modelHtml + '</tbody></table>' +
+      '<h3 class="pf-h">Model kârlılığı</h3><table class="pf-table"><thead><tr><th>MODEL</th><th class="n">ÇİFT</th><th class="n">CİRO</th><th class="n">KÂR</th><th class="n">MARJ</th></tr></thead><tbody>' + karHtml + '</tbody></table>' +
+      '<h3 class="pf-h">Cari yaşlandırma</h3><table class="pf-table"><thead><tr><th>CARİ</th><th class="n">BAKİYE</th><th class="n">0–30</th><th class="n">31–60</th><th class="n">61–90</th><th class="n">90+</th></tr></thead><tbody>' + ageHtml + '</tbody></table>' +
+      '<p class="pf-note">Veri kalitesi: ' + esc(note) + '</p>' +
+      '<div class="pf-foot"><span>' + esc(data.settings.firmaAdi) + '</span><span>' + esc(S.user ? S.user.ad : '') + ' · ' + dateTR(Core.todayISO()) + '</span></div></div>');
   }
 
   function backup() {
@@ -4688,8 +5190,13 @@ function viewShipments() {
       renderView();
       var inp = $('[data-role="ship-list-search"]');
       if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
-    } else if (t.dataset.role === 'report-month') {
-      S.ui.reportMonth = t.value; renderView();
+    } else if (t.dataset.role === 'report-preset') {
+      rApplyPreset(t.value);
+      renderView();
+    } else if (t.dataset.role === 'report-from') {
+      S.ui.reportFrom = t.value; S.ui.reportPreset = 'custom'; renderView();
+    } else if (t.dataset.role === 'report-to') {
+      S.ui.reportTo = t.value; S.ui.reportPreset = 'custom'; renderView();
     } else if (t.dataset.cart) {
       updateCartField(t);
     } else if (t.id === 'shipTarih') {
@@ -4740,6 +5247,12 @@ function viewShipments() {
   }, true);
 
   document.addEventListener('click', function (e) {
+    var rt = e.target.closest('[data-report-tab]');
+    if (rt) {
+      S.ui.reportTab = rt.dataset.reportTab;
+      renderView();
+      return;
+    }
     var mb = e.target.closest('[data-model-view]');
     if (mb) {
       S.ui.modelView = mb.dataset.modelView;
