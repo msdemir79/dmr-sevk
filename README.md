@@ -14,6 +14,7 @@ Tek bir HTML dosyası olarak çalışan, verilerini seçtiğiniz **Excel (.xlsx)
 - Model görseli sipariş, sevk ve fişte otomatik; siparişlerde ürün kartı görünümü
 - Dashboard grafikleri, model galerisi, koyu tema, Ctrl+K komut paleti, QR’lı fiş
 - Rapor Merkezi: tarih aralığı/karşılaştırma, kârlılık, cari yaşlandırma, sevkiyat ve ürün analizi
+- Raporlarda Excel ve CSV dışa aktarma
 - Çoklu cari hesap, cari ekstre, tahsilat ve bakiye
 - Cari Hesap’ta hızlı Tahsilat ve Gider girişi; GİDER işlem türü
 - Model kartları: kategori, renk seçimi, asorti şablonu, fiyat, maliyet, barkod, sezon ve resim
@@ -67,7 +68,7 @@ Planlanan geliştirmeler ve tasarım notları: [ROADMAP.md](ROADMAP.md). Örnek:
 
 ## Sürüm
 
-Güncel sürüm: **v3.1.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
+Güncel sürüm: **v3.1.1**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
 
 ### Yeni sürüm çıkarma
 

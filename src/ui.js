@@ -155,8 +155,8 @@
       t = setTimeout(function () { fn.apply(self, args); }, ms || 220);
     };
   }
-  function download(bytes, filename) {
-    var blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  function download(bytes, filename, mime) {
+    var blob = new Blob([bytes], { type: mime || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url; a.download = filename;
@@ -1159,6 +1159,8 @@
         case 'order-filter-sheet': openOrderFilterSheet(); break;
         case 'toggle-theme': toggleTheme(); break;
         case 'go-models': go('models'); break;
+        case 'report-excel': reportExportExcel(); break;
+        case 'report-csv': reportExportCsv(); break;
         case 'report-model': S.ui.orderSearch = el.dataset.model || ''; S.ui.orderFilter = 'all'; go('orders'); break;
         case 'report-cari': setActiveCari(id); go('ledger'); break;
         case 'report-order': var ro = findOrder(id); if (ro) openOrderForm(ro); break;
@@ -2440,6 +2442,8 @@ function viewShipments() {
       '<div class="field"><label for="reportFrom">Başlangıç</label><input id="reportFrom" type="date" class="input" data-role="report-from" value="' + esc(ctx.r.from) + '"></div>' +
       '<div class="field"><label for="reportTo">Bitiş</label><input id="reportTo" type="date" class="input" data-role="report-to" value="' + esc(ctx.r.to) + '"></div>' +
       '<div class="report-range">' + esc(rLabel(ctx.r)) + (ctx.cid ? ' · ' + esc(activeCari().ad) : ' · tüm cariler') + '</div>' +
+      '<button class="btn" data-act="report-excel">' + ICONS.download + ' Excel</button>' +
+      '<button class="btn" data-act="report-csv">CSV</button>' +
       '<button class="btn" data-act="print-report">' + ICONS.print + ' Raporu yazdır</button></div>' +
       '<div class="report-tabs">' + tabs.map(function (t) {
         return '<button class="report-tab' + (S.ui.reportTab === t[0] ? ' active' : '') + '" data-report-tab="' + t[0] + '">' + t[1] + '</button>';
@@ -2622,9 +2626,16 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.1.0';
+  var SURUM = '3.1.1';
 
   var YENILIKLER = [
+    {
+      v: '3.1.1', t: '01.11.2026', m: [
+        'Rapor Merkezi’ne Excel ve CSV dışa aktarma',
+        'Excel: Özet, model kârlılığı, cari yaşlandırma, sevkiyat, beden, giderler, veri kalitesi sayfaları',
+        'CSV: muhasebe/Excel için noktalı virgüllü UTF-8 çıktı'
+      ]
+    },
     {
       v: '3.1.0', t: '01.11.2026', m: [
         'Rapor Merkezi: Özet, Kârlılık, Cari, Sevkiyat, Ürün sekmeleri',
@@ -5103,6 +5114,100 @@ function viewShipments() {
     var rows = filteredLedger();
     if (!rows.length) { toast('Yazdırılacak hareket yok.', 'err'); return; }
     printHtml(ekstreDocHtml(rows, S.ui.ledgerFrom, S.ui.ledgerTo, activeCari()));
+  }
+
+  function reportFileBase() {
+    var ctx = reportBuild();
+    return 'DMR_RAPOR_' + ctx.r.from.replace(/-/g, '') + '_' + ctx.r.to.replace(/-/g, '');
+  }
+
+  function reportExportExcel() {
+    try {
+      var ctx = reportBuild();
+      var q = ctx.quality;
+      var ozet = [
+        ['Dönem', rLabel(ctx.r)],
+        ['Cari', ctx.cid ? activeCari().ad : 'Tüm cariler'],
+        ['Sevk edilen çift', ctx.cur.cift],
+        ['Sevk tutarı', ctx.cur.revenue],
+        ['Tahsilat', ctx.cur.collection],
+        ['Gider', ctx.cur.expense],
+        ['Brüt kâr', ctx.profit.reduce(function (a, r) { return a + r.kar; }, 0)],
+        ['Net kâr', ctx.profit.reduce(function (a, r) { return a + r.kar; }, 0) - ctx.cur.expense]
+      ];
+      var sheets = [
+        { name: 'ÖZET', columns: [{ header: 'METRİK', width: 24 }, { header: 'DEĞER', width: 38 }], rows: ozet },
+        { name: 'MODEL KARLILIGI', columns: [
+          { header: 'MODEL', width: 32 }, { header: 'ÇİFT', width: 9 }, { header: 'CİRO', width: 13 },
+          { header: 'MALİYET', width: 13 }, { header: 'KÂR', width: 13 }, { header: 'MARJ %', width: 9 }, { header: 'DURUM', width: 13 }
+        ], rows: ctx.modelProfit.map(function (r) {
+          return [r.model, r.cift, r.ciro, r.maliyet, r.kar, r.marj, (r.maliyetsiz || r.kartsiz) ? 'MALİYETSİZ' : ''];
+        }) },
+        { name: 'CARİ YASLANDIRMA', columns: [
+          { header: 'CARİ', width: 28 }, { header: 'BAKİYE', width: 13 }, { header: '0-30', width: 12 },
+          { header: '31-60', width: 12 }, { header: '61-90', width: 12 }, { header: '90+', width: 12 }, { header: 'ORT. GÜN', width: 10 }
+        ], rows: ctx.aging.rows.map(function (r) {
+          return [r.ad, r.bakiye, r.buckets[0], r.buckets[1], r.buckets[2], r.buckets[3], r.avgDays];
+        }) },
+        { name: 'SEVKİYAT', columns: [{ header: 'METRİK', width: 24 }, { header: 'DEĞER', width: 38 }], rows: [
+          ['Ortalama sevk süresi (gün)', ctx.perf.avgDays],
+          ['Karşılama oranı %', ctx.perf.fill],
+          ['Kısmi sevk', ctx.perf.partial],
+          ['15+ gün geciken', ctx.perf.overdue.d15]
+        ] },
+        { name: 'BEDEN', columns: [{ header: 'MODEL', width: 30 }, { header: 'RENK', width: 16 }].concat(
+          ctx.size.sizes.map(function (s) { return { header: String(s), width: 7 }; }),
+          [{ header: 'TOPLAM', width: 9 }]
+        ), rows: ctx.size.rows.map(function (r) {
+          return [r.model, r.renk].concat(ctx.size.sizes.map(function (s) { return Core.num(r.map[s]); }), [r.toplam]);
+        }) },
+        { name: 'GIDERLER', columns: [
+          { header: 'TARİH', width: 12 }, { header: 'CARİ', width: 24 }, { header: 'AÇIKLAMA', width: 36 }, { header: 'TUTAR', width: 13 }
+        ], rows: ctx.cur.expenses.map(function (r) { return [r.tarih, cariAdi(r.cariId), r.aciklama, r.tutar]; }) },
+        { name: 'VERI KALITESI', columns: [{ header: 'KONTROL', width: 30 }, { header: 'ADET/FARK', width: 20 }], rows: [
+          ['Maliyetsiz model', q.missingCost.length],
+          ['Maliyetsiz satır', q.maliyetsiz],
+          ['Kartsız sevk satırı', q.kartsiz],
+          ['Fiyatsız sipariş', q.noPrice.length],
+          ['Cari/sevk farkı', q.recon]
+        ] }
+      ];
+      var bytes = XLSXLite.writeWorkbook({ sheets: sheets }, { creator: 'DMR AYAKKABI' });
+      download(bytes, reportFileBase() + '.xlsx');
+      toast('Excel raporu indirildi', 'ok');
+    } catch (e) { toast('Excel oluşturulamadı: ' + e.message, 'err'); }
+  }
+
+  function reportExportCsv() {
+    try {
+      var ctx = reportBuild();
+      var q = ctx.quality;
+      var lines = [];
+      function add(a) { lines.push(a.map(function (x) {
+        var v = x === undefined || x === null ? '' : String(x);
+        return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+      }).join(';')); }
+      add(['DMR AYAKKABI RAPORU']);
+      add(['Dönem', rLabel(ctx.r)]);
+      add(['Cari', ctx.cid ? activeCari().ad : 'Tüm cariler']);
+      add([]);
+      add(['ÖZET']); add(['Metrik', 'Değer']);
+      add(['Sevk çift', ctx.cur.cift]); add(['Sevk tutarı', ctx.cur.revenue]);
+      add(['Tahsilat', ctx.cur.collection]); add(['Gider', ctx.cur.expense]);
+      add(['Brüt kâr', ctx.profit.reduce(function (a, r) { return a + r.kar; }, 0)]);
+      add([]);
+      add(['MODEL KARLILIGI']); add(['Model', 'Çift', 'Ciro', 'Maliyet', 'Kâr', 'Marj %', 'Durum']);
+      ctx.modelProfit.forEach(function (r) { add([r.model, r.cift, r.ciro, r.maliyet, r.kar, r.marj, (r.maliyetsiz || r.kartsiz) ? 'MALİYETSİZ' : '']); });
+      add([]);
+      add(['CARI YASLANDIRMA']); add(['Cari', 'Bakiye', '0-30', '31-60', '61-90', '90+', 'Ort. gün']);
+      ctx.aging.rows.forEach(function (r) { add([r.ad, r.bakiye, r.buckets[0], r.buckets[1], r.buckets[2], r.buckets[3], r.avgDays]); });
+      add([]);
+      add(['VERI KALITESI']); add(['Kontrol', 'Adet/Fark']);
+      add(['Maliyetsiz model', q.missingCost.length]); add(['Maliyetsiz satır', q.maliyetsiz]);
+      add(['Kartsız sevk satırı', q.kartsiz]); add(['Fiyatsız sipariş', q.noPrice.length]); add(['Cari/sevk farkı', q.recon]);
+      download('\uFEFF' + lines.join('\r\n'), reportFileBase() + '.csv', 'text/csv;charset=utf-8');
+      toast('CSV raporu indirildi', 'ok');
+    } catch (e) { toast('CSV oluşturulamadı: ' + e.message, 'err'); }
   }
 
   function printReport() {

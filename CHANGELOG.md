@@ -2,6 +2,12 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.1.1 — 01.11.2026
+
+### Eklendi
+- **Rapor Merkezi → Excel:** Özet, model kârlılığı, cari yaşlandırma, sevkiyat, beden, giderler ve veri kalitesi sayfaları.
+- **Rapor Merkezi → CSV:** noktalı virgüllü, UTF-8 (BOM) muhasebe/Excel çıktısı.
+
 ## v3.1.0 — 01.11.2026
 
 ### Rapor Merkezi
