@@ -16,6 +16,7 @@
   }
   var ICONS = {
     grid: ic('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
+  filter: ic('<path d="M3 4h18l-7 8v6l-4 2v-8z"/>'),
   expand: ic('<path d="M8 3H3v5"/><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M16 21h5v-5"/>'),
     box: ic('<path d="M21 8.5v7a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 15.5v-7a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8.5z"/><path d="m3.3 7.2 8.7 5 8.7-5"/><path d="M12 22V12"/>'),
     truck: ic('<path d="M14 17V5a1 1 0 0 0-1-1H2v12h12z"/><path d="M14 9h4l4 4v4h-8"/><circle cx="6" cy="18.5" r="1.8"/><circle cx="17.5" cy="18.5" r="1.8"/>'),
@@ -182,7 +183,7 @@
     readOnly: false,
     ui: {
       cariId: 0, shipCariId: 0,
-      orderSearch: '', orderFilter: 'all', orderView: 'cards', orderSortKey: 'sipno', orderSortDir: 'desc', orderPage: 1,
+      orderSearch: '', orderFilter: 'all', orderView: 'cards', modelView: 'gallery', orderSortKey: 'sipno', orderSortDir: 'desc', orderPage: 1,
       ledgerSearch: '', ledgerType: 'all', ledgerFrom: '', ledgerTo: '', ledgerPage: 1,
       shipSearch: '', cart: [], shipTarih: Core.todayISO(), shipFisNo: null, shipAciklama: '',
       shipFaturaNo: '', shipFaturaTarih: '',
@@ -948,6 +949,27 @@
       '</div>';
   }
 
+  function isDark() {
+    return document.documentElement.getAttribute('data-theme') === 'dark';
+  }
+
+  function toggleTheme() {
+    document.documentElement.setAttribute('data-theme', isDark() ? 'light' : 'dark');
+    try { localStorage.setItem('dmr:theme', isDark() ? 'dark' : 'light'); } catch (e) { }
+    updateFileChip();
+  }
+
+  function openLightbox(src, label) {
+    if (!src) return;
+    openModal({
+      title: label || 'Ürün görseli',
+      subtitle: 'Görsel önizleme',
+      size: 'wide',
+      body: '<div class="lightbox-wrap"><img class="lightbox-img" src="' + esc(src) + '" alt="' + esc(label || '') + '"></div>',
+      footer: '<button class="btn" data-modal-close>Kapat</button>'
+    });
+  }
+
   function updateFileChip() {
     var chip = $('#fileChip');
     if (!chip) return;
@@ -960,6 +982,7 @@
       '<button class="fsave" data-act="save">' + (S.file.dirty ? 'Kaydet' : 'Excel\'e kaydet') + '</button>' +
       '<button class="fhelp" data-act="help">Kullanım kılavuzu</button>' +
       '<button class="fhelp" data-act="open-changelog" style="opacity:.7">Sürüm ' + SURUM + ' · yenilikler</button>' +
+      '<button class="fhelp" data-act="toggle-theme">' + (isDark() ? '☀ Aydınlık tema' : '☾ Koyu tema') + '</button>' +
       '<button class="fhelp update-link" data-act="check-update">' + ICONS.refresh + ' Güncelleme kontrol et' +
       (S.update && S.update.isNew ? ' <span class="update-badge">YENİ</span>' : '') + '</button>';
   }
@@ -1129,6 +1152,8 @@
         case 'open-health': openHealth(false); break;
         case 'open-changelog': openChangelog(); break;
         case 'check-update': checkUpdates(true); break;
+        case 'order-filter-sheet': openOrderFilterSheet(); break;
+        case 'toggle-theme': toggleTheme(); break;
         case 'go-models': go('models'); break;
         case 'backup-now':
           try { backupSnapshot(writeBytes(), true).then(function (ok) { toast(ok ? 'Yedek alındı' : 'Yedek alınamadı', ok ? 'ok' : 'err'); }); }
@@ -1244,7 +1269,7 @@
 
   function thumbHtml(order, cls) {
     var img = orderImage(order);
-    if (img) return '<div class="thumb ' + (cls || '') + '" style="background-image:url(&quot;' + esc(img) + '&quot;)" role="img" aria-label="' + esc(order.model) + '"></div>';
+    if (img) return '<div class="thumb ' + (cls || '') + '" data-lightbox="' + esc(img) + '" data-label="' + esc(order.model) + '" style="background-image:url(&quot;' + esc(img) + '&quot;)" role="img" aria-label="' + esc(order.model) + '"></div>';
     var initials = String(order.model || '?').trim().slice(0, 2).toLocaleUpperCase('tr-TR');
     return '<div class="thumb ' + (cls || '') + '">' + esc(initials) + '</div>';
   }
@@ -1297,6 +1322,87 @@
       m.cift += Core.num(r.cift);
     });
     return out;
+  }
+
+  function donutSvg(parts, size) {
+    var total = parts.reduce(function (a, p) { return a + p.value; }, 0);
+    var r = size / 2 - 7, c = 2 * Math.PI * r, off = 0;
+    var segs = parts.map(function (p) {
+      var len = total ? c * p.value / total : 0;
+      var seg = '<circle cx="' + (size / 2) + '" cy="' + (size / 2) + '" r="' + r + '" fill="none" stroke="' + p.color + '" stroke-width="9" stroke-dasharray="' + len + ' ' + (c - len) + '" stroke-dashoffset="' + (-off) + '"/>';
+      off += len;
+      return seg;
+    }).join('');
+    return '<svg class="donut" viewBox="0 0 ' + size + ' ' + size + '" aria-hidden="true">' +
+      '<circle cx="' + (size / 2) + '" cy="' + (size / 2) + '" r="' + r + '" fill="none" stroke="var(--surface-3)" stroke-width="9"/>' +
+      '<g transform="rotate(-90 ' + (size / 2) + ' ' + (size / 2) + ')">' + segs + '</g></svg>';
+  }
+
+  function topModelRows(cid, limit) {
+    var map = {};
+    data.shipments.forEach(function (sh) {
+      if (cid && sh.cariId !== cid) return;
+      Core.shipmentLines(data, sh.id).forEach(function (l) {
+        var k = l.model || '—';
+        if (!map[k]) map[k] = { model: k, cift: 0, tutar: 0 };
+        map[k].cift += Core.num(l.cift);
+        map[k].tutar += Core.num(l.tutar);
+      });
+    });
+    return Object.keys(map).map(function (k) { return map[k]; })
+      .sort(function (a, b) { return b.cift - a.cift; }).slice(0, limit || 5);
+  }
+
+  function dashboardCharts(cid) {
+    var tops = topModelRows(cid, 5);
+    var maxTop = Math.max.apply(null, tops.map(function (x) { return x.cift; }).concat([1]));
+    var topHtml = tops.length ? tops.map(function (x) {
+      var img = modelImageFor(x.model);
+      return '<div class="hbar">' +
+        '<div class="hbar-head"><div class="mini-thumb" style="' + (img ? 'background-image:url(&quot;' + esc(img) + '&quot;)' : '') + '">' + (img ? '' : esc(String(x.model).slice(0, 2))) + '</div>' +
+        '<b>' + esc(x.model) + '</b><span>' + nf0(x.cift) + ' çift</span></div>' +
+        '<div class="hbar-track"><i style="width:' + Math.max(4, Math.round(x.cift / maxTop * 100)) + '%"></i></div>' +
+        '</div>';
+    }).join('') : emptyState('box', 'Henüz sevkiyat yok', 'İlk sevkten sonra en çok satan modeller burada görünür.', '');
+
+    var shipped = Core.shippedMap(data);
+    var counts = { open: 0, partial: 0, done: 0 };
+    data.orders.forEach(function (o) {
+      if (cid && o.cariId !== cid) return;
+      var i = Core.orderInfo(data, o, shipped);
+      if (i.kalan <= 0) counts.done++;
+      else if (i.giden > 0) counts.partial++;
+      else counts.open++;
+    });
+    var status = [
+      { label: 'Açık', value: counts.open, color: '#0f766e' },
+      { label: 'Kısmi sevk', value: counts.partial, color: '#f59e0b' },
+      { label: 'Tamamlandı', value: counts.done, color: '#94a3b8' }
+    ];
+    var statusTotal = counts.open + counts.partial + counts.done;
+    var statusHtml = '<div class="donut-wrap">' + donutSvg(status, 118) +
+      '<div class="donut-center"><b>' + nf0(statusTotal) + '</b><span>sipariş</span></div></div>' +
+      '<div class="legend">' + status.map(function (x) {
+        return '<div><i style="background:' + x.color + '"></i><span>' + x.label + '</span><b>' + nf0(x.value) + '</b></div>';
+      }).join('') + '</div>';
+
+    var balances = data.cariler.map(function (c) {
+      return { ad: c.ad, bakiye: Core.stats(data, c.id).balance };
+    }).sort(function (a, b) { return Math.abs(b.bakiye) - Math.abs(a.bakiye); }).slice(0, 5);
+    var maxBal = Math.max.apply(null, balances.map(function (x) { return Math.abs(x.bakiye); }).concat([1]));
+    var balHtml = balances.length ? balances.map(function (x) {
+      var neg = x.bakiye < 0;
+      return '<div class="hbar">' +
+        '<div class="hbar-head"><b>' + esc(x.ad) + '</b><span style="color:' + (neg ? 'var(--alacak)' : 'var(--borc)') + '">' + nf2(x.bakiye) + ' ' + esc(data.settings.para || '₺') + '</span></div>' +
+        '<div class="hbar-track"><i class="' + (neg ? 'ok' : 'borc') + '" style="width:' + Math.max(4, Math.round(Math.abs(x.bakiye) / maxBal * 100)) + '%"></i></div>' +
+        '</div>';
+    }).join('') : emptyState('wallet', 'Cari yok', 'Cari ekleyince bakiye dağılımı görünür.', '');
+
+    return '<div class="chart-grid">' +
+      '<div class="card chart-card"><div class="card-head"><div><h2>En çok satan 5 model</h2><div class="sub">Sevk edilen çift · ' + (cid ? 'bu cari' : 'tüm cariler') + '</div></div><button class="btn btn-sm" data-act="go-reports">Raporlar ' + ICONS.right + '</button></div><div class="card-body">' + topHtml + '</div></div>' +
+      '<div class="card chart-card"><div class="card-head"><div><h2>Sevk durumu</h2><div class="sub">Siparişlerin sevk durumu</div></div></div><div class="card-body">' + statusHtml + '</div></div>' +
+      '<div class="card chart-card"><div class="card-head"><div><h2>Cari dağılımı</h2><div class="sub">Mutlak bakiyeye göre ilk 5</div></div><button class="btn btn-sm" data-act="go-cariler">Cariler ' + ICONS.right + '</button></div><div class="card-body">' + balHtml + '</div></div>' +
+      '</div>';
   }
 
   function viewDashboard() {
@@ -1413,7 +1519,8 @@
       '<div class="card" style="margin-top:16px">' +
       '  <div class="card-head"><div><h2>Aylık sevkiyat</h2><div class="sub">Son 6 ay, sevk tutarı · ' + (cid ? esc(cari.ad) : 'tüm cariler') + '</div></div>' + (hasShipment ? '<span class="muted small">bin ' + (data.settings.para || '₺') + '</span>' : '') + '</div>' +
       '  <div class="card-body">' + chartBody + '</div>' +
-      '</div>';
+      '</div>' +
+      dashboardCharts(cid);
   }
 
   /* ------------------------------------------------------------------ */
@@ -1551,15 +1658,39 @@
       pager(rows.length, page, PAGE_SIZE, 'orders');
   }
 
+  function openOrderFilterSheet() {
+    var filters = [['all', 'Tümü'], ['pending', 'Bekleyen'], ['partial', 'Kısmi'], ['done', 'Tamamlanan']];
+    var m = openModal({
+      title: 'Sipariş filtresi',
+      subtitle: 'Duruma göre filtrele',
+      size: 'sheet',
+      body: '<div class="sheet-filters">' + filters.map(function (f) {
+        return '<button type="button" class="btn ' + (S.ui.orderFilter === f[0] ? 'btn-primary' : '') + '" data-sheet-filter="' + f[0] + '">' + f[1] + '</button>';
+      }).join('') + '</div>',
+      footer: '<button class="btn" data-modal-close>Kapat</button>'
+    });
+    m.el.classList.add('sheet-backdrop');
+    $$('[data-sheet-filter]', m.el).forEach(function (b) {
+      b.addEventListener('click', function () {
+        S.ui.orderFilter = b.dataset.sheetFilter;
+        S.ui.orderPage = 1;
+        $$('[data-filter]').forEach(function (x) { x.classList.toggle('active', x.dataset.filter === S.ui.orderFilter); });
+        m.close();
+        renderOrdersTableOnly();
+      });
+    });
+  }
+
   function viewOrders() {
     var filters = [['all', 'Tümü'], ['pending', 'Bekleyen'], ['partial', 'Kısmi'], ['done', 'Tamamlanan']];
     return '<div class="card">' +
       '<div class="toolbar">' +
       '<div class="search grow"><label for="orderSearch" class="sr-only"></label>' + ICONS.search +
       '<input id="orderSearch" class="input" placeholder="Model, renk, kod veya sipariş no ara…" value="' + esc(S.ui.orderSearch) + '" data-role="order-search" autocomplete="off"></div>' +
-      '<div class="seg">' + filters.map(function (f) {
+      '<div class="seg order-filter-seg">' + filters.map(function (f) {
         return '<button data-filter="' + f[0] + '" class="' + (S.ui.orderFilter === f[0] ? 'active' : '') + '">' + f[1] + '</button>';
       }).join('') + '</div>' +
+      '<button class="btn btn-sm mobile-filter" data-act="order-filter-sheet">' + ICONS.filter + ' Filtre</button>' +
       '<div class="seg" title="Görünüm">' +
       '<button data-order-view="cards" class="' + (S.ui.orderView === 'cards' ? 'active' : '') + '">' + ICONS.grid + ' Kart</button>' +
       '<button data-order-view="table" class="' + (S.ui.orderView === 'table' ? 'active' : '') + '">Tablo</button></div>' +
@@ -1632,9 +1763,10 @@
     S.ui.cart.forEach(function (c) { inCart[c.lineId] = true; });
     return list.slice(0, 80).map(function (x) {
       return '<div class="pick-item' + (inCart[x.l.id] ? ' disabled' : '') + '" data-act="cart-add" data-id="' + x.l.id + '">' +
-        thumbHtml(x.o) +
+        thumbHtml(x.o, 'md') +
         '<div class="info"><b>' + esc(x.o.model) + '</b>' +
-        '<span>' + esc(lineSub(x.l)) + ' · kalan <b>' + nf0(x.i.kalan) + '</b> çift · ' + nf1(x.i.kalanKoli) + ' koli</span></div>' +
+        '<span>' + esc(lineSub(x.l)) + '</span>' +
+        '<div class="pick-meta"><span class="pill info">Kalan ' + nf0(x.i.kalan) + ' çift</span><span class="pill muted">' + nf1(x.i.kalanKoli) + ' koli</span></div></div>' +
         '<span class="add">' + (inCart[x.l.id] ? ICONS.check : '+') + '</span>' +
         '</div>';
     }).join('');
@@ -2014,9 +2146,20 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '2.7.0';
+  var SURUM = '3.0.0';
 
   var YENILIKLER = [
+    {
+      v: '3.0.0', t: '01.11.2026', m: [
+        'Dashboard: en çok satan 5 model, sevk durumu ve cari dağılımı grafikleri',
+        'Model galerisi: büyük görselli kartlar, renk çipleri, Kart/Tablo geçişi',
+        'Sevk seçim kartlarında ürün görseli ve kalan çift/koli rozetleri',
+        'Fişte QR doğrulama, müşteri kopyası ve Teslim Edildi damgası',
+        'Ctrl+K hızlı komut paleti: yeni sipariş, cari, fiş, rapor, tema',
+        'Koyu tema ve mobil alt filtre paneli',
+        'Kartlarda resme tıklayınca büyütme (lightbox)'
+      ]
+    },
     {
       v: '2.7.0', t: '01.11.2026', m: [
         'Model kartı görseli siparişte, sevk listesinde ve fişte otomatik kullanılıyor',
@@ -2512,7 +2655,7 @@ function viewShipments() {
   function openPalette() {
     var m = openModal({
       title: 'Hızlı arama',
-      subtitle: 'Model, cari veya fiş no yazın · Ctrl+K',
+      subtitle: 'Komut, model, cari veya fiş no yazın · Ctrl+K',
       body: '<div class="palette"><div class="search">' + ICONS.search +
         '<input class="input" id="palInput" placeholder="Ara…" autocomplete="off" spellcheck="false"></div>' +
         '<div class="pal-list" id="palList"></div></div>',
@@ -2524,8 +2667,22 @@ function viewShipments() {
 
     function topla(q) {
       q = q.toLocaleLowerCase('tr-TR').trim();
+      var KOMUTLAR = [
+        { tur: 'Komut', ad: 'Yeni sipariş', alt: 'Sipariş oluştur', fn: function () { openOrderForm(null); } },
+        { tur: 'Komut', ad: 'Sevk işlemi', alt: 'Sevk fişi oluştur', fn: function () { go('ship'); } },
+        { tur: 'Komut', ad: 'Cari hesaplar', alt: 'Cari listesi', fn: function () { go('cariler'); } },
+        { tur: 'Komut', ad: 'Cari hesap', alt: 'Bakiye ve hareketler', fn: function () { go('ledger'); } },
+        { tur: 'Komut', ad: 'Sevk fişleri', alt: 'Fiş listesi', fn: function () { go('shipments'); } },
+        { tur: 'Komut', ad: 'Yeni model', alt: 'Model kartı oluştur', fn: function () { openModelForm(null); } },
+        { tur: 'Komut', ad: 'Yeni cari', alt: 'Cari hesap oluştur', fn: function () { openCariForm(null); } },
+        { tur: 'Komut', ad: 'Raporlar', alt: 'Satış ve sevk raporları', fn: function () { go('reports'); } },
+        { tur: 'Komut', ad: 'Ayarlar', alt: 'Firma, renk ve şablonlar', fn: function () { go('settings'); } },
+        { tur: 'Komut', ad: 'Güncelleme kontrol et', alt: 'GitHub Releases', fn: function () { checkUpdates(true); } },
+        { tur: 'Komut', ad: isDark() ? 'Aydınlık tema' : 'Koyu tema', alt: 'Görünümü değiştir', fn: toggleTheme }
+      ];
       var out = [];
       if (!q) {
+        out = KOMUTLAR.slice();
         data.orders.slice().sort(function (a, b) { return b.id - a.id; }).slice(0, 5).forEach(function (o) {
           out.push({ tur: 'Sipariş', ad: o.model, alt: cariAdi(o.cariId) + ' · #' + o.sipno, fn: function () { openOrderForm(o); } });
         });
@@ -2534,6 +2691,9 @@ function viewShipments() {
         });
         return out;
       }
+      KOMUTLAR.forEach(function (c) {
+        if ((c.ad + ' ' + c.alt).toLocaleLowerCase('tr-TR').indexOf(q) >= 0) out.push(c);
+      });
       data.orders.forEach(function (o) {
         var sc = [o.model, o.renk, o.sipno, cariAdi(o.cariId), o.kod].join(' ').toLocaleLowerCase('tr-TR');
         if (sc.indexOf(q) >= 0) out.push({ tur: 'Sipariş', ad: o.model, alt: cariAdi(o.cariId) + ' · #' + o.sipno, fn: function () { openOrderForm(o); } });
@@ -2647,15 +2807,63 @@ function viewShipments() {
         '</div></td></tr>';
     }).join('');
 
+    var gallery = keys.map(function (k) {
+      var kart = kartMap[k] || {};
+      var r = ozetMap[k] || { siparis: 0, sevk: 0, kalan: 0 };
+      var model = kart.model || r.model;
+      var marj = Core.num(kart.fiyat) > 0 ? (Core.num(kart.fiyat) - Core.num(kart.maliyet)) / Core.num(kart.fiyat) * 100 : 0;
+      var foto = kart.model ? (data.modelImages[kart.id] || '') : '';
+      var alt = [];
+      if (kart.kategori) alt.push((Matris.kategori(kart.kategori) || {}).ad || kart.kategori);
+      if (kart.sezon) alt.push(kart.sezon);
+      var renkAdlari = (kart.renkler && kart.renkler.length)
+        ? kart.renkler
+        : Matris.modelColors(data, kart.id).map(function (c) { return c.ad; });
+      var renkler = renkAdlari.slice(0, 4);
+      var renkHtml = renkler.map(function (c) { return '<span class="color-chip">' + esc(c) + '</span>'; }).join('') +
+        (renkAdlari.length > 4 ? '<span class="color-chip">+' + (renkAdlari.length - 4) + '</span>' : '');
+      var koli = kart.model ? (Matris.asortiToplam(kart.asortiSablon) || Core.num(kart.asorti)) : 0;
+      return '<article class="model-card">' +
+        '<div class="model-card-img"' + (foto ? ' data-lightbox="' + esc(foto) + '" data-label="' + esc(model) + '"' : '') + '>' +
+        (foto ? '<img class="model-card-photo" src="' + esc(foto) + '" alt="' + esc(model) + '">' : '<span>' + esc(String(model || '?').slice(0, 2)) + '</span>') +
+        (kart.model ? '<span class="model-badge">' + renkAdlari.length + ' renk</span>' : '<span class="model-badge warn">Kart yok</span>') +
+        '</div>' +
+        '<div class="model-card-body">' +
+        '<div class="model-card-title">' + esc(model) + '</div>' +
+        '<div class="model-card-sub">' + esc(alt.join(' · ') || '—') + '</div>' +
+        '<div class="model-card-colors">' + (renkHtml || '<span class="color-chip muted">Renk yok</span>') + '</div>' +
+        '<div class="model-card-stats">' +
+        '<div><span>Liste</span><b>' + (kart.model ? nf2(kart.fiyat) : '—') + '</b></div>' +
+        '<div><span>Koli</span><b>' + (koli ? nf0(koli) : '—') + '</b></div>' +
+        '<div><span>Kalan</span><b>' + nf0(r.kalan) + '</b></div>' +
+        '</div>' +
+        '<div class="model-card-foot">' +
+        '<span class="model-margin">' + (kart.model && Core.num(kart.fiyat) ? 'Marj %' + nf1(marj) : '') + '</span>' +
+        '<div class="row-actions">' +
+        (kart.model
+          ? '<button class="btn btn-icon" data-act="model-edit" data-id="' + kart.id + '" title="Düzenle" aria-label="Düzenle">' + ICONS.edit + '</button>' +
+            '<button class="btn btn-icon danger" data-act="model-del" data-id="' + kart.id + '" title="Sil" aria-label="Sil">' + ICONS.trash + '</button>'
+          : '<button class="btn btn-sm" data-act="model-new" data-model="' + esc(model) + '">' + ICONS.plus + ' Kart ekle</button>') +
+        '</div></div></div></article>';
+    }).join('');
+
     return '<div class="kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))">' +
       '<div class="kpi"><div class="kpi-label">Model kartı</div><div class="kpi-value">' + data.modeller.length + '</div><div class="kpi-foot">fiyat ve maliyet tanımlı</div></div>' +
       '<div class="kpi warn"><div class="kpi-label">Kartsız model</div><div class="kpi-value">' + kartsiz + '</div><div class="kpi-foot">fiyat listede yok</div></div>' +
       '<div class="kpi info"><div class="kpi-label">Toplam kalan</div><div class="kpi-value">' + nf0(toplamKalan) + '<small>çift</small></div><div class="kpi-foot">tüm cariler</div></div>' +
       '</div>' +
-      '<div class="card"><div class="table-wrap" style="max-height:none"><table class="data"><thead><tr>' +
-      '<th></th><th>Model</th><th class="right">Liste</th><th class="right">Asorti</th><th class="right">Maliyet</th><th class="right">Marj</th>' +
-      '<th class="right">Sipariş</th><th class="right">Sevk</th><th class="right">Kalan</th><th></th>' +
-      '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      '<div class="card"><div class="toolbar" style="border-bottom:1px solid var(--line)">' +
+      '<div class="seg" style="margin-left:auto">' +
+      '<button data-model-view="gallery" class="' + (S.ui.modelView === 'gallery' ? 'active' : '') + '">' + ICONS.grid + ' Galeri</button>' +
+      '<button data-model-view="table" class="' + (S.ui.modelView === 'table' ? 'active' : '') + '">Tablo</button>' +
+      '</div></div>' +
+      (S.ui.modelView === 'gallery'
+        ? '<div class="model-cards">' + gallery + '</div>'
+        : '<div class="table-wrap" style="max-height:none"><table class="data"><thead><tr>' +
+          '<th></th><th>Model</th><th class="right">Liste</th><th class="right">Asorti</th><th class="right">Maliyet</th><th class="right">Marj</th>' +
+          '<th class="right">Sipariş</th><th class="right">Sevk</th><th class="right">Kalan</th><th></th>' +
+          '</tr></thead><tbody>' + rows + '</tbody></table></div>') +
+      '</div>';
   }
 
   function openModelForm(model, modelAdi) {
@@ -4179,21 +4387,37 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Yazdırma belgeleri                                                  */
   /* ------------------------------------------------------------------ */
-  function docHeader(title, extraRight) {
+  function qrAscii(text) {
+    return String(text || '').replace(/[çÇ]/g, 'c').replace(/[ğĞ]/g, 'g').replace(/[ıİ]/g, 'i')
+      .replace(/[öÖ]/g, 'o').replace(/[şŞ]/g, 's').replace(/[üÜ]/g, 'u');
+  }
+
+  function qrSvg(text) {
+    try {
+      var qr = qrcode(0, 'M');
+      qr.addData(qrAscii(text));
+      qr.make();
+      return qr.createSvgTag({ cellSize: 2, margin: 0 });
+    } catch (e) { return ''; }
+  }
+
+  function docHeader(title, extraRight, qr) {
     var s = data.settings;
     var logo = s.logo ? '<img src="' + esc(s.logo) + '" alt="">' : '';
     return '<div class="pf-top">' +
       '<div class="pf-brand">' + logo + '<div><div class="t1">' + esc(s.firmaAdi) + '</div>' +
       '<div class="t2">' + esc(s.firmaAdres || '') + (s.firmaTel ? ' · Tel: ' + esc(s.firmaTel) : '') + '</div></div></div>' +
+      (qr ? '<div class="pf-qr">' + qr + '<span>FİŞ DOĞRULAMA</span></div>' : '') +
       '<div class="pf-title"><b>' + esc(title || s.sevkBaslik || 'SEVK FİŞİ') + '</b><div class="t2">' + esc(extraRight || '') + '</div></div>' +
       '</div>';
   }
 
-  function shipmentDocHtml(s, kagit) {
+  function shipmentDocHtml(s, kagit, opts) {
+    opts = opts || {};
     var a5 = kagit === 'A5';
     var fisCari = Core.cariById(data, s.cariId) || { ad: s.cari || '', adres: '', tel: '' };
     var lines = Core.shipmentLines(data, s.id);
-    var minRows = Math.max(a5 ? 6 : 8, lines.length);
+    var minRows = Math.max(a5 ? 5 : 7, lines.length);
     var rows = '';
     for (var i = 0; i < minRows; i++) {
       var l = lines[i];
@@ -4241,8 +4465,12 @@ function viewShipments() {
         '<td class="n">' + nf0(totalCift) + '</td></tr></tfoot></table></div>';
     }
 
+    var qrText = 'DMR|FIS:' + s.fisNo + '|TARIH:' + s.tarih + '|CIFT:' + totalCift + '|TUTAR:' + totalTutar + '|CARI:' + fisCari.ad;
+    var qr = qrSvg(qrText);
+    var copyLabel = opts.kopya ? 'MÜŞTERİ KOPYASI' : '';
+
     return '<div class="print-doc' + (a5 ? ' a5' : '') + '">' +
-      docHeader(data.settings.sevkBaslik || 'SEVK FİŞİ', '') +
+      docHeader(data.settings.sevkBaslik || 'SEVK FİŞİ', copyLabel, qr) +
       '<div class="pf-meta">' +
       '<div class="row"><span class="k">FİRMA</span><span class="v">' + esc(fisCari.ad) + '</span></div>' +
       '<div class="row"><span class="k">TARİH</span><span class="v">' + dateTR(s.tarih) + '</span></div>' +
@@ -4257,7 +4485,8 @@ function viewShipments() {
       sizeTable +
       '<div class="pf-note">' + (s.aciklama ? 'Not: ' + esc(s.aciklama) : '') + '</div>' +
       '<div class="pf-note" style="text-align:right;font-weight:600">Tutar: ' + money(totalTutar) + '</div>' +
-      '<div class="pf-sign"><div class="line">TESLİM EDEN</div><div class="line">TESLİM ALAN</div></div>' +
+      '<div class="pf-sign"><div class="line">TESLİM EDEN</div><div class="line">TESLİM ALAN</div>' +
+      (opts.teslim ? '<div class="pf-stamp">TESLİM EDİLDİ</div>' : '') + '</div>' +
       '<div class="pf-foot"><span>' + esc(data.settings.firmaAdi) + '</span><span>' + esc(fisCari.ad) + ' · ' + dateTR(s.tarih) + '</span></div>' +
       '</div>';
   }
@@ -4312,10 +4541,10 @@ function viewShipments() {
     setTimeout(function () { window.print(); }, 60);
   }
 
-  function printShipment(id, kagit) {
+  function printShipment(id, kagit, opts) {
     var s = findShipment(id);
     if (!s) return;
-    printHtml(shipmentDocHtml(s, kagit || data.settings.kagit || 'A4'), kagit || data.settings.kagit || 'A4');
+    printHtml(shipmentDocHtml(s, kagit || data.settings.kagit || 'A4', opts), kagit || data.settings.kagit || 'A4');
   }
 
   function previewShipment(id) {
@@ -4323,24 +4552,29 @@ function viewShipments() {
     if (!s) return;
     var lines = Core.shipmentLines(data, s.id);
     var kagit = data.settings.kagit || 'A4';
+    var pvOpts = { teslim: false, kopya: false };
     var m = openModal({
       title: 'Sevk fişi #' + s.fisNo,
       subtitle: dateTR(s.tarih) + ' · ' + lines.length + ' satır · ' + nf0(s.cift) + ' çift',
       size: 'xwide',
-      body: '<div class="preview-wrap" id="pvDoc">' + shipmentDocHtml(s, kagit) + '</div>',
+      body: '<div class="preview-wrap" id="pvDoc">' + shipmentDocHtml(s, kagit, pvOpts) + '</div>',
       footer:
         '<div class="seg" id="pvPaper" style="margin-right:auto">' +
         '  <button type="button" data-paper="A4"' + (kagit === 'A4' ? ' class="active"' : '') + '>A4</button>' +
         '  <button type="button" data-paper="A5"' + (kagit === 'A5' ? ' class="active"' : '') + '>A5</button>' +
         '</div>' +
-        '<button class="btn" id="btnPvFull" aria-pressed="false">' + ICONS.expand + ' Tam ekran</button>' +
+        '<div class="seg" id="pvOpts" style="margin-left:auto">' +
+      '  <button type="button" class="btn btn-sm" id="btnPvTeslim" aria-pressed="false">Teslim damgası</button>' +
+      '  <button type="button" class="btn btn-sm" id="btnPvKopya" aria-pressed="false">Müşteri kopyası</button>' +
+      '</div>' +
+      '<button class="btn" id="btnPvFull" aria-pressed="false">' + ICONS.expand + ' Tam ekran</button>' +
         '<button class="btn" data-modal-close>Kapat</button>' +
         '<button class="btn btn-primary" id="btnPrintDoc">' + ICONS.print + ' Yazdır</button>'
     });
 
     function applyPaper(p) {
       kagit = p;
-      $('#pvDoc', m.el).innerHTML = shipmentDocHtml(s, kagit);
+      $('#pvDoc', m.el).innerHTML = shipmentDocHtml(s, kagit, pvOpts);
       $$('#pvPaper [data-paper]', m.el).forEach(function (b) { b.classList.toggle('active', b.dataset.paper === kagit); });
     }
     $$('#pvPaper [data-paper]', m.el).forEach(function (b) {
@@ -4361,7 +4595,18 @@ function viewShipments() {
         btnFull.innerHTML = pvFull ? (ICONS.expand + ' Normal') : (ICONS.expand + ' Tam ekran');
       });
     }
-    $('#btnPrintDoc', m.el).addEventListener('click', function () { m.close(); printShipment(id, kagit); });
+    function pvToggle(btn, key) {
+      if (!btn) return;
+      pvOpts[key] = !pvOpts[key];
+      btn.classList.toggle('active', pvOpts[key]);
+      btn.setAttribute('aria-pressed', pvOpts[key] ? 'true' : 'false');
+      $('#pvDoc', m.el).innerHTML = shipmentDocHtml(s, kagit, pvOpts);
+    }
+    var btnTeslim = $('#btnPvTeslim', m.el);
+    var btnKopya = $('#btnPvKopya', m.el);
+    if (btnTeslim) btnTeslim.addEventListener('click', function () { pvToggle(btnTeslim, 'teslim'); });
+    if (btnKopya) btnKopya.addEventListener('click', function () { pvToggle(btnKopya, 'kopya'); });
+    $('#btnPrintDoc', m.el).addEventListener('click', function () { m.close(); printShipment(id, kagit, pvOpts); });
   }
 
   function printEkstre() {
@@ -4485,6 +4730,23 @@ function viewShipments() {
   });
 
   document.addEventListener('click', function (e) {
+    var lb = e.target.closest('[data-lightbox]');
+    if (lb) {
+      e.preventDefault();
+      e.stopPropagation();
+      openLightbox(lb.getAttribute('data-lightbox'), lb.getAttribute('data-label') || '');
+      return;
+    }
+  }, true);
+
+  document.addEventListener('click', function (e) {
+    var mb = e.target.closest('[data-model-view]');
+    if (mb) {
+      S.ui.modelView = mb.dataset.modelView;
+      $$('[data-model-view]').forEach(function (b) { b.classList.toggle('active', b === mb); });
+      renderView();
+      return;
+    }
     var vb = e.target.closest('[data-order-view]');
     if (vb) {
       S.ui.orderView = vb.dataset.orderView;
@@ -4636,6 +4898,9 @@ function viewShipments() {
       if (v === '0') S.autosave = false;
     } catch (e) { }
 
+    try {
+      if (localStorage.getItem('dmr:theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    } catch (e) { }
     bindGlobal();
 
     // Karşılama ekranını hemen göster; dosya/önbellek bilgisi hazır olunca güncelle

@@ -213,6 +213,31 @@ BOOT = r"""
     if (h === 'orders-table') {
       APP.S.ui.orderView = 'table'; APP.S.view = 'orders'; APP.updateChrome(); APP.renderView();
     }
+    if (h === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      APP.S.view = 'dashboard'; APP.updateChrome(); APP.renderView();
+    }
+    if (h === 'cmd') {
+      APP.S.view = 'dashboard'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+      }, 250);
+    }
+    if (h === 'mobile-filter') {
+      APP.S.view = 'orders'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="order-filter-sheet"]');
+        if (b) b.click();
+
+      }, 300);
+    }
+    if (h === 'lightbox') {
+      APP.S.view = 'orders'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-lightbox]');
+        if (b) b.click();
+      }, 300);
+    }
     if (h === 'orders') { APP.S.view = 'orders'; APP.updateChrome(); APP.renderView(); }
     if (h === 'reports') { APP.S.view = 'reports'; APP.updateChrome(); APP.renderView(); }
     if (h === 'ledger-all') { APP.S.ui.cariId = 0; APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView(); }
@@ -256,7 +281,7 @@ BOOT = r"""
       APP.S.view = 'ship'; APP.renderView();
       setTimeout(function () { APP.printShipment(res4.shipment.id, h === 'print-fis-a5' ? 'A5' : 'A4'); }, 250);
     }
-    if (h === 'fis-full') {
+    if (h === 'fis-full' || h === 'fis-stamp') {
       var omf = d.orders.filter(function (o) { return o.sipno === 72; })[0];
       var lsf = Matris.orderLinesOf(d, omf.id);
       APP.S.ui.shipCariId = omf.cariId;
@@ -269,6 +294,14 @@ BOOT = r"""
         setTimeout(function () {
           var b = document.getElementById('btnPvFull');
           if (b) b.click();
+          if (h === 'fis-stamp') {
+            setTimeout(function () {
+              var t = document.getElementById('btnPvTeslim');
+              var k = document.getElementById('btnPvKopya');
+              if (t) t.click();
+              if (k) k.click();
+            }, 200);
+          }
         }, 500);
       }, 350);
     }

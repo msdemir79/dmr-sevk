@@ -20,6 +20,7 @@ def main():
         "{{XLSX}}": read("xlsx.js"),
         "{{MATRIS}}": read("matris.js"),
         "{{CORE}}": read("core.js"),
+        "{{QRCODE}}": read("qrcode.js"),
         "{{UI}}": read("ui.js"),
     }
     for key, value in parts.items():

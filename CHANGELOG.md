@@ -2,6 +2,21 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.0.0 — 01.11.2026
+
+### Görsel / UX
+- **Dashboard:** aylık sevkiyatın yanında **en çok satan 5 model**, **sevk durumu donut** ve **cari dağılımı** grafikleri.
+- **Model galerisi:** 150 px görselli kartlar, renk çipleri, liste/koli/kalan ve **Kart / Tablo** geçişi.
+- **Sevk seçim kartları:** ürün görseli, kalan çift ve koli rozetleri.
+- **Fiş:** QR doğrulama, **Müşteri kopyası** etiketi ve **Teslim Edildi** damgası.
+- **Ctrl+K hızlı komut paleti:** yeni sipariş, sevk, cari, model, rapor, güncelleme ve tema.
+- **Koyu tema** ve mobil **alt filtre paneli**.
+- Kartlarda resme tıklayınca **lightbox**.
+
+### Teknik
+- QR üretimi için MIT lisanslı `qrcode-generator` gömüldü; harici servis/CDN yok.
+- Veri şeması değişmedi; Excel dosyanız aynı kalır.
+
 ## v2.7.0 — 01.11.2026
 
 ### Eklendi
