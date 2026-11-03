@@ -189,7 +189,7 @@
       shipFaturaNo: '', shipFaturaTarih: '',
       shipListSearch: '', shipListPage: 1,
       reportMonth: Core.todayISO().slice(0, 7),
-    reportTab: 'ozet', reportPreset: 'last30',
+    reportTab: 'ozet', reportPreset: 'last30', reportOnlyOpen: false,
     reportFrom: (function () { var d = new Date(); d.setDate(d.getDate() - 29); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(),
     reportTo: Core.todayISO(),
     },
@@ -1159,6 +1159,7 @@
         case 'order-filter-sheet': openOrderFilterSheet(); break;
         case 'toggle-theme': toggleTheme(); break;
         case 'go-models': go('models'); break;
+        case 'report-toggle-open': S.ui.reportOnlyOpen = !S.ui.reportOnlyOpen; renderView(); break;
         case 'report-excel': reportExportExcel(); break;
         case 'report-csv': reportExportCsv(); break;
         case 'report-model': S.ui.orderSearch = el.dataset.model || ''; S.ui.orderFilter = 'all'; go('orders'); break;
@@ -2353,6 +2354,104 @@ function viewShipments() {
     };
   }
 
+  function reportOrderStatus(orders) {
+    var byOrder = {};
+    orders.forEach(function (o) { byOrder[o.id] = o; });
+    var map = {};
+    function add(model, renk, sipC, sipK, sevC, sevK) {
+      var m = model || '—';
+      var r = renk || '—';
+      var key = Core.normKey(m) + '|' + Core.normKey(r);
+      if (!map[key]) map[key] = { model: m, renk: r, sipC: 0, sipK: 0, sevC: 0, sevK: 0 };
+      map[key].sipC += Core.num(sipC);
+      map[key].sipK += Core.num(sipK);
+      map[key].sevC += Core.num(sevC);
+      map[key].sevK += Core.num(sevK);
+    }
+    orders.forEach(function (o) {
+      var kart = Core.modelKart(data, o.model);
+      var lines = Matris.orderLinesOf(data, o.id);
+      if (!lines.length) {
+        var koli = Core.num(o.asorti) ? Core.num(o.adet) / Core.num(o.asorti) : 0;
+        add(o.model, o.renk, o.adet, koli, 0, 0);
+      } else {
+        lines.forEach(function (l) {
+          var cift = (l.mod === 'ASORTILI' && !kart) ? Core.num(l.cift) : Matris.lineCift(l, kart);
+          add(o.model, l.renk || o.renk, cift, Core.num(l.koli), 0, 0);
+        });
+      }
+    });
+    data.lines.forEach(function (l) {
+      var o = byOrder[l.orderId];
+      if (!o) return;
+      add(l.model || o.model, l.renk || o.renk, 0, 0, l.cift, l.koli);
+    });
+    var rows = Object.keys(map).map(function (k) {
+      var r = map[k];
+      r.sipC = Core.round2(r.sipC); r.sipK = Core.round2(r.sipK);
+      r.sevC = Core.round2(r.sevC); r.sevK = Core.round2(r.sevK);
+      r.kalanC = Core.round2(r.sipC - r.sevC);
+      r.kalanK = Core.round2(r.sipK - r.sevK);
+      r.doluluk = r.sipC ? Core.round2(r.sevC / r.sipC * 100, 1) : (r.sevC ? 100 : 0);
+      r.durum = r.kalanC < -0.01 ? 'FAZLA' : r.kalanC <= 0.01 ? 'TAMAMLANDI' : (r.sevC > 0 ? 'KISMI' : 'ACIK');
+      return r;
+    }).sort(function (a, b) {
+      var am = Core.normKey(a.model), bm = Core.normKey(b.model);
+      if (am !== bm) return am < bm ? -1 : 1;
+      return Core.normKey(a.renk) < Core.normKey(b.renk) ? -1 : 1;
+    });
+    var totals = { sipC: 0, sipK: 0, sevC: 0, sevK: 0, kalanC: 0, kalanK: 0 };
+    rows.forEach(function (r) {
+      totals.sipC += r.sipC; totals.sipK += r.sipK; totals.sevC += r.sevC; totals.sevK += r.sevK;
+      totals.kalanC += r.kalanC; totals.kalanK += r.kalanK;
+    });
+    Object.keys(totals).forEach(function (k) { totals[k] = Core.round2(totals[k]); });
+    return { rows: rows, totals: totals };
+  }
+
+  function reportCustomerStatus(orders) {
+    var byOrder = {};
+    orders.forEach(function (o) { byOrder[o.id] = o; });
+    var map = {};
+    function add(cid, sipC, sipK, sevC, sevK) {
+      if (!map[cid]) map[cid] = { cariId: cid, cari: cariAdi(cid) || '—', sipC: 0, sipK: 0, sevC: 0, sevK: 0 };
+      map[cid].sipC += Core.num(sipC); map[cid].sipK += Core.num(sipK);
+      map[cid].sevC += Core.num(sevC); map[cid].sevK += Core.num(sevK);
+    }
+    orders.forEach(function (o) {
+      var kart = Core.modelKart(data, o.model);
+      var lines = Matris.orderLinesOf(data, o.id);
+      if (!lines.length) {
+        add(o.cariId, o.adet, Core.num(o.asorti) ? Core.num(o.adet) / Core.num(o.asorti) : 0, 0, 0);
+      } else {
+        lines.forEach(function (l) {
+          var cift = (l.mod === 'ASORTILI' && !kart) ? Core.num(l.cift) : Matris.lineCift(l, kart);
+          add(o.cariId, cift, Core.num(l.koli), 0, 0);
+        });
+      }
+    });
+    data.lines.forEach(function (l) {
+      var o = byOrder[l.orderId];
+      if (o) add(o.cariId, 0, 0, l.cift, l.koli);
+    });
+    var rows = Object.keys(map).map(function (k) {
+      var r = map[k];
+      r.sipC = Core.round2(r.sipC); r.sipK = Core.round2(r.sipK);
+      r.sevC = Core.round2(r.sevC); r.sevK = Core.round2(r.sevK);
+      r.kalanC = Core.round2(r.sipC - r.sevC); r.kalanK = Core.round2(r.sipK - r.sevK);
+      r.bakiye = Core.balance(data, r.cariId);
+      r.durum = r.kalanC < -0.01 ? 'FAZLA' : r.kalanC <= 0.01 ? 'TAMAMLANDI' : (r.sevC > 0 ? 'KISMI' : 'ACIK');
+      return r;
+    }).sort(function (a, b) { return b.kalanC - a.kalanC; });
+    var totals = { sipC: 0, sipK: 0, sevC: 0, sevK: 0, kalanC: 0, kalanK: 0 };
+    rows.forEach(function (r) {
+      totals.sipC += r.sipC; totals.sipK += r.sipK; totals.sevC += r.sevC; totals.sevK += r.sevK;
+      totals.kalanC += r.kalanC; totals.kalanK += r.kalanK;
+    });
+    Object.keys(totals).forEach(function (k) { totals[k] = Core.round2(totals[k]); });
+    return { rows: rows, totals: totals };
+  }
+
   function reportBuild() {
     var r = rRange(), cid = S.ui.cariId;
     var cur = reportCollect(r.from, r.to, cid);
@@ -2364,6 +2463,8 @@ function viewShipments() {
       r: r, prevR: prevR, lastR: lastR, cid: cid, cur: cur, prev: prev, last: last,
       profit: profit, modelProfit: reportModelProfit(profit),
       aging: reportAging(r.to, cid), perf: reportPerf(cur.orders, cur.lines, cid),
+      orderStatus: reportOrderStatus(cur.orders),
+      customerStatus: reportCustomerStatus(cur.orders),
       size: reportSize(cur.lines), colors: reportColors(cur.lines), asorti: reportAsorti(cur.lines),
       quality: reportQuality(cur, profit)
     };
@@ -2433,7 +2534,7 @@ function viewShipments() {
   }
 
   function reportToolbar(ctx) {
-    var tabs = [['ozet', 'Özet'], ['kar', 'Kârlılık'], ['cari', 'Cari'], ['sevk', 'Sevkiyat'], ['urun', 'Ürün']];
+    var tabs = [['ozet', 'Özet'], ['kar', 'Kârlılık'], ['cari', 'Cari'], ['siparis', 'Sipariş / Sevk / Kalan'], ['sevk', 'Sevkiyat'], ['urun', 'Ürün']];
     return '<div class="card report-shell"><div class="report-toolbar">' +
       '<div class="field"><label for="reportPreset">Hızlı dönem</label><select id="reportPreset" class="select" data-role="report-preset">' +
       [['last30', 'Son 30 gün'], ['month', 'Bu ay'], ['last', 'Geçen ay'], ['quarter', 'Bu çeyrek'], ['ytd', 'Yıl başından'], ['custom', 'Özel aralık']].map(function (x) {
@@ -2548,7 +2649,19 @@ function viewShipments() {
           r.buckets.map(function (v) { return '<td class="right">' + (v ? money(v) : '—') + '</td>'; }).join('') +
           '<td class="right">' + nf0(r.avgDays) + '</td></tr>';
       }).join('') : '<tr><td colspan="7">' + emptyState('wallet', 'Borçlu cari yok', 'Tüm bakiyeler kapalı görünüyor.', '') + '</td></tr>') +
-      '</tbody></table></div></div>';
+      '</tbody></table></div></div>' +
+      reportCustomerStatusHtml(ctx);
+  }
+
+  function reportCustomerStatusHtml(ctx) {
+    var t = ctx.customerStatus.totals;
+    var rows = ctx.customerStatus.rows;
+    return '<div class="card" style="margin-top:14px"><div class="card-head"><div><h2>Cari bazlı sipariş / sevk / kalan</h2><div class="sub">Sipariş tarihi: ' + esc(rLabel(ctx.r)) + '</div></div></div>' +
+      '<div class="table-wrap"><table class="data"><thead><tr><th>Cari</th><th class="right">Sipariş Çift</th><th class="right">Sipariş Koli</th><th class="right">Sevk Çift</th><th class="right">Sevk Koli</th><th class="right">Kalan Çift</th><th class="right">Kalan Koli</th><th class="right">Bakiye</th></tr></thead><tbody>' +
+      (rows.length ? rows.map(function (r) {
+        return '<tr class="clickable" data-act="report-cari" data-id="' + r.cariId + '"><td class="strong">' + esc(r.cari) + '</td><td class="right">' + nf0(r.sipC) + '</td><td class="right">' + nf1(r.sipK) + '</td><td class="right">' + nf0(r.sevC) + '</td><td class="right">' + nf1(r.sevK) + '</td><td class="right strong">' + nf0(r.kalanC) + '</td><td class="right strong">' + nf1(r.kalanK) + '</td><td class="right">' + money(r.bakiye) + '</td></tr>';
+      }).join('') : '<tr><td colspan="8">' + emptyState('users', 'Cari satırı yok', 'Seçilen dönemde sipariş yok.', '') + '</td></tr>') +
+      '</tbody><tfoot><tr><td>TOPLAM</td><td class="right">' + nf0(t.sipC) + '</td><td class="right">' + nf1(t.sipK) + '</td><td class="right">' + nf0(t.sevC) + '</td><td class="right">' + nf1(t.sevK) + '</td><td class="right strong">' + nf0(t.kalanC) + '</td><td class="right strong">' + nf1(t.kalanK) + '</td><td></td></tr></tfoot></table></div></div>';
   }
 
   function reportSevkHtml(ctx) {
@@ -2610,9 +2723,40 @@ function viewShipments() {
       '</div></div>';
   }
 
+  function reportOrderStatusHtml(ctx) {
+    var all = ctx.orderStatus.rows;
+    var rows = S.ui.reportOnlyOpen ? all.filter(function (r) { return r.kalanC > 0.01; }) : all;
+    var t = ctx.orderStatus.totals;
+    var pill = function (d) {
+      if (d === 'TAMAMLANDI') return '<span class="pill ok">Tamamlandı</span>';
+      if (d === 'KISMI') return '<span class="pill warn">Kısmi</span>';
+      if (d === 'FAZLA') return '<span class="pill danger">Fazla sevk</span>';
+      return '<span class="pill info">Açık</span>';
+    };
+    var body = rows.length ? rows.map(function (r) {
+      return '<tr class="clickable" data-act="report-model" data-model="' + esc(r.model) + '">' +
+        '<td class="strong">' + esc(r.model) + '</td><td>' + esc(r.renk) + '</td>' +
+        '<td class="right">' + nf0(r.sipC) + '</td><td class="right">' + nf1(r.sipK) + '</td>' +
+        '<td class="right">' + nf0(r.sevC) + '</td><td class="right">' + nf1(r.sevK) + '</td>' +
+        '<td class="right strong" style="color:' + (r.kalanC < 0 ? 'var(--alacak)' : r.kalanC > 0 ? 'var(--borc)' : '') + '">' + nf0(r.kalanC) + '</td>' +
+        '<td class="right strong">' + nf1(r.kalanK) + '</td><td class="right">%' + nf1(r.doluluk) + '</td><td>' + pill(r.durum) + '</td></tr>';
+    }).join('') : '<tr><td colspan="10">' + emptyState('truck', 'Satır yok', 'Seçilen dönemde sipariş satırı bulunmuyor.', '') + '</td></tr>';
+    return '<div class="kpis report-kpis">' +
+      rKpi('Sipariş', nf0(t.sipC) + ' çift', nf1(t.sipK) + ' koli', '', '') +
+      rKpi('Sevk edilen', nf0(t.sevC) + ' çift', nf1(t.sevK) + ' koli', 'ok', '') +
+      rKpi('Kalan', nf0(t.kalanC) + ' çift', nf1(t.kalanK) + ' koli', 'warn', '') +
+      rKpi('Kalan satır', nf0(all.filter(function (r) { return r.kalanC > 0.01; }).length), 'model / renk', 'info', '') +
+      '</div>' +
+      '<div class="card" style="margin-top:14px"><div class="card-head"><div><h2>Sipariş / Sevk / Kalan</h2><div class="sub">Sipariş tarihi: ' + esc(rLabel(ctx.r)) + ' · sevkler bu siparişlere ait tüm fişler</div></div>' +
+      '<button class="btn btn-sm" data-act="report-toggle-open">' + (S.ui.reportOnlyOpen ? 'Tümünü göster' : 'Sadece kalanı olanlar') + '</button></div>' +
+      '<div class="table-wrap"><table class="data"><thead><tr><th>Model</th><th>Renk</th><th class="right">Sipariş Çift</th><th class="right">Sipariş Koli</th><th class="right">Sevk Çift</th><th class="right">Sevk Koli</th><th class="right">Kalan Çift</th><th class="right">Kalan Koli</th><th class="right">Doluluk</th><th>Durum</th></tr></thead><tbody>' + body + '</tbody>' +
+      '<tfoot><tr><td colspan="2">TOPLAM</td><td class="right">' + nf0(t.sipC) + '</td><td class="right">' + nf1(t.sipK) + '</td><td class="right">' + nf0(t.sevC) + '</td><td class="right">' + nf1(t.sevK) + '</td><td class="right strong">' + nf0(t.kalanC) + '</td><td class="right strong">' + nf1(t.kalanK) + '</td><td class="right">' + (t.sipC ? '%' + nf1(t.sevC / t.sipC * 100) : '—') + '</td><td></td></tr></tfoot></table></div></div>';
+  }
+
   function reportTabHtml(ctx) {
     if (S.ui.reportTab === 'kar') return reportProfitHtml(ctx);
     if (S.ui.reportTab === 'cari') return reportCariHtml(ctx) + reportQualityHtml(ctx);
+    if (S.ui.reportTab === 'siparis') return reportOrderStatusHtml(ctx);
     if (S.ui.reportTab === 'sevk') return reportSevkHtml(ctx) + reportQualityHtml(ctx);
     if (S.ui.reportTab === 'urun') return reportUrunHtml(ctx) + reportQualityHtml(ctx);
     return reportOverview(ctx) + reportQualityHtml(ctx);
@@ -2626,9 +2770,18 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.1.1';
+  var SURUM = '3.2.0';
 
   var YENILIKLER = [
+    {
+      v: '3.2.0', t: '03.11.2026', m: [
+        'Rapor Merkezi’ne “Sipariş / Sevk / Kalan” sekmesi',
+        'Model + renk bazında sipariş, sevk ve kalan çift/koli',
+        'Doluluk oranı ve Açık / Kısmi / Tamamlandı durumu',
+        'Cari bazlı sipariş, sevk, kalan ve bakiye tablosu',
+        'Excel/CSV/yazdırmaya sipariş durumu sayfaları'
+      ]
+    },
     {
       v: '3.1.1', t: '01.11.2026', m: [
         'Rapor Merkezi’ne Excel ve CSV dışa aktarma',
@@ -5149,6 +5302,18 @@ function viewShipments() {
         ], rows: ctx.aging.rows.map(function (r) {
           return [r.ad, r.bakiye, r.buckets[0], r.buckets[1], r.buckets[2], r.buckets[3], r.avgDays];
         }) },
+        { name: 'CARI SIPARIS', columns: [
+          { header: 'CARİ', width: 28 }, { header: 'SİPARİŞ ÇİFT', width: 12 }, { header: 'SİPARİŞ KOLİ', width: 12 },
+          { header: 'SEVK ÇİFT', width: 11 }, { header: 'SEVK KOLİ', width: 11 }, { header: 'KALAN ÇİFT', width: 12 }, { header: 'KALAN KOLİ', width: 12 }, { header: 'BAKİYE', width: 13 }
+        ], rows: ctx.customerStatus.rows.map(function (r) { return [r.cari, r.sipC, r.sipK, r.sevC, r.sevK, r.kalanC, r.kalanK, r.bakiye]; }) },
+        { name: 'SIPARIS SEVK', columns: [
+          { header: 'MODEL', width: 30 }, { header: 'RENK', width: 16 },
+          { header: 'SİPARİŞ ÇİFT', width: 12 }, { header: 'SİPARİŞ KOLİ', width: 12 },
+          { header: 'SEVK ÇİFT', width: 11 }, { header: 'SEVK KOLİ', width: 11 },
+          { header: 'KALAN ÇİFT', width: 12 }, { header: 'KALAN KOLİ', width: 12 }, { header: 'DURUM', width: 12 }
+        ], rows: ctx.orderStatus.rows.map(function (r) {
+          return [r.model, r.renk, r.sipC, r.sipK, r.sevC, r.sevK, r.kalanC, r.kalanK, r.durum];
+        }) },
         { name: 'SEVKİYAT', columns: [{ header: 'METRİK', width: 24 }, { header: 'DEĞER', width: 38 }], rows: [
           ['Ortalama sevk süresi (gün)', ctx.perf.avgDays],
           ['Karşılama oranı %', ctx.perf.fill],
@@ -5199,6 +5364,12 @@ function viewShipments() {
       add(['MODEL KARLILIGI']); add(['Model', 'Çift', 'Ciro', 'Maliyet', 'Kâr', 'Marj %', 'Durum']);
       ctx.modelProfit.forEach(function (r) { add([r.model, r.cift, r.ciro, r.maliyet, r.kar, r.marj, (r.maliyetsiz || r.kartsiz) ? 'MALİYETSİZ' : '']); });
       add([]);
+      add(['SIPARIS / SEVK / KALAN']); add(['Model', 'Renk', 'Sipariş çift', 'Sipariş koli', 'Sevk çift', 'Sevk koli', 'Kalan çift', 'Kalan koli', 'Durum']);
+      ctx.orderStatus.rows.forEach(function (r) { add([r.model, r.renk, r.sipC, r.sipK, r.sevC, r.sevK, r.kalanC, r.kalanK, r.durum]); });
+      add([]);
+      add(['CARI SIPARIS / SEVK / KALAN']); add(['Cari', 'Sipariş çift', 'Sipariş koli', 'Sevk çift', 'Sevk koli', 'Kalan çift', 'Kalan koli', 'Bakiye']);
+      ctx.customerStatus.rows.forEach(function (r) { add([r.cari, r.sipC, r.sipK, r.sevC, r.sevK, r.kalanC, r.kalanK, r.bakiye]); });
+      add([]);
       add(['CARI YASLANDIRMA']); add(['Cari', 'Bakiye', '0-30', '31-60', '61-90', '90+', 'Ort. gün']);
       ctx.aging.rows.forEach(function (r) { add([r.ad, r.bakiye, r.buckets[0], r.buckets[1], r.buckets[2], r.buckets[3], r.avgDays]); });
       add([]);
@@ -5247,6 +5418,10 @@ function viewShipments() {
       '<div class="pf-kpis"><div><span>SEVK ÇİFT</span><b>' + nf0(ctx.cur.cift) + '</b></div><div><span>CİRO</span><b>' + money(ctx.cur.revenue) + '</b></div><div><span>TAHSİLAT</span><b>' + money(ctx.cur.collection) + '</b></div><div><span>BRÜT KÂR</span><b>' + money(kar) + '</b></div><div><span>GİDER</span><b>' + money(ctx.cur.expense) + '</b></div><div><span>NET KÂR</span><b>' + money(kar - ctx.cur.expense) + '</b></div></div>' +
       '<h3 class="pf-h">Sevkiyat · model</h3><table class="pf-table"><thead><tr><th>MODEL</th><th class="n">ÇİFT</th><th class="n">TUTAR</th></tr></thead><tbody>' + modelHtml + '</tbody></table>' +
       '<h3 class="pf-h">Model kârlılığı</h3><table class="pf-table"><thead><tr><th>MODEL</th><th class="n">ÇİFT</th><th class="n">CİRO</th><th class="n">KÂR</th><th class="n">MARJ</th></tr></thead><tbody>' + karHtml + '</tbody></table>' +
+      '<h3 class="pf-h">Sipariş / Sevk / Kalan</h3><table class="pf-table"><thead><tr><th>MODEL</th><th>RENK</th><th class="n">SİP. ÇİFT</th><th class="n">SEVK ÇİFT</th><th class="n">KALAN ÇİFT</th><th class="n">DURUM</th></tr></thead><tbody>' +
+      ctx.orderStatus.rows.slice(0, 25).map(function (r) {
+        return '<tr><td>' + esc(r.model) + '</td><td>' + esc(r.renk) + '</td><td class="n">' + nf0(r.sipC) + '</td><td class="n">' + nf0(r.sevC) + '</td><td class="n">' + nf0(r.kalanC) + '</td><td>' + esc(r.durum) + '</td></tr>';
+      }).join('') + '</tbody></table>' +
       '<h3 class="pf-h">Cari yaşlandırma</h3><table class="pf-table"><thead><tr><th>CARİ</th><th class="n">BAKİYE</th><th class="n">0–30</th><th class="n">31–60</th><th class="n">61–90</th><th class="n">90+</th></tr></thead><tbody>' + ageHtml + '</tbody></table>' +
       '<p class="pf-note">Veri kalitesi: ' + esc(note) + '</p>' +
       '<div class="pf-foot"><span>' + esc(data.settings.firmaAdi) + '</span><span>' + esc(S.user ? S.user.ad : '') + ' · ' + dateTR(Core.todayISO()) + '</span></div></div>');

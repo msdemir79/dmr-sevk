@@ -246,7 +246,7 @@ BOOT = r"""
         if (b) b.click();
       }, 300);
     }
-    if (['report-kar', 'report-cari', 'report-sevk', 'report-urun'].indexOf(h) >= 0) {
+    if (['report-kar', 'report-cari', 'report-siparis', 'report-sevk', 'report-urun'].indexOf(h) >= 0) {
       APP.S.ui.reportTab = h.slice(7); APP.S.view = 'reports'; APP.updateChrome(); APP.renderView();
     }
     if (h === 'reports') { APP.S.view = 'reports'; APP.updateChrome(); APP.renderView(); }

@@ -2,6 +2,17 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.2.0 — 03.11.2026
+
+### Eklendi
+- **Rapor Merkezi → Sipariş / Sevk / Kalan:** model + renk bazında sipariş çift/koli, sevk çift/koli, kalan çift/koli.
+- Doluluk oranı ve **Açık / Kısmi / Tamamlandı / Fazla sevk** durumu.
+- **Sadece kalanı olanlar** filtresi.
+- **Cari bazlı** sipariş / sevk / kalan / bakiye tablosu.
+- Excel, CSV ve yazdırma çıktılarına sipariş durumu sayfaları.
+
+![Sipariş / Sevk / Kalan](docs/asama10-siparis.png)
+
 ## v3.1.1 — 01.11.2026
 
 ### Eklendi
