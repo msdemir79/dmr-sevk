@@ -2,6 +2,14 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.2.2 — 04.11.2026
+
+### Düzeltildi
+- Sevk fişi baskısında **A4/A5 taşma** ve **kaydırma çubuğu** sorunu.
+- `.print-doc.a5` genişlik/yüksekliği sayfa alanına sabitleniyor; `html/body` taşması kapatıldı.
+- Fiş tabloları sabit düzende; sağdan kesilme önlendi.
+- A4 ve A5 tek sayfa.
+
 ## v3.2.1 — 03.11.2026
 
 ### Eklendi

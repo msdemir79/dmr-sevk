@@ -708,10 +708,15 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
 .preview-wrap .print-doc.a5 { width: 148mm; max-width: 100%; min-height: 0; padding: 8mm 7mm; }
 
 @media print {
-  body { background: #fff; }
+  html, body { width: auto !important; height: auto !important; min-height: 0 !important; overflow: visible !important; background: #fff; }
   .app, .modal-backdrop, .toast-root, .welcome { display: none !important; }
-  .print-root { display: block !important; }
-  .print-doc { width: auto; min-height: 0; padding: 0; margin: 0; }
+  .print-root { display: block !important; width: auto !important; height: auto !important; overflow: visible !important; }
+  .print-doc, .print-doc.a5 {
+    width: auto !important; min-height: 0 !important; max-width: none !important;
+    padding: 0 !important; margin: 0 !important; box-shadow: none !important; border-radius: 0 !important;
+  }
+  .print-doc table.pf-table { table-layout: fixed; width: 100%; }
+  .print-doc table.pf-table td, .print-doc table.pf-table th { overflow-wrap: anywhere; }
   @page { size: A4; margin: 12mm; }
 }
 

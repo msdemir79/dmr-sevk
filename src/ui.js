@@ -2770,9 +2770,16 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.2.1';
+  var SURUM = '3.2.2';
 
   var YENILIKLER = [
+    {
+      v: '3.2.2', t: '04.11.2026', m: [
+        'Sevk fişi baskısında A4/A5 taşma ve kaydırma çubuğu düzeltildi',
+        'Fiş genişliği sayfa alanına oturtuldu; tablo sabit düzende',
+        'A4 ve A5 tek sayfa'
+      ]
+    },
     {
       v: '3.2.1', t: '03.11.2026', m: [
         'Sevk fişinde Beden dökümü aç/kapat seçeneği',
