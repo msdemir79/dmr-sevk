@@ -9513,9 +9513,16 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.2.0';
+  var SURUM = '3.2.1';
 
   var YENILIKLER = [
+    {
+      v: '3.2.1', t: '03.11.2026', m: [
+        'Sevk fişinde Beden dökümü aç/kapat seçeneği',
+        'Kapalıyken beden tablosu fişe hiç basılmaz',
+        'Son tercih hatırlanır; doğrudan yazdırmada da uygulanır'
+      ]
+    },
     {
       v: '3.2.0', t: '03.11.2026', m: [
         'Rapor Merkezi’ne “Sipariş / Sevk / Kalan” sekmesi',
@@ -11811,6 +11818,10 @@ function viewShipments() {
   function shipmentDocHtml(s, kagit, opts) {
     opts = opts || {};
     var a5 = kagit === 'A5';
+    var showBeden = opts.beden;
+    if (showBeden === undefined) {
+      try { showBeden = localStorage.getItem('dmr:bedenDokumu') !== '0'; } catch (e) { showBeden = true; }
+    }
     var fisCari = Core.cariById(data, s.cariId) || { ad: s.cari || '', adres: '', tel: '' };
     var lines = Core.shipmentLines(data, s.id);
     var minRows = Math.max(a5 ? 5 : 7, lines.length);
@@ -11878,7 +11889,7 @@ function viewShipments() {
       '<tbody>' + rows + '</tbody>' +
       '<tfoot><tr><td colspan="3">GENEL TOPLAM</td><td class="n">' + nf1(totalKoli) + '</td><td class="n">' + nf0(totalCift) + '</td></tr></tfoot>' +
       '</table>' +
-      sizeTable +
+      (showBeden ? sizeTable : '') +
       '<div class="pf-note">' + (s.aciklama ? 'Not: ' + esc(s.aciklama) : '') + '</div>' +
       '<div class="pf-note" style="text-align:right;font-weight:600">Tutar: ' + money(totalTutar) + '</div>' +
       '<div class="pf-sign"><div class="line">TESLİM EDEN</div><div class="line">TESLİM ALAN</div>' +
@@ -11948,7 +11959,8 @@ function viewShipments() {
     if (!s) return;
     var lines = Core.shipmentLines(data, s.id);
     var kagit = data.settings.kagit || 'A4';
-    var pvOpts = { teslim: false, kopya: false };
+    var pvOpts = { teslim: false, kopya: false, beden: true };
+    try { pvOpts.beden = localStorage.getItem('dmr:bedenDokumu') !== '0'; } catch (e) { }
     var m = openModal({
       title: 'Sevk fişi #' + s.fisNo,
       subtitle: dateTR(s.tarih) + ' · ' + lines.length + ' satır · ' + nf0(s.cift) + ' çift',
@@ -11960,6 +11972,7 @@ function viewShipments() {
         '  <button type="button" data-paper="A5"' + (kagit === 'A5' ? ' class="active"' : '') + '>A5</button>' +
         '</div>' +
         '<div class="seg" id="pvOpts" style="margin-left:auto">' +
+      '  <button type="button" class="btn btn-sm' + (pvOpts.beden ? ' active' : '') + '" id="btnPvBeden" aria-pressed="' + (pvOpts.beden ? 'true' : 'false') + '">Beden dökümü</button>' +
       '  <button type="button" class="btn btn-sm" id="btnPvTeslim" aria-pressed="false">Teslim damgası</button>' +
       '  <button type="button" class="btn btn-sm" id="btnPvKopya" aria-pressed="false">Müşteri kopyası</button>' +
       '</div>' +
@@ -11996,10 +12009,15 @@ function viewShipments() {
       pvOpts[key] = !pvOpts[key];
       btn.classList.toggle('active', pvOpts[key]);
       btn.setAttribute('aria-pressed', pvOpts[key] ? 'true' : 'false');
+      if (key === 'beden') {
+        try { localStorage.setItem('dmr:bedenDokumu', pvOpts[key] ? '1' : '0'); } catch (e) { }
+      }
       $('#pvDoc', m.el).innerHTML = shipmentDocHtml(s, kagit, pvOpts);
     }
+    var btnBeden = $('#btnPvBeden', m.el);
     var btnTeslim = $('#btnPvTeslim', m.el);
     var btnKopya = $('#btnPvKopya', m.el);
+    if (btnBeden) btnBeden.addEventListener('click', function () { pvToggle(btnBeden, 'beden'); });
     if (btnTeslim) btnTeslim.addEventListener('click', function () { pvToggle(btnTeslim, 'teslim'); });
     if (btnKopya) btnKopya.addEventListener('click', function () { pvToggle(btnKopya, 'kopya'); });
     $('#btnPrintDoc', m.el).addEventListener('click', function () { m.close(); printShipment(id, kagit, pvOpts); });

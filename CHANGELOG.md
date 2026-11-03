@@ -2,6 +2,13 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.2.1 — 03.11.2026
+
+### Eklendi
+- Sevk fişi önizlemesinde **Beden dökümü** aç/kapat düğmesi.
+- Kapalıyken beden tablosu fişte hiç görünmez; A4/A5 tek sayfa korunur.
+- Son tercih hatırlanır ve doğrudan yazdırmada da uygulanır.
+
 ## v3.2.0 — 03.11.2026
 
 ### Eklendi

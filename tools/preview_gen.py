@@ -291,7 +291,7 @@ BOOT = r"""
       APP.S.view = 'ship'; APP.renderView();
       setTimeout(function () { APP.printShipment(res4.shipment.id, h === 'print-fis-a5' ? 'A5' : 'A4'); }, 250);
     }
-    if (h === 'fis-full' || h === 'fis-stamp') {
+    if (h === 'fis-full' || h === 'fis-stamp' || h === 'fis-nobeden') {
       var omf = d.orders.filter(function (o) { return o.sipno === 72; })[0];
       var lsf = Matris.orderLinesOf(d, omf.id);
       APP.S.ui.shipCariId = omf.cariId;
@@ -310,6 +310,12 @@ BOOT = r"""
               var k = document.getElementById('btnPvKopya');
               if (t) t.click();
               if (k) k.click();
+            }, 200);
+          }
+          if (h === 'fis-nobeden') {
+            setTimeout(function () {
+              var b = document.getElementById('btnPvBeden');
+              if (b) b.click();
             }, 200);
           }
         }, 500);
