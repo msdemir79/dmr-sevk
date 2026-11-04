@@ -926,6 +926,7 @@
       '  <main class="main">' +
       '    <div class="topbar"><div><h1 id="viewTitle"></h1><p class="sub" id="viewSub"></p></div>' +
       '      <div class="topbar-actions" id="viewActions"></div></div>' +
+      '    <div id="updateNotice" class="update-notice hidden"></div>' +
       '    <div class="content" id="view"></div>' +
       '  </main>' +
       '</div>';
@@ -973,6 +974,21 @@
     });
   }
 
+  function renderUpdateNotice() {
+    var el = $('#updateNotice');
+    if (!el) return;
+    var u = S.update;
+    if (!u || !u.isNew || u.dismissed) {
+      el.classList.add('hidden');
+      el.innerHTML = '';
+      return;
+    }
+    el.classList.remove('hidden');
+    el.innerHTML = '<div><b>Yeni sürüm v' + esc(u.tag) + ' hazır</b><span>Güncelleme notlarını görüntüleyip DMR_SEVK.html dosyasını indirebilirsiniz.</span></div>' +
+      '<button class="btn btn-sm btn-primary" data-act="check-update">İncele</button>' +
+      '<button class="btn btn-sm" data-act="dismiss-update">Kapat</button>';
+  }
+
   function updateFileChip() {
     var chip = $('#fileChip');
     if (!chip) return;
@@ -988,6 +1004,7 @@
       '<button class="fhelp" data-act="toggle-theme">' + (isDark() ? '☀ Aydınlık tema' : '☾ Koyu tema') + '</button>' +
       '<button class="fhelp update-link" data-act="check-update">' + ICONS.refresh + ' Güncelleme kontrol et' +
       (S.update && S.update.isNew ? ' <span class="update-badge">YENİ</span>' : '') + '</button>';
+    renderUpdateNotice();
   }
 
   function updateChrome() {
@@ -1156,6 +1173,7 @@
         case 'open-health': openHealth(false); break;
         case 'open-changelog': openChangelog(); break;
         case 'check-update': checkUpdates(true); break;
+        case 'dismiss-update': if (S.update) S.update.dismissed = true; renderUpdateNotice(); break;
         case 'order-filter-sheet': openOrderFilterSheet(); break;
         case 'toggle-theme': toggleTheme(); break;
         case 'go-models': go('models'); break;
@@ -2770,9 +2788,17 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.2.2';
+  var SURUM = '3.2.3';
 
   var YENILIKLER = [
+    {
+      v: '3.2.3', t: '04.11.2026', m: [
+        'Yeni sürüm varsa üstte kalıcı “Yeni sürüm hazır” bildirimi',
+        'Güncelleme kontrolü 6 saatte bir ve çevrimiçi olunca tekrar denenir',
+        'Bildirimden doğrudan sürüm notları ve indirme',
+        'Manuel “Güncelleme kontrol et” düğmesi korundu'
+      ]
+    },
     {
       v: '3.2.2', t: '04.11.2026', m: [
         'Sevk fişi baskısında A4/A5 taşma ve kaydırma çubuğu düzeltildi',
@@ -3223,7 +3249,11 @@ function viewShipments() {
       u.isNew = verNewer(u.tag, SURUM);
       S.update = u;
       try { updateFileChip(); } catch (e) { }
-      if (Date.now() - (u.checked || 0) < 24 * 60 * 60 * 1000) return;
+      if (Date.now() - (u.checked || 0) < 6 * 60 * 60 * 1000) return;
+    }
+    if (!window.__dmrUpdateOnline) {
+      window.__dmrUpdateOnline = true;
+      window.addEventListener('online', function () { checkUpdates(false); });
     }
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     checkUpdates(false);

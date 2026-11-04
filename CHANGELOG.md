@@ -2,6 +2,14 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.2.3 — 04.11.2026
+
+### Eklendi
+- Yeni sürüm bulunduğunda üstte **kalıcı “Yeni sürüm hazır”** bildirimi.
+- Bildirimden doğrudan sürüm notları ve **DMR_SEVK.html indir**.
+- Güncelleme kontrolü **6 saatte bir**; çevrimdışı açılışta internet gelince tekrar denenir.
+- Manuel **Güncelleme kontrol et** düğmesi korundu.
+
 ## v3.2.2 — 04.11.2026
 
 ### Düzeltildi
