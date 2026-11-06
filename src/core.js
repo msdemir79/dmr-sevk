@@ -887,6 +887,35 @@
     audit(data, kullanici, 'PERSONEL SİL', p.ad);
   }
 
+  function monthDays(ay) {
+    var m = /^(\d{4})-(\d{2})$/.exec(String(ay || ''));
+    if (!m) return 30;
+    return new Date(Number(m[1]), Number(m[2]), 0).getDate();
+  }
+
+  function normalizeGunler(g, ay) {
+    var max = monthDays(ay);
+    return String(g || '').toUpperCase().replace(/İ/g, 'I').replace(/[^TYIRH]/g, '').slice(0, max);
+  }
+
+  function countGun(g, ch) {
+    var n = 0;
+    String(g || '').split('').forEach(function (x) { if (x === ch) n++; });
+    return n;
+  }
+
+  function gridDays(rec, ay) {
+    var n = monthDays(ay);
+    var src = normalizeGunler(rec && rec.gunler, ay);
+    var arr = [];
+    for (var i = 0; i < n; i++) arr.push(src[i] || 'T');
+    if (!src && rec && num(rec.eksikGun) > 0) {
+      var cnt = Math.min(n, Math.round(num(rec.eksikGun)));
+      for (i = n - cnt; i < n; i++) arr[i] = 'Y';
+    }
+    return arr;
+  }
+
   function normalizePuantaj(input) {
     input = input || {};
     var durum = String(input.durum || 'TASLAK').toUpperCase();
@@ -898,7 +927,8 @@
       ay: String(input.ay || '').slice(0, 7),
       maas: round2(num(input.maas)),
       gunlukSaat: num(input.gunlukSaat) || 8,
-      eksikGun: Math.max(0, Math.min(30, num(input.eksikGun))),
+      gunler: normalizeGunler(input.gunler, input.ay),
+      eksikGun: Math.max(0, Math.min(31, num(input.eksikGun))),
       eksikSaat: Math.max(0, num(input.eksikSaat)),
       fazlaMesai: Math.max(0, num(input.fazlaMesai)),
       ekOdeme: round2(num(input.ekOdeme)),
@@ -938,6 +968,7 @@
     var out = {};
     Object.keys(rec).forEach(function (k) { out[k] = rec[k]; });
     out.gorev = p.gorev || '';
+    out.gunSayisi = monthDays(ay);
     var c = calculatePuantaj(out);
     out.gunluk = c.gunluk; out.saatlik = c.saatlik;
     out.eksikGunKesinti = c.eksikGunKesinti; out.eksikSaatKesinti = c.eksikSaatKesinti;
@@ -951,6 +982,7 @@
     var ay = String(input.ay || '').slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(ay)) throw new Error('Dönem ayı geçersiz.');
     var existing = (data.puantaj || []).filter(function (r) { return r.personelId === p.id && r.ay === ay; })[0];
+    var gunler = input.gunler !== undefined ? normalizeGunler(input.gunler, ay) : (existing ? normalizeGunler(existing.gunler, ay) : '');
     var rec = normalizePuantaj({
       id: existing ? existing.id : 0,
       personelId: p.id,
@@ -958,6 +990,7 @@
       ay: ay,
       maas: input.maas !== undefined && input.maas !== '' ? input.maas : (existing ? existing.maas : p.maas),
       gunlukSaat: input.gunlukSaat !== undefined && input.gunlukSaat !== '' ? input.gunlukSaat : (existing ? existing.gunlukSaat : p.gunlukSaat),
+      gunler: gunler,
       eksikGun: input.eksikGun,
       eksikSaat: input.eksikSaat,
       fazlaMesai: input.fazlaMesai,
@@ -969,6 +1002,7 @@
       odemeTarihi: input.odemeTarihi !== undefined ? input.odemeTarihi : (existing ? existing.odemeTarihi : ''),
       not: input.not !== undefined ? input.not : (existing ? existing.not : '')
     });
+    if (rec.gunler) rec.eksikGun = countGun(rec.gunler, 'Y');
     rec.net = calculatePuantaj(rec).net;
     if (existing) {
       rec.id = existing.id;
@@ -1460,7 +1494,7 @@
     });
 
     var puantajRows = (data.puantaj || []).map(function (r) {
-      return [r.id, r.personelId, r.personelAd || '', r.ay, money(r.maas), num(r.gunlukSaat),
+      return [r.id, r.personelId, r.personelAd || '', r.ay, r.gunler || '', money(r.maas), num(r.gunlukSaat),
         num(r.eksikGun), num(r.eksikSaat), num(r.fazlaMesai), money(r.ekOdeme), money(r.kesinti), money(r.avans),
         money(r.net), r.durum || 'TASLAK', r.odemeTarihi || '', r.not || ''];
     });
@@ -1535,7 +1569,7 @@
           name: SHEET.PUANTAJ,
           columns: [
             { header: 'ID', width: 6 }, { header: 'PERSONEL ID', width: 10 }, { header: 'PERSONEL', width: 24 },
-            { header: 'AY', width: 10 }, { header: 'MAAŞ', width: 12 }, { header: 'GÜNLÜK SAAT', width: 11 },
+            { header: 'AY', width: 10 }, { header: 'GÜNLER', width: 18 }, { header: 'MAAŞ', width: 12 }, { header: 'GÜNLÜK SAAT', width: 11 },
             { header: 'EKSİK GÜN', width: 10 }, { header: 'EKSİK SAAT', width: 10 }, { header: 'FAZLA MESAİ', width: 11 },
             { header: 'EK ÖDEME', width: 11 }, { header: 'KESİNTİ', width: 11 }, { header: 'AVANS', width: 11 },
             { header: 'NET', width: 12 }, { header: 'DURUM', width: 10 }, { header: 'ÖDEME TARİHİ', width: 12 }, { header: 'NOT', width: 26 }
@@ -1685,7 +1719,7 @@
     AKTIF: 'aktif', NOT: 'not'
   };
   var PUANTAJ_KEYS = {
-    ID: 'id', PERSONELID: 'personelId', PERSONEL: 'personelAd', AY: 'ay', DONEM: 'ay',
+    ID: 'id', PERSONELID: 'personelId', PERSONEL: 'personelAd', AY: 'ay', DONEM: 'ay', GUNLER: 'gunler',
     MAAS: 'maas', GUNLUKSAAT: 'gunlukSaat', EKSIKGUN: 'eksikGun', EKSIKSAAT: 'eksikSaat',
     FAZLAMESAI: 'fazlaMesai', FAZLAMESAISAAT: 'fazlaMesai', EKODEME: 'ekOdeme', KESINTI: 'kesinti',
     AVANS: 'avans', NET: 'net', DURUM: 'durum', ODEMETARIHI: 'odemeTarihi', NOT: 'not'
@@ -1864,6 +1898,7 @@
           personelId: pid,
           personelAd: pname,
           ay: pick(urow, um, 'ay'),
+          gunler: pick(urow, um, 'gunler'),
           maas: pick(urow, um, 'maas'),
           gunlukSaat: pick(urow, um, 'gunlukSaat'),
           eksikGun: pick(urow, um, 'eksikGun'),
@@ -2501,6 +2536,10 @@
     deletePersonel: deletePersonel,
     normalizePuantaj: normalizePuantaj,
     calculatePuantaj: calculatePuantaj,
+    monthDays: monthDays,
+    normalizeGunler: normalizeGunler,
+    countGun: countGun,
+    gridDays: gridDays,
     getPuantaj: getPuantaj,
     savePuantaj: savePuantaj,
     setPuantajStatus: setPuantajStatus,

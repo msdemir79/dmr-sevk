@@ -2,6 +2,22 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.4.0 — 07.11.2026
+
+### Eklendi
+- **Toplu Puantaj** sekmesi: personel satırları, ayın günleri tek ekranda.
+- Gün hücresine tıklayınca sırayla **T → Y → İ → R → H**:
+  - **T:** tam geldi
+  - **Y:** gelmedi / ücretsiz → 1 eksik gün
+  - **İ:** ücretli izin → kesintisiz
+  - **R:** rapor → kesintisiz
+  - **H:** hafta tatili → kesintisiz
+- Eksik gün griddeki Y sayısından otomatik hesaplanır; net anında güncellenir.
+- **Pazarları H yap** ve **Tümünü T yap** düğmeleri.
+- Ödenmiş ay gridde kilitlidir.
+- Fazla mesai ve eksik saat toplamı satırdaki **Düzenle** ile girilir.
+- PUANTAJ Excel sayfasına **GÜNLER** sütunu eklendi.
+
 ## v3.3.1 — 06.11.2026
 
 ### Değişti

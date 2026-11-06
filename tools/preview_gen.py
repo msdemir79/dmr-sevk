@@ -261,10 +261,14 @@ BOOT = r"""
     if (['report-kar', 'report-cari', 'report-siparis', 'report-sevk', 'report-urun'].indexOf(h) >= 0) {
       APP.S.ui.reportTab = h.slice(7); APP.S.view = 'reports'; APP.updateChrome(); APP.renderView();
     }
-    if (h === 'personel' || h === 'personel-puantaj' || h === 'personel-maas') {
+    if (h === 'personel' || h === 'personel-puantaj' || h === 'personel-maas' || h === 'personel-toplu') {
       APP.S.view = 'personel';
-      APP.S.ui.personelTab = h === 'personel-puantaj' ? 'puantaj' : h === 'personel-maas' ? 'maas' : 'liste';
+      APP.S.ui.personelTab = h === 'personel-puantaj' ? 'puantaj' : h === 'personel-maas' ? 'maas' : h === 'personel-toplu' ? 'toplu' : 'liste';
       APP.updateChrome(); APP.renderView();
+    }
+    if (h === 'personel-toplu-click') {
+      APP.S.view = 'personel'; APP.S.ui.personelTab = 'toplu'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var b = document.querySelector('[data-act="puantaj-grid"]'); if (b) b.click(); }, 300);
     }
     if (h === 'personel-form') {
       APP.S.view = 'personel'; APP.updateChrome(); APP.renderView();

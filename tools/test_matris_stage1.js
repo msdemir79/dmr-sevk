@@ -151,15 +151,21 @@ ok(Core.payrollTotal(dp, '2026-11') === 9791.67, 'aylık maaş toplamı');
 Core.updatePersonel(dp, per.id, { maas: 12000 }, 'test');
 const eski = Core.getPuantaj(dp, per.id, '2026-11');
 ok(eski.maas === 10000 && eski.net === 9791.67, 'maaş snapshot korunuyor');
+const gchar = new Array(31).fill('T');
+gchar[0] = 'Y'; gchar[1] = 'I'; gchar[2] = 'R'; gchar[3] = 'H';
+const aralik = Core.savePuantaj(dp, { personelId: per.id, ay: '2026-12', gunler: gchar.join('') }, 'test');
+ok(Core.monthDays('2026-12') === 31 && Core.gridDays(aralik, '2026-12').length === 31, 'ay gün sayısı ve grid');
+ok(aralik.eksikGun === 1 && aralik.net === 11600, 'gridde Y eksik gün, İ/R/H kesintisiz');
 let silHata = false;
 try { Core.deletePersonel(dp, per.id, 'test'); } catch (e) { silHata = true; }
 ok(silHata, 'puantajı olan personel silinemiyor');
 const wbp = await X.readWorkbook(X.writeWorkbook(Core.buildWorkbook(dp)));
 const pSheet = wbp.sheets.filter(x => x.name === 'PERSONEL')[0];
 const uSheet = wbp.sheets.filter(x => x.name === 'PUANTAJ')[0];
-ok(pSheet && pSheet.rows.length === 2 && uSheet && uSheet.rows.length === 2, 'personel/puantaj Excelde');
+ok(pSheet && pSheet.rows.length === 2 && uSheet && uSheet.rows.length === 3, 'personel/puantaj Excelde');
 const dp2 = Core.readData(wbp.sheets);
-ok(dp2.personel.length === 1 && dp2.puantaj.length === 1 && dp2.puantaj[0].net === 9791.67, 'personel/puantaj Excelden okundu');
+const uAra = dp2.puantaj.filter(x => x.ay === '2026-12')[0];
+ok(dp2.personel.length === 1 && dp2.puantaj.length === 2 && uAra && uAra.gunler.length === 31, 'personel/puantaj Excelden okundu');
 
 // ---- eski dosya: satır sayfası yok ----
   const eskiSheets = wb.sheets.filter(s => s.name !== 'SİPARİŞ SATIRLARI');

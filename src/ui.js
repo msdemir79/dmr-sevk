@@ -1118,7 +1118,7 @@
       if (!el) return;
       var act = el.dataset.act;
       var id = el.dataset.id ? parseInt(el.dataset.id, 10) : null;
-      var ADMIN_ONLY = { 'new-file': 1, 'clear-all': 1, 'import-legacy': 1, 'import-cari': 1, 'user-new': 1, 'user-edit': 1, 'user-del': 1, 'user-pass': 1, 'personel-new': 1, 'personel-edit': 1, 'personel-del': 1, 'puantaj-edit': 1, 'puantaj-paid': 1, 'puantaj-pusula': 1 };
+      var ADMIN_ONLY = { 'new-file': 1, 'clear-all': 1, 'import-legacy': 1, 'import-cari': 1, 'user-new': 1, 'user-edit': 1, 'user-del': 1, 'user-pass': 1, 'personel-new': 1, 'personel-edit': 1, 'personel-del': 1, 'puantaj-edit': 1, 'puantaj-paid': 1, 'puantaj-pusula': 1, 'puantaj-grid': 1, 'puantaj-grid-all': 1, 'puantaj-grid-h': 1 };
       if (ADMIN_ONLY[act] && !isAdmin()) {
         toast('Bu işlem için yönetici yetkisi gerekli.', 'err');
         return;
@@ -1188,6 +1188,9 @@
         case 'puantaj-edit': openPuantajForm(id, el.dataset.ay); break;
         case 'puantaj-paid': markPuantajPaid(id, el.dataset.personelId, el.dataset.ay); break;
         case 'puantaj-pusula': openPayslip(id, el.dataset.ay); break;
+        case 'puantaj-grid': togglePuantajDay(el); break;
+        case 'puantaj-grid-all': setAllPuantajDays(el.dataset.ay); break;
+        case 'puantaj-grid-h': setSundayPuantaj(el.dataset.ay); break;
         case 'report-toggle-open': S.ui.reportOnlyOpen = !S.ui.reportOnlyOpen; renderView(); break;
         case 'report-excel': reportExportExcel(); break;
         case 'report-csv': reportExportCsv(); break;
@@ -2106,9 +2109,10 @@ function viewShipments() {
     var base = aktif.reduce(function (a, p) { return a + Core.num(p.maas); }, 0);
     var net = Core.payrollTotal(data, ay);
     var eksikGun = rows.reduce(function (a, r) { return a + Core.num(r.eksikGun); }, 0);
-    var tabs = [['liste', 'Personel'], ['puantaj', 'Puantaj'], ['maas', 'Maaş']];
+    var tabs = [['liste', 'Personel'], ['toplu', 'Toplu Puantaj'], ['puantaj', 'Puantaj'], ['maas', 'Maaş']];
     var content;
-    if (S.ui.personelTab === 'puantaj') content = personelPuantajHtml(rows, ay);
+    if (S.ui.personelTab === 'toplu') content = personelTopluHtml(rows, ay);
+    else if (S.ui.personelTab === 'puantaj') content = personelPuantajHtml(rows, ay);
     else if (S.ui.personelTab === 'maas') content = personelMaasHtml(rows, ay);
     else content = personelListeHtml(ay);
 
@@ -2122,8 +2126,8 @@ function viewShipments() {
       '<div class="card-body"><div class="kpis report-kpis">' +
       rKpi('Aktif personel', nf0(aktif.length), (data.personel || []).length + ' kayıt', '', '') +
       rKpi('Aylık maaş toplamı', money(base), 'aktif personel', 'info', '') +
-      rKpi(monthName(ay) + ' net', money(net), rows.length + ' personel', 'ok', '') +
-      rKpi('Eksik gün', nf1(eksikGun), 'bu dönem', 'warn', '') +
+      '<div class="kpi ok"><div class="kpi-label">' + monthName(ay) + ' net</div><div class="kpi-value" id="personelKpiNet">' + money(net) + '</div><div class="kpi-foot">' + rows.length + ' personel</div></div>' +
+      '<div class="kpi warn"><div class="kpi-label">Eksik gün</div><div class="kpi-value" id="personelKpiEgun">' + nf1(eksikGun) + '</div><div class="kpi-foot">bu dönem</div></div>' +
       '</div></div>' +
       '<div class="personel-body">' + content + '</div></div>';
   }
@@ -2143,6 +2147,47 @@ function viewShipments() {
           '<button class="btn btn-icon danger" data-act="personel-del" data-id="' + p.id + '" title="Sil" aria-label="Sil">' + ICONS.trash + '</button>' +
           '</div></td></tr>';
       }).join('') + '</tbody></table></div>';
+  }
+
+  function personelTopluHtml(rows, ay) {
+    if (!rows.length) return emptyState('users', 'Personel yok', 'Personel ekleyince toplu puantaj gridi burada görünür.', '');
+    var n = Core.monthDays(ay);
+    var yil = Number(ay.slice(0, 4)), ayNo = Number(ay.slice(5, 7));
+    var etiket = { T: 'Tam geldi', Y: 'Gelmedi / ücretsiz', I: 'Ücretli izin', R: 'Rapor', H: 'Hafta tatili' };
+    var gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+    var head = '';
+    for (var d = 1; d <= n; d++) {
+      var wd = new Date(yil, ayNo - 1, d).getDay();
+      head += '<th class="pj-dh' + (wd === 0 ? ' sun' : wd === 6 ? ' sat' : '') + '" title="' + d + ' ' + gunAdi[wd] + '">' + d + '</th>';
+    }
+    var body = rows.map(function (r) {
+      var chars = Core.gridDays(r, ay);
+      var yCount = chars.filter(function (x) { return x === 'Y'; }).length;
+      var net = Core.calculatePuantaj(Object.assign({}, r, { eksikGun: yCount })).net;
+      var locked = r.durum === 'ODENDI';
+      var cells = chars.map(function (ch, i) {
+        return '<td><button type="button" class="pj-day st-' + ch + (locked ? ' locked' : '') + '" data-act="puantaj-grid" data-personel-id="' + r.personelId + '" data-ay="' + esc(ay) + '" data-day="' + (i + 1) + '" title="' + esc(etiket[ch] || ch) + '"' + (locked ? ' disabled' : '') + '>' + (ch === 'I' ? 'İ' : ch) + '</button></td>';
+      }).join('');
+      return '<tr class="' + (locked ? 'pj-locked-row' : '') + '">' +
+        '<td class="pj-person"><div class="pj-person-top"><b>' + esc(r.personelAd) + '</b>' +
+        '<button class="btn btn-icon pj-edit" data-act="puantaj-edit" data-id="' + r.personelId + '" data-ay="' + esc(ay) + '" title="Eksik saat / fazla mesai düzenle" aria-label="Düzenle">' + ICONS.edit + '</button></div>' +
+        '<span>' + esc(r.gorev || '') + (r.durum === 'ODENDI' ? ' · Ödendi' : r.durum === 'KESIN' ? ' · Kesin' : '') + '</span></td>' + cells +
+        '<td class="right" data-grid-egun="' + r.personelId + '">' + nf0(yCount) + '</td>' +
+        '<td class="right">' + nf1(r.eksikSaat) + '</td>' +
+        '<td class="right">' + nf1(r.fazlaMesai) + '</td>' +
+        '<td class="right strong" data-grid-net="' + r.personelId + '">' + money(net) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    return '<div class="pj-toolbar">' +
+      '<div class="pj-legend"><span><i class="st-T">T</i> Tam</span><span><i class="st-Y">Y</i> Gelmedi</span><span><i class="st-I">İ</i> İzin</span><span><i class="st-R">R</i> Rapor</span><span><i class="st-H">H</i> Hafta tatili</span></div>' +
+      '<div style="flex:1"></div>' +
+      '<button class="btn btn-sm" data-act="puantaj-grid-h" data-ay="' + esc(ay) + '">Pazarları H yap</button>' +
+      '<button class="btn btn-sm" data-act="puantaj-grid-all" data-ay="' + esc(ay) + '">Tümünü T yap</button>' +
+      '</div>' +
+      '<div class="pj-wrap"><table class="pj-grid"><thead><tr><th class="pj-person">Personel</th>' + head +
+      '<th>Eksik gün</th><th>Eksik saat</th><th>FM</th><th>Net</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+      '<p class="muted small" style="padding:10px 14px;margin:0">Güne tıkla: <b>T → Y → İ → R → H</b>. Y = 1 eksik gün; İ, R ve H kesintisizdir. Eksik saat ve fazla mesai toplamı satırdaki <b>Düzenle</b> ile girilir.</p>';
   }
 
   function personelPuantajHtml(rows, ay) {
@@ -2225,16 +2270,101 @@ function viewShipments() {
     });
   }
 
+  function togglePuantajDay(el) {
+    if (!isAdmin()) return;
+    var personelId = Core.num(el.dataset.personelId);
+    var ay = el.dataset.ay;
+    var day = Core.num(el.dataset.day);
+    var rec = Core.getPuantaj(data, personelId, ay);
+    if (!rec) return;
+    if (rec.durum === 'ODENDI') { toast('Ödenmiş ay kilitli; önce ödemeyi geri alın.', 'err'); return; }
+    var chars = Core.gridDays(rec, ay);
+    var cycle = ['T', 'Y', 'I', 'R', 'H'];
+    var next = cycle[(cycle.indexOf(chars[day - 1]) + 1) % cycle.length];
+    chars[day - 1] = next;
+    try {
+      var saved = Core.savePuantaj(data, {
+        personelId: personelId, ay: ay, maas: rec.maas, gunlukSaat: rec.gunlukSaat,
+        gunler: chars.join(''), eksikSaat: rec.eksikSaat, fazlaMesai: rec.fazlaMesai,
+        ekOdeme: rec.ekOdeme, kesinti: rec.kesinti, avans: rec.avans,
+        durum: rec.durum, odemeTarihi: rec.odemeTarihi, not: rec.not
+      }, S.user ? S.user.ad : '');
+      var etiket = { T: 'Tam geldi', Y: 'Gelmedi / ücretsiz', I: 'Ücretli izin', R: 'Rapor', H: 'Hafta tatili' };
+      el.className = 'pj-day st-' + next;
+      el.textContent = next === 'I' ? 'İ' : next;
+      el.title = etiket[next];
+      var yCount = chars.filter(function (x) { return x === 'Y'; }).length;
+      var row = el.closest('tr');
+      var eg = row ? row.querySelector('[data-grid-egun]') : null;
+      var nt = row ? row.querySelector('[data-grid-net]') : null;
+      if (eg) eg.textContent = nf0(yCount);
+      if (nt) nt.textContent = money(saved.net);
+      var kNet = document.getElementById('personelKpiNet');
+      var kEg = document.getElementById('personelKpiEgun');
+      if (kNet) kNet.textContent = money(Core.payrollTotal(data, ay));
+      if (kEg) kEg.textContent = nf0(Core.payrollRows(data, ay).reduce(function (a, x) { return a + Core.num(x.eksikGun); }, 0));
+      setDirty(true);
+    } catch (err) { toast(err.message, 'err'); }
+  }
+
+  function setAllPuantajDays(ay) {
+    if (!isAdmin()) return;
+    var rows = Core.payrollRows(data, ay);
+    if (!rows.length) return;
+    confirmDialog({ title: 'Tüm günler T yapılsın mı?', message: 'Ödenmemiş tüm personelin günleri "Tam" olarak işaretlenecek. Mevcut İ/Y/R/H işaretleri silinir.', confirmText: 'Tümünü T yap', danger: true }).then(function (ok) {
+      if (!ok) return;
+      var n = Core.monthDays(ay);
+      var all = new Array(n + 1).join('T');
+      var say = 0;
+      rows.forEach(function (r) {
+        if (r.durum === 'ODENDI') return;
+        Core.savePuantaj(data, {
+          personelId: r.personelId, ay: ay, maas: r.maas, gunlukSaat: r.gunlukSaat, gunler: all,
+          eksikSaat: r.eksikSaat, fazlaMesai: r.fazlaMesai, ekOdeme: r.ekOdeme, kesinti: r.kesinti,
+          avans: r.avans, durum: r.durum, odemeTarihi: r.odemeTarihi, not: r.not
+        }, S.user ? S.user.ad : '');
+        say++;
+      });
+      setDirty(true); renderView(); toast(say + ' personel için tüm günler T yapıldı', 'ok');
+    });
+  }
+
+  function setSundayPuantaj(ay) {
+    if (!isAdmin()) return;
+    var rows = Core.payrollRows(data, ay);
+    if (!rows.length) return;
+    confirmDialog({ title: 'Pazar günleri H yapılsın mı?', message: 'Ödenmemiş personelde Pazar günleri "Hafta tatili" olarak işaretlenecek; diğer günler "Tam" olacak.', confirmText: 'Pazarları H yap' }).then(function (ok) {
+      if (!ok) return;
+      var n = Core.monthDays(ay);
+      var yil = Number(ay.slice(0, 4)), ayNo = Number(ay.slice(5, 7));
+      var chars = [];
+      for (var d = 1; d <= n; d++) chars.push(new Date(yil, ayNo - 1, d).getDay() === 0 ? 'H' : 'T');
+      var all = chars.join('');
+      var say = 0;
+      rows.forEach(function (r) {
+        if (r.durum === 'ODENDI') return;
+        Core.savePuantaj(data, {
+          personelId: r.personelId, ay: ay, maas: r.maas, gunlukSaat: r.gunlukSaat, gunler: all,
+          eksikSaat: r.eksikSaat, fazlaMesai: r.fazlaMesai, ekOdeme: r.ekOdeme, kesinti: r.kesinti,
+          avans: r.avans, durum: r.durum, odemeTarihi: r.odemeTarihi, not: r.not
+        }, S.user ? S.user.ad : '');
+        say++;
+      });
+      setDirty(true); renderView(); toast(say + ' personel için Pazar günleri H yapıldı', 'ok');
+    });
+  }
+
   function openPuantajForm(personelId, ay) {
     if (!isAdmin()) return toast('Bu işlem için yönetici yetkisi gerekli.', 'err');
     var p = Core.personelById(data, personelId);
     if (!p) return toast('Personel bulunamadı.', 'err');
     var rec = Core.getPuantaj(data, personelId, ay);
+    var gridMode = !!rec.gunler;
     var m = openModal({
       title: 'Puantaj · ' + p.ad,
       subtitle: monthName(ay) + ' · ' + money(rec.maas) + ' / ay',
       body: '<form id="puantajForm" class="form-grid g3" autocomplete="off">' +
-        '<div class="field"><label for="pjEksikGun">Eksik gün</label><input id="pjEksikGun" class="input num" inputmode="decimal" value="' + esc(rec.eksikGun) + '"></div>' +
+        '<div class="field"><label for="pjEksikGun">Eksik gün' + (gridMode ? ' <span class="hint">(günlük gridden)</span>' : '') + '</label><input id="pjEksikGun" class="input num" inputmode="decimal" value="' + esc(rec.eksikGun) + '"' + (gridMode ? ' disabled title="Eksik gün Toplu Puantaj ekranından değiştirilir."' : '') + '></div>' +
         '<div class="field"><label for="pjEksikSaat">Eksik saat</label><input id="pjEksikSaat" class="input num" inputmode="decimal" value="' + esc(rec.eksikSaat) + '"></div>' +
         '<div class="field"><label for="pjFm">Fazla mesai saat</label><input id="pjFm" class="input num" inputmode="decimal" value="' + esc(rec.fazlaMesai) + '"></div>' +
         '<div class="field"><label for="pjEk">Ek ödeme</label><input id="pjEk" class="input num" inputmode="decimal" value="' + esc(rec.ekOdeme) + '"></div>' +
@@ -2266,6 +2396,7 @@ function viewShipments() {
       try {
         Core.savePuantaj(data, {
           personelId: personelId, ay: ay, maas: rec.maas, gunlukSaat: rec.gunlukSaat,
+          gunler: rec.gunler || '',
           eksikGun: $('#pjEksikGun', m.el).value, eksikSaat: $('#pjEksikSaat', m.el).value,
           fazlaMesai: $('#pjFm', m.el).value, ekOdeme: $('#pjEk', m.el).value,
           kesinti: $('#pjKes', m.el).value, avans: $('#pjAvans', m.el).value,
@@ -3029,9 +3160,18 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.3.1';
+  var SURUM = '3.4.0';
 
   var YENILIKLER = [
+    {
+      v: '3.4.0', t: '07.11.2026', m: [
+        'Toplu Puantaj: personel satırları ve gün gün T / Y / İ / R / H işaretleme',
+        'Y eksik gün sayılır; İ (izin), R (rapor) ve H (hafta tatili) kesintisizdir',
+        'Günlük gridden eksik gün otomatik hesaplanır; net anında güncellenir',
+        'Pazarları H yap / Tümünü T yap; ödenmiş ay kilitli',
+        'PUANTAJ sayfasına GÜNLER sütunu eklendi'
+      ]
+    },
     {
       v: '3.3.1', t: '06.11.2026', m: [
         'Ayarlar dört sekmeye ayrıldı: Genel, Katalog, Kullanıcılar & Güvenlik, Veri',
