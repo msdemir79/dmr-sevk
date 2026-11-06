@@ -15,6 +15,7 @@ Tek bir HTML dosyası olarak çalışan, verilerini seçtiğiniz **Excel (.xlsx)
 - Dashboard grafikleri, model galerisi, koyu tema, Ctrl+K komut paleti, QR’lı fiş
 - Rapor Merkezi: tarih aralığı/karşılaştırma, kârlılık, cari yaşlandırma, sevkiyat ve ürün analizi
 - Raporlarda Excel ve CSV dışa aktarma
+- Personel puantajı ve basit iç maaş hesabı (yönetici)
 - Model/renk bazlı Sipariş / Sevk / Kalan raporu
 - Sevk fişinde isteğe bağlı beden dökümü
 - Yeni sürüm bildirimi ve çevrimiçi tekrar kontrol
@@ -61,7 +62,7 @@ CI, kaynaklardan yeniden derler ve `DMR_SEVK.html` dosyasının güncel olduğun
 
 ## Excel sayfaları
 
-`CARİLER`, `KULLANICILAR`, `MODEL KARTLARI`, `SİPARİŞLER`, `CARİ HESAP`, `SEVK FİŞLERİ`, `SEVK SATIRLARI`, `İŞLEM GÜNLÜĞÜ`, `ÇÖP KUTUSU`, `RESİMLER` (gizli), `AYARLAR`.
+`CARİLER`, `KULLANICILAR`, `MODEL KARTLARI`, `RENKLER`, `ASORTİ ŞABLONLARI`, `MODEL RENKLERİ`, `SİPARİŞLER`, `SİPARİŞ SATIRLARI`, `CARİ HESAP`, `SEVK FİŞLERİ`, `SEVK SATIRLARI`, `PERSONEL`, `PUANTAJ`, `İŞLEM GÜNLÜĞÜ`, `ÇÖP KUTUSU`, `RESİMLER` (gizli), `MODEL RESİMLERİ` (gizli), `AYARLAR`.
 
 Eski (VBA) dosyalar `Ayarlar → Eski dosyadan yeni veritabanı oluştur` ile veya mevcut veritabanına `Excel dosyasından cari aktar` ile alınabilir.
 
@@ -71,7 +72,7 @@ Planlanan geliştirmeler ve tasarım notları: [ROADMAP.md](ROADMAP.md). Örnek:
 
 ## Sürüm
 
-Güncel sürüm: **v3.2.3**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
+Güncel sürüm: **v3.3.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
 
 ### Yeni sürüm çıkarma
 

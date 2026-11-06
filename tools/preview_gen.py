@@ -122,6 +122,11 @@ BOOT = r"""
     Matris.migrateMaster(d);
     Matris.ensureLines(d);
 
+    var pp1 = Core.addPersonel(d, { ad: 'Ahmet Yılmaz', gorev: 'Satış', maas: 10000, gunlukSaat: 8, iseGiris: '2025-03-01' }, 'preview');
+    var pp2 = Core.addPersonel(d, { ad: 'Elif Kaya', gorev: 'Muhasebe', maas: 12000, gunlukSaat: 8, iseGiris: '2024-11-15' }, 'preview');
+    Core.savePuantaj(d, { personelId: pp1.id, ay: '2026-11', eksikGun: 2, eksikSaat: 4, fazlaMesai: 10, avans: 1000 }, 'preview');
+    Core.savePuantaj(d, { personelId: pp2.id, ay: '2026-11', eksikGun: 0, eksikSaat: 0, fazlaMesai: 5 }, 'preview');
+
     APP.data = d;
     APP.S.file.name = 'DMR_VERI.xlsx';
     APP.S.file.lastSaved = new Date();
@@ -248,6 +253,19 @@ BOOT = r"""
     }
     if (['report-kar', 'report-cari', 'report-siparis', 'report-sevk', 'report-urun'].indexOf(h) >= 0) {
       APP.S.ui.reportTab = h.slice(7); APP.S.view = 'reports'; APP.updateChrome(); APP.renderView();
+    }
+    if (h === 'personel' || h === 'personel-puantaj' || h === 'personel-maas') {
+      APP.S.view = 'personel';
+      APP.S.ui.personelTab = h === 'personel-puantaj' ? 'puantaj' : h === 'personel-maas' ? 'maas' : 'liste';
+      APP.updateChrome(); APP.renderView();
+    }
+    if (h === 'personel-form') {
+      APP.S.view = 'personel'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var b = document.querySelector('[data-act="personel-new"]'); if (b) b.click(); }, 250);
+    }
+    if (h === 'puantaj-form') {
+      APP.S.view = 'personel'; APP.S.ui.personelTab = 'puantaj'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var b = document.querySelector('[data-act="puantaj-edit"]'); if (b) b.click(); }, 250);
     }
     if (h === 'reports') { APP.S.view = 'reports'; APP.updateChrome(); APP.renderView(); }
     if (h === 'ledger-all') { APP.S.ui.cariId = 0; APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView(); }

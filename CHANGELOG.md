@@ -2,6 +2,24 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.3.0 — 06.11.2026
+
+### Eklendi
+- **Personel** ekranı; yalnızca yönetici.
+- Aylık puantaj: eksik gün, eksik saat, fazla mesai, ek ödeme, kesinti, avans.
+- Basit iç maaş hesabı:
+  - Günlük = maaş / 30
+  - Saatlik = günlük / günlük çalışma saati
+  - Eksik gün/saat düşümü
+  - Fazla mesai × 1,5
+  - Net = maaş − kesintiler + fazla mesai + ek ödeme − avans
+- **Maaş pusulası** yazdırma; “Ödendi” işaretleme.
+- Personel ve puantaj için Excel sayfaları.
+- Maaş değişikliğinde geçmiş ay snapshot’ı korunur.
+
+### Not
+Bu modül **resmî bordro değildir**; SGK, vergi, brüt/net ve yasal kesintiler içermez.
+
 ## v3.2.3 — 04.11.2026
 
 ### Eklendi

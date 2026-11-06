@@ -132,12 +132,36 @@ const S = { 40: 1, 41: 2, 42: 3, 43: 2, 44: 1, 45: 1 };
 
   const wbm = X.writeWorkbook(Core.buildWorkbook(dm));
   const wbmm = await X.readWorkbook(wbm);
-  ok(wbmm.sheets.length === 16 && wbmm.sheets.some(x => x.name === 'RENKLER') && wbmm.sheets.some(x => x.name === 'ASORTİ ŞABLONLARI') && wbmm.sheets.some(x => x.name === 'MODEL RENKLERİ'), 'renk/şablon sayfaları Excelde');
+  ok(wbmm.sheets.length === 18 && wbmm.sheets.some(x => x.name === 'RENKLER') && wbmm.sheets.some(x => x.name === 'ASORTİ ŞABLONLARI') && wbmm.sheets.some(x => x.name === 'MODEL RENKLERİ') && wbmm.sheets.some(x => x.name === 'PERSONEL') && wbmm.sheets.some(x => x.name === 'PUANTAJ'), 'renk/şablon/personel sayfaları Excelde');
   const dm2 = Core.readData(wbmm.sheets);
   const mm2 = dm2.modeller.filter(x => x.model === '7001')[0];
   ok(mm2 && mm2.asortiSablonId === sab.id && mm2.renkler.length === 2, 'model şablon/renk Excelden okundu');
 
-  // ---- eski dosya: satır sayfası yok ----
+  // ---- personel / puantaj ----
+const dp = Core.newData();
+const per = Core.addPersonel(dp, { ad: 'Test Personel', gorev: 'Satış', maas: 10000, gunlukSaat: 8 }, 'test');
+ok(per.id > 0 && per.maas === 10000 && per.gunlukSaat === 8, 'personel eklendi');
+const tam = Core.getPuantaj(dp, per.id, '2026-11');
+ok(tam.net === 10000, 'tam ay maaş 10000');
+const kayit = Core.savePuantaj(dp, { personelId: per.id, ay: '2026-11', eksikGun: 2, eksikSaat: 4, fazlaMesai: 10 }, 'test');
+ok(kayit.net === 9791.67, 'eksik gün/saat ve fazla mesai hesabı');
+const hesap = Core.getPuantaj(dp, per.id, '2026-11');
+ok(hesap.eksikGunKesinti === 666.67 && hesap.eksikSaatKesinti === 166.67 && hesap.fazlaMesaiTutar === 625, 'kesinti ve FM kalemleri');
+ok(Core.payrollTotal(dp, '2026-11') === 9791.67, 'aylık maaş toplamı');
+Core.updatePersonel(dp, per.id, { maas: 12000 }, 'test');
+const eski = Core.getPuantaj(dp, per.id, '2026-11');
+ok(eski.maas === 10000 && eski.net === 9791.67, 'maaş snapshot korunuyor');
+let silHata = false;
+try { Core.deletePersonel(dp, per.id, 'test'); } catch (e) { silHata = true; }
+ok(silHata, 'puantajı olan personel silinemiyor');
+const wbp = await X.readWorkbook(X.writeWorkbook(Core.buildWorkbook(dp)));
+const pSheet = wbp.sheets.filter(x => x.name === 'PERSONEL')[0];
+const uSheet = wbp.sheets.filter(x => x.name === 'PUANTAJ')[0];
+ok(pSheet && pSheet.rows.length === 2 && uSheet && uSheet.rows.length === 2, 'personel/puantaj Excelde');
+const dp2 = Core.readData(wbp.sheets);
+ok(dp2.personel.length === 1 && dp2.puantaj.length === 1 && dp2.puantaj[0].net === 9791.67, 'personel/puantaj Excelden okundu');
+
+// ---- eski dosya: satır sayfası yok ----
   const eskiSheets = wb.sheets.filter(s => s.name !== 'SİPARİŞ SATIRLARI');
   const d5 = Core.readData(eskiSheets);
   ok(d5.orderLines.length === 1 && d5.orderLines[0].mod === 'ESKI', 'eski dosyada satır üretildi');

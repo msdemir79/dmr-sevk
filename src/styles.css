@@ -1029,3 +1029,14 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
 .update-notice b { display: block; font-size: 12.5px; }
 .update-notice span { display: block; color: #92400e; font-size: 11px; margin-top: 1px; }
 @media (max-width: 700px) { .update-notice { margin: 0 10px 4px; flex-wrap: wrap; } .update-notice .btn { flex: 1; } }
+
+/* --- personel / puantaj --- */
+.personel-shell .report-toolbar { align-items: flex-end; }
+.personel-shell .report-tab { font-size: 12px; }
+.personel-body { padding: 0; }
+.personel-body .table-wrap { max-height: calc(100vh - 360px); }
+.puantaj-preview { display: flex; flex-wrap: wrap; gap: 8px 18px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-top: 4px; }
+.puantaj-preview > div { min-width: 92px; }
+.puantaj-preview span { display: block; color: var(--muted); font-size: 9.5px; text-transform: uppercase; letter-spacing: .03em; }
+.puantaj-preview b { font-size: 12.5px; }
+.puantaj-preview .net b { color: var(--brand-dark); font-size: 15px; }

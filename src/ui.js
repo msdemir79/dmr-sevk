@@ -190,6 +190,7 @@
       shipListSearch: '', shipListPage: 1,
       reportMonth: Core.todayISO().slice(0, 7),
     reportTab: 'ozet', reportPreset: 'last30', reportOnlyOpen: false,
+    personelTab: 'liste', personelMonth: Core.todayISO().slice(0, 7),
     reportFrom: (function () { var d = new Date(); d.setDate(d.getDate() - 29); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(),
     reportTo: Core.todayISO(),
     },
@@ -880,6 +881,7 @@
     cariler: { title: 'Cari Hesaplar', sub: 'Müşteri kartları, bakiyeler ve açık siparişler' },
     models: { title: 'Modeller', sub: 'Fiyat, maliyet, barkod ve model özeti' },
     reports: { title: 'Raporlar', sub: 'Dönem, kârlılık, cari ve sevkiyat analizi' },
+  personel: { title: 'Personel', sub: 'Puantaj ve iç maaş hesabı' },
     settings: { title: 'Ayarlar', sub: 'Firma bilgileri, dosya ve tercihler' }
   };
 
@@ -890,7 +892,7 @@
       return (!cid || o.cariId === cid) && Core.orderInfo(data, o, shipped).kalan > 0;
     }).length;
     var ships = cid ? data.shipments.filter(function (s) { return s.cariId === cid; }).length : data.shipments.length;
-    return [
+    var items = [
       { key: 'dashboard', icon: 'grid', label: 'Panel' },
       { key: 'orders', icon: 'box', label: 'Siparişler', count: open },
       { key: 'ship', icon: 'truck', label: 'Sevk İşlemi' },
@@ -901,6 +903,8 @@
       { key: 'reports', icon: 'chart', label: 'Raporlar' },
       { key: 'settings', icon: 'settings', label: 'Ayarlar' }
     ];
+    if (isAdmin()) items.splice(items.length - 1, 0, { key: 'personel', icon: 'users', label: 'Personel' });
+    return items;
   }
 
   function renderShell() {
@@ -1097,6 +1101,7 @@
       case 'cariler': html = viewCariler(); break;
       case 'models': html = viewModels(); break;
       case 'reports': html = viewReports(); break;
+        case 'personel': html = isAdmin() ? viewPersonel() : '<div class="card"><div class="card-body"><p class="muted">Bu ekran için yönetici yetkisi gerekli.</p></div></div>'; break;
       case 'settings': html = viewSettings(); break;
       default: html = viewDashboard();
     }
@@ -1113,7 +1118,7 @@
       if (!el) return;
       var act = el.dataset.act;
       var id = el.dataset.id ? parseInt(el.dataset.id, 10) : null;
-      var ADMIN_ONLY = { 'new-file': 1, 'clear-all': 1, 'import-legacy': 1, 'import-cari': 1, 'user-new': 1, 'user-edit': 1, 'user-del': 1, 'user-pass': 1 };
+      var ADMIN_ONLY = { 'new-file': 1, 'clear-all': 1, 'import-legacy': 1, 'import-cari': 1, 'user-new': 1, 'user-edit': 1, 'user-del': 1, 'user-pass': 1, 'personel-new': 1, 'personel-edit': 1, 'personel-del': 1, 'puantaj-edit': 1, 'puantaj-paid': 1, 'puantaj-pusula': 1 };
       if (ADMIN_ONLY[act] && !isAdmin()) {
         toast('Bu işlem için yönetici yetkisi gerekli.', 'err');
         return;
@@ -1177,6 +1182,12 @@
         case 'order-filter-sheet': openOrderFilterSheet(); break;
         case 'toggle-theme': toggleTheme(); break;
         case 'go-models': go('models'); break;
+        case 'personel-new': openPersonelForm(null); break;
+        case 'personel-edit': openPersonelForm(Core.personelById(data, id)); break;
+        case 'personel-del': removePersonel(id); break;
+        case 'puantaj-edit': openPuantajForm(id, el.dataset.ay); break;
+        case 'puantaj-paid': markPuantajPaid(id, el.dataset.personelId, el.dataset.ay); break;
+        case 'puantaj-pusula': openPayslip(id, el.dataset.ay); break;
         case 'report-toggle-open': S.ui.reportOnlyOpen = !S.ui.reportOnlyOpen; renderView(); break;
         case 'report-excel': reportExportExcel(); break;
         case 'report-csv': reportExportCsv(); break;
@@ -2075,6 +2086,236 @@ function viewShipments() {
   /* Raporlar                                                            */
   /* ------------------------------------------------------------------ */
   /* ------------------------------------------------------------------ */
+  /* Personel / puantaj / maaş                                           */
+  /* ------------------------------------------------------------------ */
+  function personelMonth() {
+    return S.ui.personelMonth || Core.todayISO().slice(0, 7);
+  }
+
+  function personelDurumPill(d) {
+    if (d === 'ODENDI') return '<span class="pill ok">Ödendi</span>';
+    if (d === 'KESIN') return '<span class="pill info">Kesin</span>';
+    return '<span class="pill muted">Taslak</span>';
+  }
+
+  function viewPersonel() {
+    if (!isAdmin()) return '<div class="card"><div class="card-body"><p class="muted">Bu ekran için yönetici yetkisi gerekli.</p></div></div>';
+    var ay = personelMonth();
+    var rows = Core.payrollRows(data, ay);
+    var aktif = (data.personel || []).filter(function (p) { return p.aktif !== false; });
+    var base = aktif.reduce(function (a, p) { return a + Core.num(p.maas); }, 0);
+    var net = Core.payrollTotal(data, ay);
+    var eksikGun = rows.reduce(function (a, r) { return a + Core.num(r.eksikGun); }, 0);
+    var tabs = [['liste', 'Personel'], ['puantaj', 'Puantaj'], ['maas', 'Maaş']];
+    var content;
+    if (S.ui.personelTab === 'puantaj') content = personelPuantajHtml(rows, ay);
+    else if (S.ui.personelTab === 'maas') content = personelMaasHtml(rows, ay);
+    else content = personelListeHtml(ay);
+
+    return '<div class="card personel-shell"><div class="report-toolbar">' +
+      '<div class="seg">' + tabs.map(function (t) {
+        return '<button class="report-tab' + (S.ui.personelTab === t[0] ? ' active' : '') + '" data-personel-tab="' + t[0] + '">' + t[1] + '</button>';
+      }).join('') + '</div>' +
+      '<div class="field" style="max-width:170px"><label for="personelMonth">Dönem</label><input id="personelMonth" type="month" class="input" data-role="personel-month" value="' + esc(ay) + '"></div>' +
+      '<div style="flex:1"></div>' +
+      '<button class="btn btn-primary" data-act="personel-new">' + ICONS.plus + ' Yeni personel</button></div>' +
+      '<div class="card-body"><div class="kpis report-kpis">' +
+      rKpi('Aktif personel', nf0(aktif.length), (data.personel || []).length + ' kayıt', '', '') +
+      rKpi('Aylık maaş toplamı', money(base), 'aktif personel', 'info', '') +
+      rKpi(monthName(ay) + ' net', money(net), rows.length + ' personel', 'ok', '') +
+      rKpi('Eksik gün', nf1(eksikGun), 'bu dönem', 'warn', '') +
+      '</div></div>' +
+      '<div class="personel-body">' + content + '</div></div>';
+  }
+
+  function personelListeHtml(ay) {
+    var list = data.personel || [];
+    if (!list.length) return emptyState('users', 'Henüz personel yok', 'İlk personeli ekleyerek puantaj ve maaş takibine başlayın.',
+      '<button class="btn btn-primary" data-act="personel-new">' + ICONS.plus + ' Yeni personel</button>');
+    return '<div class="table-wrap"><table class="data"><thead><tr><th>Personel</th><th>Görev</th><th class="right">Aylık maaş</th><th class="right">Günlük saat</th><th class="right">İşe giriş</th><th>Durum</th><th></th></tr></thead><tbody>' +
+      list.map(function (p) {
+        return '<tr><td><div class="strong">' + esc(p.ad) + '</div>' + (p.not ? '<div class="sub">' + esc(p.not) + '</div>' : '') + '</td>' +
+          '<td>' + esc(p.gorev || '—') + '</td><td class="right">' + money(p.maas) + '</td><td class="right">' + nf1(p.gunlukSaat) + '</td>' +
+          '<td class="right">' + (p.iseGiris ? dateTR(p.iseGiris) : '—') + '</td><td>' + (p.aktif === false ? '<span class="pill muted">Pasif</span>' : '<span class="pill ok">Aktif</span>') + '</td>' +
+          '<td><div class="row-actions">' +
+          '<button class="btn btn-icon" data-act="personel-edit" data-id="' + p.id + '" title="Düzenle" aria-label="Düzenle">' + ICONS.edit + '</button>' +
+          '<button class="btn btn-icon" data-act="puantaj-edit" data-id="' + p.id + '" data-ay="' + esc(ay) + '" title="Puantaj" aria-label="Puantaj">' + ICONS.wallet + '</button>' +
+          '<button class="btn btn-icon danger" data-act="personel-del" data-id="' + p.id + '" title="Sil" aria-label="Sil">' + ICONS.trash + '</button>' +
+          '</div></td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  function personelPuantajHtml(rows, ay) {
+    if (!rows.length) return emptyState('users', 'Personel yok', 'Personel ekleyince puantaj satırları burada görünür.', '');
+    return '<div class="table-wrap"><table class="data"><thead><tr><th>Personel</th><th class="right">Maaş</th><th class="right">Eksik gün</th><th class="right">Eksik saat</th><th class="right">Fazla mesai</th><th class="right">Net</th><th>Durum</th><th></th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr><td><div class="strong">' + esc(r.personelAd) + '</div><div class="sub">' + esc(r.ay) + '</div></td>' +
+          '<td class="right">' + money(r.maas) + '</td><td class="right">' + nf1(r.eksikGun) + '</td><td class="right">' + nf1(r.eksikSaat) + '</td>' +
+          '<td class="right">' + nf1(r.fazlaMesai) + '</td><td class="right strong">' + money(r.net) + '</td><td>' + personelDurumPill(r.durum) + '</td>' +
+          '<td><div class="row-actions">' +
+          '<button class="btn btn-sm" data-act="puantaj-edit" data-id="' + r.personelId + '" data-ay="' + esc(ay) + '">Düzenle</button>' +
+          '<button class="btn btn-icon" data-act="puantaj-pusula" data-id="' + r.personelId + '" data-ay="' + esc(ay) + '" title="Maaş pusulası" aria-label="Maaş pusulası">' + ICONS.print + '</button>' +
+          (r.durum !== 'ODENDI' ? '<button class="btn btn-sm" data-act="puantaj-paid" data-id="' + (r.id || 0) + '" data-personel-id="' + r.personelId + '" data-ay="' + esc(ay) + '">Ödendi</button>' : '') +
+          '</div></td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<p class="muted small" style="padding:10px 14px;margin:0">Kaydı olmayan personel <b>tam ay</b> kabul edilir. Eksik gün ve aynı günün eksik saati birlikte girilirse çift kesinti olur.</p>';
+  }
+
+  function personelMaasHtml(rows, ay) {
+    if (!rows.length) return emptyState('wallet', 'Maaş satırı yok', 'Personel ekleyince aylık maaş tablosu oluşur.', '');
+    var t = { maas: 0, eksik: 0, fm: 0, ek: 0, kes: 0, avans: 0, net: 0 };
+    rows.forEach(function (r) {
+      t.maas += Core.num(r.maas); t.eksik += Core.num(r.eksikGunKesinti) + Core.num(r.eksikSaatKesinti);
+      t.fm += Core.num(r.fazlaMesaiTutar); t.ek += Core.num(r.ekOdeme); t.kes += Core.num(r.kesinti) + Core.num(r.avans); t.net += Core.num(r.net);
+    });
+    return '<div class="table-wrap"><table class="data"><thead><tr><th>Personel</th><th class="right">Aylık maaş</th><th class="right">Eksik kesinti</th><th class="right">Fazla mesai</th><th class="right">Ek ödeme</th><th class="right">Kesinti + avans</th><th class="right">Net</th><th>Durum</th><th></th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr><td><div class="strong">' + esc(r.personelAd) + '</div><div class="sub">' + esc(r.gorev || '') + '</div></td>' +
+          '<td class="right">' + money(r.maas) + '</td><td class="right">' + money(Core.num(r.eksikGunKesinti) + Core.num(r.eksikSaatKesinti)) + '</td>' +
+          '<td class="right">' + money(r.fazlaMesaiTutar) + '</td><td class="right">' + money(r.ekOdeme) + '</td><td class="right">' + money(Core.num(r.kesinti) + Core.num(r.avans)) + '</td>' +
+          '<td class="right strong">' + money(r.net) + '</td><td>' + personelDurumPill(r.durum) + '</td>' +
+          '<td><div class="row-actions"><button class="btn btn-sm" data-act="puantaj-edit" data-id="' + r.personelId + '" data-ay="' + esc(ay) + '">Düzenle</button>' +
+          '<button class="btn btn-icon" data-act="puantaj-pusula" data-id="' + r.personelId + '" data-ay="' + esc(ay) + '" title="Pusula" aria-label="Pusula">' + ICONS.print + '</button>' +
+          (r.durum !== 'ODENDI' ? '<button class="btn btn-sm" data-act="puantaj-paid" data-id="' + (r.id || 0) + '" data-personel-id="' + r.personelId + '" data-ay="' + esc(ay) + '">Ödendi</button>' : '') +
+          '</div></td></tr>';
+      }).join('') + '</tbody><tfoot><tr><td>TOPLAM</td><td class="right">' + money(t.maas) + '</td><td class="right">' + money(t.eksik) + '</td><td class="right">' + money(t.fm) + '</td><td class="right">' + money(t.ek) + '</td><td class="right">' + money(t.kes) + '</td><td class="right strong">' + money(t.net) + '</td><td></td><td></td></tr></tfoot></table></div>' +
+      '<p class="muted small" style="padding:10px 14px;margin:0">Bu tablo <b>resmî bordro değildir</b>; SGK, vergi ve yasal kesintiler içermez. Sadece iç hesaplama amaçlıdır.</p>';
+  }
+
+  function openPersonelForm(p) {
+    if (!isAdmin()) return toast('Bu işlem için yönetici yetkisi gerekli.', 'err');
+    var isEdit = !!p;
+    var x = p || { ad: '', gorev: '', maas: '', gunlukSaat: 8, iseGiris: Core.todayISO(), aktif: true, not: '' };
+    var m = openModal({
+      title: isEdit ? 'Personeli düzenle' : 'Yeni personel',
+      subtitle: 'İç maaş hesabı · resmî bordro değildir',
+      body: '<form id="personelForm" class="form-grid g2" autocomplete="off">' +
+        '<div class="field span2"><label for="prAd">Ad soyad *</label><input id="prAd" class="input" required value="' + esc(x.ad) + '"></div>' +
+        '<div class="field"><label for="prGorev">Görev</label><input id="prGorev" class="input" value="' + esc(x.gorev) + '"></div>' +
+        '<div class="field"><label for="prMaas">Aylık maaş *</label><input id="prMaas" class="input num" inputmode="decimal" value="' + esc(x.maas) + '"></div>' +
+        '<div class="field"><label for="prSaat">Günlük çalışma saati</label><input id="prSaat" class="input num" inputmode="decimal" value="' + esc(x.gunlukSaat) + '"></div>' +
+        '<div class="field"><label for="prGiris">İşe giriş</label><input id="prGiris" class="input" type="date" value="' + esc(x.iseGiris) + '"></div>' +
+        '<div class="field span2"><label for="prNot">Not</label><input id="prNot" class="input" value="' + esc(x.not) + '"></div>' +
+        '<div class="field span2"><label class="switch"><input id="prAktif" type="checkbox"' + (x.aktif === false ? '' : ' checked') + '><span class="track"></span><span>Aktif</span></label></div>' +
+        '<div class="span2 auth-err" id="prErr"></div></form>',
+      footer: '<button class="btn" data-modal-close>Vazgeç</button><button class="btn btn-primary" type="submit" form="personelForm">' + ICONS.check + ' Kaydet</button>'
+    });
+    $('#personelForm', m.el).addEventListener('submit', function (e) {
+      e.preventDefault();
+      var payload = {
+        ad: $('#prAd', m.el).value, gorev: $('#prGorev', m.el).value, maas: $('#prMaas', m.el).value,
+        gunlukSaat: $('#prSaat', m.el).value, iseGiris: $('#prGiris', m.el).value, not: $('#prNot', m.el).value,
+        aktif: $('#prAktif', m.el).checked
+      };
+      try {
+        if (isEdit) Core.updatePersonel(data, p.id, payload, S.user ? S.user.ad : '');
+        else Core.addPersonel(data, payload, S.user ? S.user.ad : '');
+        setDirty(true); m.close(); renderView(); updateChrome(); toast(isEdit ? 'Personel güncellendi' : 'Personel eklendi', 'ok');
+      } catch (err) { $('#prErr', m.el).textContent = err.message; }
+    });
+  }
+
+  function removePersonel(id) {
+    var p = Core.personelById(data, id);
+    if (!p) return;
+    confirmDialog({ title: 'Personel silinsin mi?', message: p.ad + ' silinecek. Puantaj kaydı varsa silinemez.', confirmText: 'Sil', danger: true }).then(function (ok) {
+      if (!ok) return;
+      try { Core.deletePersonel(data, id, S.user ? S.user.ad : ''); setDirty(true); renderView(); toast('Personel silindi', 'ok'); }
+      catch (err) { toast(err.message, 'err'); }
+    });
+  }
+
+  function openPuantajForm(personelId, ay) {
+    if (!isAdmin()) return toast('Bu işlem için yönetici yetkisi gerekli.', 'err');
+    var p = Core.personelById(data, personelId);
+    if (!p) return toast('Personel bulunamadı.', 'err');
+    var rec = Core.getPuantaj(data, personelId, ay);
+    var m = openModal({
+      title: 'Puantaj · ' + p.ad,
+      subtitle: monthName(ay) + ' · ' + money(rec.maas) + ' / ay',
+      body: '<form id="puantajForm" class="form-grid g3" autocomplete="off">' +
+        '<div class="field"><label for="pjEksikGun">Eksik gün</label><input id="pjEksikGun" class="input num" inputmode="decimal" value="' + esc(rec.eksikGun) + '"></div>' +
+        '<div class="field"><label for="pjEksikSaat">Eksik saat</label><input id="pjEksikSaat" class="input num" inputmode="decimal" value="' + esc(rec.eksikSaat) + '"></div>' +
+        '<div class="field"><label for="pjFm">Fazla mesai saat</label><input id="pjFm" class="input num" inputmode="decimal" value="' + esc(rec.fazlaMesai) + '"></div>' +
+        '<div class="field"><label for="pjEk">Ek ödeme</label><input id="pjEk" class="input num" inputmode="decimal" value="' + esc(rec.ekOdeme) + '"></div>' +
+        '<div class="field"><label for="pjKes">Diğer kesinti</label><input id="pjKes" class="input num" inputmode="decimal" value="' + esc(rec.kesinti) + '"></div>' +
+        '<div class="field"><label for="pjAvans">Avans</label><input id="pjAvans" class="input num" inputmode="decimal" value="' + esc(rec.avans) + '"></div>' +
+        '<div class="field span3"><label for="pjNot">Not</label><input id="pjNot" class="input" value="' + esc(rec.not) + '"></div>' +
+        '<div class="span3"><div class="puantaj-preview" id="pjPreview"></div><div class="auth-err" id="pjErr"></div></div></form>',
+      footer: '<button class="btn" data-modal-close>Vazgeç</button><button class="btn btn-primary" type="submit" form="puantajForm">' + ICONS.check + ' Kaydet</button>'
+    });
+    function calc() {
+      var x = {
+        maas: rec.maas, gunlukSaat: rec.gunlukSaat,
+        eksikGun: $('#pjEksikGun', m.el).value, eksikSaat: $('#pjEksikSaat', m.el).value,
+        fazlaMesai: $('#pjFm', m.el).value, ekOdeme: $('#pjEk', m.el).value,
+        kesinti: $('#pjKes', m.el).value, avans: $('#pjAvans', m.el).value
+      };
+      var c = Core.calculatePuantaj(x);
+      var uyari = Core.num(x.eksikGun) && Core.num(x.eksikSaat) ? '<div class="report-alert" style="margin:6px 0 0">' + ICONS.alert + ' Eksik gün ve eksik saat birlikte girildi; aynı gün için çift kesinti olabilir.</div>' : '';
+      $('#pjPreview', m.el).innerHTML = '<div><span>Günlük</span><b>' + money(c.gunluk) + '</b></div><div><span>Saatlik</span><b>' + money(c.saatlik) + '</b></div>' +
+        '<div><span>Eksik gün</span><b>−' + money(c.eksikGunKesinti) + '</b></div><div><span>Eksik saat</span><b>−' + money(c.eksikSaatKesinti) + '</b></div>' +
+        '<div><span>Fazla mesai</span><b>+' + money(c.fazlaMesaiTutar) + '</b></div><div class="net"><span>Net</span><b>' + money(c.net) + '</b></div>' + uyari;
+    }
+    ['pjEksikGun', 'pjEksikSaat', 'pjFm', 'pjEk', 'pjKes', 'pjAvans'].forEach(function (id) {
+      $('#' + id, m.el).addEventListener('input', calc);
+    });
+    calc();
+    $('#puantajForm', m.el).addEventListener('submit', function (e) {
+      e.preventDefault();
+      try {
+        Core.savePuantaj(data, {
+          personelId: personelId, ay: ay, maas: rec.maas, gunlukSaat: rec.gunlukSaat,
+          eksikGun: $('#pjEksikGun', m.el).value, eksikSaat: $('#pjEksikSaat', m.el).value,
+          fazlaMesai: $('#pjFm', m.el).value, ekOdeme: $('#pjEk', m.el).value,
+          kesinti: $('#pjKes', m.el).value, avans: $('#pjAvans', m.el).value,
+          not: $('#pjNot', m.el).value, durum: rec.durum || 'TASLAK'
+        }, S.user ? S.user.ad : '');
+        setDirty(true); m.close(); renderView(); updateChrome(); toast('Puantaj kaydedildi', 'ok');
+      } catch (err) { $('#pjErr', m.el).textContent = err.message; }
+    });
+  }
+
+  function markPuantajPaid(id, personelId, ay) {
+    try {
+      if (!id) {
+        var rec = Core.savePuantaj(data, { personelId: num(personelId), ay: ay }, S.user ? S.user.ad : '');
+        id = rec.id;
+      }
+      Core.setPuantajStatus(data, id, 'ODENDI', Core.todayISO(), S.user ? S.user.ad : '');
+      setDirty(true); renderView(); toast('Maaş ödendi olarak işaretlendi', 'ok');
+    } catch (err) { toast(err.message, 'err'); }
+  }
+
+  function openPayslip(personelId, ay) {
+    var p = Core.personelById(data, personelId);
+    if (!p) return;
+    var r = Core.getPuantaj(data, personelId, ay);
+    if (!r) return;
+    var rows = [
+      ['Aylık maaş', money(r.maas)],
+      ['Eksik gün kesintisi (' + nf1(r.eksikGun) + ' gün)', '−' + money(r.eksikGunKesinti)],
+      ['Eksik saat kesintisi (' + nf1(r.eksikSaat) + ' saat)', '−' + money(r.eksikSaatKesinti)],
+      ['Fazla mesai (' + nf1(r.fazlaMesai) + ' saat × 1,5)', '+' + money(r.fazlaMesaiTutar)],
+      ['Ek ödeme', '+' + money(r.ekOdeme)],
+      ['Diğer kesinti', '−' + money(r.kesinti)],
+      ['Avans', '−' + money(r.avans)]
+    ];
+    printHtml('<div class="print-doc">' +
+      docHeader('MAAŞ PUSULASI', monthName(ay)) +
+      '<div class="pf-meta"><div class="row"><span class="k">PERSONEL</span><span class="v">' + esc(p.ad) + '</span></div>' +
+      '<div class="row"><span class="k">GÖREV</span><span class="v">' + esc(p.gorev || '—') + '</span></div>' +
+      '<div class="row"><span class="k">DÖNEM</span><span class="v">' + esc(monthName(ay)) + '</span></div>' +
+      '<div class="row"><span class="k">GÜNLÜK SAAT</span><span class="v">' + nf1(r.gunlukSaat) + '</span></div></div>' +
+      '<table class="pf-table"><thead><tr><th>AÇIKLAMA</th><th class="n">TUTAR</th></tr></thead><tbody>' +
+      rows.map(function (x) { return '<tr><td>' + esc(x[0]) + '</td><td class="n">' + x[1] + '</td></tr>'; }).join('') +
+      '</tbody><tfoot><tr><td>NET ÖDENECEK</td><td class="n">' + money(r.net) + '</td></tr></tfoot></table>' +
+      '<p class="pf-note">Bu pusula <b>resmî bordro değildir</b>; SGK, vergi ve yasal kesintiler içermez. İç hesaplama amaçlıdır.</p>' +
+      '<div class="pf-sign"><div class="line">TESLİM EDEN</div><div class="line">TESLİM ALAN</div></div>' +
+      '<div class="pf-foot"><span>' + esc(data.settings.firmaAdi) + '</span><span>' + esc(monthName(ay)) + ' · ' + esc(p.ad) + '</span></div></div>');
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Rapor merkezi                                                       */
   /* ------------------------------------------------------------------ */
   function rp2(n) { return String(n).padStart(2, '0'); }
@@ -2788,9 +3029,17 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.2.3';
+  var SURUM = '3.3.0';
 
   var YENILIKLER = [
+    {
+      v: '3.3.0', t: '06.11.2026', m: [
+        'Personel, aylık puantaj ve iç maaş hesabı',
+        'Eksik gün, eksik saat, fazla mesai (x1,5), avans, ek ödeme ve kesinti',
+        'Maaş pusulası yazdırma ve ödendi işaretleme',
+        'Personel ve puantaj Excel sayfaları; yönetici yetkisi'
+      ]
+    },
     {
       v: '3.2.3', t: '04.11.2026', m: [
         'Yeni sürüm varsa üstte kalıcı “Yeni sürüm hazır” bildirimi',
@@ -5525,6 +5774,9 @@ function viewShipments() {
       renderView();
       var inp = $('[data-role="ship-list-search"]');
       if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    } else if (t.dataset.role === 'personel-month') {
+      S.ui.personelMonth = t.value || Core.todayISO().slice(0, 7);
+      renderView();
     } else if (t.dataset.role === 'report-preset') {
       rApplyPreset(t.value);
       renderView();
@@ -5582,6 +5834,12 @@ function viewShipments() {
   }, true);
 
   document.addEventListener('click', function (e) {
+    var pt = e.target.closest('[data-personel-tab]');
+    if (pt) {
+      S.ui.personelTab = pt.dataset.personelTab;
+      renderView();
+      return;
+    }
     var rt = e.target.closest('[data-report-tab]');
     if (rt) {
       S.ui.reportTab = rt.dataset.reportTab;
