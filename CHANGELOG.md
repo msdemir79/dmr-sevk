@@ -2,6 +2,18 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.3.1 — 06.11.2026
+
+### Değişti
+- **Ayarlar** dört sekmeye ayrıldı:
+  - **Genel:** firma, marka, logo, fiş, tercihler, sürüm.
+  - **Katalog:** renkler ve asorti şablonları.
+  - **Kullanıcılar & Güvenlik:** kullanıcılar, şifre, çöp, işlem günlüğü, dosya kontrolü.
+  - **Veri:** dosya, yedekler, içe aktarma ve tehlikeli işlemler.
+- Üstte sabit **dosya durumu + Kaydet / Farklı kaydet** çubuğu.
+- “Tüm verileri sil” ayrı **kırmızı tehlikeli bölge**ye taşındı.
+- Sekme değiştirirken formdaki yazılanlar korunur.
+
 ## v3.3.0 — 06.11.2026
 
 ### Eklendi

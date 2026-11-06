@@ -16,6 +16,7 @@ Tek bir HTML dosyası olarak çalışan, verilerini seçtiğiniz **Excel (.xlsx)
 - Rapor Merkezi: tarih aralığı/karşılaştırma, kârlılık, cari yaşlandırma, sevkiyat ve ürün analizi
 - Raporlarda Excel ve CSV dışa aktarma
 - Personel puantajı ve basit iç maaş hesabı (yönetici)
+- Dört sekmeli, dosya durumu sabit Ayarlar ekranı
 - Model/renk bazlı Sipariş / Sevk / Kalan raporu
 - Sevk fişinde isteğe bağlı beden dökümü
 - Yeni sürüm bildirimi ve çevrimiçi tekrar kontrol
@@ -72,7 +73,7 @@ Planlanan geliştirmeler ve tasarım notları: [ROADMAP.md](ROADMAP.md). Örnek:
 
 ## Sürüm
 
-Güncel sürüm: **v3.3.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
+Güncel sürüm: **v3.3.1**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
 
 ### Yeni sürüm çıkarma
 

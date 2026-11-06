@@ -190,7 +190,7 @@
       shipListSearch: '', shipListPage: 1,
       reportMonth: Core.todayISO().slice(0, 7),
     reportTab: 'ozet', reportPreset: 'last30', reportOnlyOpen: false,
-    personelTab: 'liste', personelMonth: Core.todayISO().slice(0, 7),
+    personelTab: 'liste', personelMonth: Core.todayISO().slice(0, 7), settingsTab: 'genel',
     reportFrom: (function () { var d = new Date(); d.setDate(d.getDate() - 29); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(),
     reportTo: Core.todayISO(),
     },
@@ -3029,9 +3029,17 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.3.0';
+  var SURUM = '3.3.1';
 
   var YENILIKLER = [
+    {
+      v: '3.3.1', t: '06.11.2026', m: [
+        'Ayarlar dört sekmeye ayrıldı: Genel, Katalog, Kullanıcılar & Güvenlik, Veri',
+        'Üstte sabit dosya durumu ve Kaydet / Farklı kaydet çubuğu',
+        'Tehlikeli veri işlemleri ayrı kırmızı bölümde',
+        'Sekme geçişlerinde form verileri korunur'
+      ]
+    },
     {
       v: '3.3.0', t: '06.11.2026', m: [
         'Personel, aylık puantaj ve iç maaş hesabı',
@@ -4424,7 +4432,24 @@ function viewShipments() {
         '</div></td></tr>';
     }).join('');
 
-    return '<div class="grid-2 even">' +
+    var active = S.ui.settingsTab || 'genel';
+    if (['genel', 'katalog', 'kullanicilar', 'veri'].indexOf(active) < 0) active = 'genel';
+    var tabs = [
+      ['genel', 'Genel', ''],
+      ['katalog', 'Katalog', (data.renkler || []).length + ' renk · ' + (data.asortiSablonlari || []).length + ' şablon'],
+      ['kullanicilar', 'Kullanıcılar & Güvenlik', (data.kullanicilar || []).length + ' kullanıcı'],
+      ['veri', 'Veri', S.file.dirty ? '●' : '']
+    ];
+    var tabHtml = tabs.map(function (t) {
+      return '<button class="settings-tab' + (active === t[0] ? ' active' : '') + '" data-settings-tab="' + t[0] + '">' +
+        '<span>' + t[1] + '</span>' + (t[2] ? '<small>' + esc(t[2]) + '</small>' : '') + '</button>';
+    }).join('');
+
+    var fname = S.file.name || 'Dosya seçilmedi';
+    var fstat = S.file.dirty ? '<span class="pill warn">Kaydedilmedi</span>' : '<span class="pill ok">Güncel</span>';
+    var last = S.file.lastSaved ? dateTR(S.file.lastSaved.toISOString().slice(0, 10)) + ' ' + timeTR(S.file.lastSaved) : '—';
+
+    var genel = '' +
       '<div class="card"><div class="card-head"><div><h2>Firma ve görünüm</h2><div class="sub">Sol üst marka ve sevk fişi başlığı</div></div></div>' +
       '<form id="settingsForm" class="card-body form-grid g2">' +
       '  <div class="field"><label for="setMarka">Uygulama adı <span class="hint">(sol üst)</span></label><input id="setMarka" name="markaAdi" class="input" maxlength="24" value="' + esc(s.markaAdi || 'DMR') + '"></div>' +
@@ -4455,74 +4480,85 @@ function viewShipments() {
       '  </div></div>' +
       '  <div class="span2 muted small" style="padding-top:2px">Cari hesap bilgileri (ad, adres, telefon) <b>Cariler</b> sayfasından yönetilir.</div>' +
       '  <div class="span2" style="display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--line);padding-top:14px">' +
-      '    <button type="submit" class="btn btn-primary">' + ICONS.check + ' Bilgileri kaydet</button>' +
+      '    <button type="submit" class="btn btn-primary">' + ICONS.check + ' Ayarları kaydet</button>' +
       '  </div>' +
       '</form></div>' +
-      '<div>' +
-      '  <div class="card"><div class="card-head"><div><h2>Veri dosyası</h2><div class="sub">Tüm kayıtlar seçtiğiniz Excel dosyasında tutulur</div></div></div>' +
-      '    <div class="card-body">' +
-      '      <div class="kv"><span>Dosya</span><b>' + esc(S.file.name || 'Henüz seçilmedi') + '</b></div>' +
-      '      <div class="kv"><span>Durum</span><b>' + (S.file.dirty ? '<span class="pill warn">Kaydedilmedi</span>' : '<span class="pill ok">Güncel</span>') + '</b></div>' +
-      '      <div class="kv"><span>Son kayıt</span><b>' + (S.file.lastSaved ? dateTR(S.file.lastSaved.toISOString().slice(0, 10)) + ' ' + timeTR(S.file.lastSaved) : '—') + '</b></div>' +
-      '      <div class="kv"><span>Kayıt modu</span><b>' + (FS_OK ? 'Doğrudan Excel dosyasına' : 'İndirme (tarayıcı)') + '</b></div>' +
-      '      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">' +
-      '        <button class="btn btn-primary btn-sm" data-act="save">' + ICONS.save + ' Kaydet</button>' +
-      '        <button class="btn btn-sm" data-act="save-as">' + ICONS.folder + ' Farklı kaydet</button>' +
-      '        <button class="btn btn-sm" data-act="open-file">' + ICONS.upload + ' Dosya aç</button>' +
-      '      </div>' +
-      '      <p class="muted small" style="margin:12px 0 0">Excel dosyasını bu ekran açıkken de açabilirsiniz; ancak kaydetmeden önce Excel\'de kapatın.</p>' +
-      '    </div></div>' +
-      '  <div class="card"><div class="card-head"><div><h2>Renkler</h2><div class="sub">Model kartlarında seçilir</div></div>' +
-      '    <button class="btn btn-sm" data-act="color-new">' + ICONS.plus + ' Renk</button></div>' +
-      '    <div class="table-wrap" style="max-height:none"><table class="data"><thead><tr><th>Renk</th><th class="right">Model</th><th></th></tr></thead><tbody>' +
-      (renkRows || '<tr><td colspan="3">' + emptyState('tag', 'Renk yok', 'Model kartlarında kullanmak için renk ekleyin.', '') + '</td></tr>') +
-      '    </tbody></table></div></div>' +
-      '  <div class="card"><div class="card-head"><div><h2>Asorti şablonları</h2><div class="sub">Modele atanır; beden dağılımı burada tanımlanır</div></div>' +
-      '    <button class="btn btn-sm" data-act="sablon-new">' + ICONS.plus + ' Şablon</button></div>' +
-      '    <div class="table-wrap" style="max-height:none"><table class="data"><thead><tr><th>Şablon</th><th class="right">Çift</th><th class="right">Model</th><th></th></tr></thead><tbody>' +
-      (sablonRows || '<tr><td colspan="4">' + emptyState('tag', 'Şablon yok', 'Asorti şablonu ekleyip modele atayın.', '') + '</td></tr>') +
-      '    </tbody></table></div></div>' +
-      '  <div class="card"><div class="card-head"><div><h2>Yedekler</h2><div class="sub">Günde bir otomatik · son 7 gün</div></div></div>' +
-      '    <div class="card-body">' +
-      '      <div style="display:flex;gap:8px;flex-wrap:wrap">' +
-      '        <button class="btn btn-sm btn-primary" data-act="open-backups">' + ICONS.shield + ' Yedekleri aç</button>' +
-      '        <button class="btn btn-sm" data-act="backup-file">' + ICONS.download + ' Yedek indir</button>' +
-      '      </div>' +
-      '      <p class="muted small" style="margin:10px 0 0">Yedekler tarayıcıda saklanır; dosyanızı ayrıca OneDrive/Drive klasöründe tutmanız önerilir.</p>' +
-      '    </div></div>' +
-      '  <div class="card"><div class="card-head"><div><h2>Kayıt güvenliği</h2></div></div>' +
-      '    <div class="card-body" style="display:flex;flex-direction:column;gap:8px">' +
-      '      <button class="btn btn-sm" style="justify-content:flex-start" data-act="open-trash">' + ICONS.archive + ' Çöp kutusu <span class="muted small">(' + (data.trash || []).length + ' kayıt)</span></button>' +
-      '      <button class="btn btn-sm" style="justify-content:flex-start" data-act="open-audit">' + ICONS.history + ' İşlem günlüğü <span class="muted small">(' + (data.audit || []).length + ')</span></button>' +
-      '      <button class="btn btn-sm" style="justify-content:flex-start" data-act="open-health">' + ICONS.shield + ' Dosya kontrolü</button>' +
-      '    </div></div>' +
-      '  <div class="card"><div class="card-head"><div><h2>Kullanıcılar</h2><div class="sub">Uygulama giriş hesapları</div></div>' +
-      '    <button class="btn btn-sm" data-act="user-new">' + ICONS.plus + ' Yeni kullanıcı</button></div>' +
-      '    <div class="table-wrap" style="max-height:none"><table class="data"><thead><tr><th>Ad soyad</th><th>Kullanıcı adı</th><th>Rol</th><th>Son giriş</th><th></th></tr></thead><tbody>' +
-      (userRows || '<tr><td colspan="5">' + emptyState('users', 'Kullanıcı yok', 'Yeni kullanıcı ekleyin.', '') + '</td></tr>') +
-      '</tbody></table></div>' +
-      '    <div class="card-body" style="border-top:1px solid var(--line)">' +
-      '      <p class="muted small" style="margin:0 0 10px">Bu giriş ekranı uygulamayı kilitler. Excel dosyasını açan biri verileri görebilir; dosyayı güvenli bir yerde tutun.</p>' +
-      '      <button class="btn btn-sm" data-act="change-pass">Şifremi değiştir</button>' +
-      '    </div></div>' +
-      '  <div class="card"><div class="card-head"><div><h2>Çalışma tercihleri</h2></div></div>' +
-      '    <div class="card-body">' +
-      '      <label class="switch"><input type="checkbox" id="autoSaveChk"' + (S.autosave ? ' checked' : '') + '><span class="track"></span>' +
-      '      <span>Her değişiklikte otomatik kaydet</span></label>' +
-      '      <p class="muted small" style="margin:8px 0 0">Kapalıysa Ctrl+S ile veya sol alttaki "Kaydet" düğmesiyle kaydedin.</p>' +
-      '    </div></div>' +
-      '  <div class="card"><div class="card-head"><div><h2>Veri işlemleri</h2></div></div>' +
-      '    <div class="card-body" style="display:flex;flex-direction:column;gap:8px">' +
-      '      <button class="btn btn-sm" style="justify-content:flex-start" data-act="import-cari">' + ICONS.upload + ' Excel dosyasından cari aktar <span class="muted small">(mevcut veritabanına)</span></button>' +
-      '      <button class="btn btn-sm" style="justify-content:flex-start" data-act="import-legacy">' + ICONS.upload + ' Eski dosyadan yeni veritabanı oluştur</button>' +
-      '      <button class="btn btn-sm" style="justify-content:flex-start" data-act="new-file">' + ICONS.file + ' Yeni boş dosya oluştur</button>' +
-      '      <button class="btn btn-sm btn-danger" style="justify-content:flex-start" data-act="clear-all">' + ICONS.trash + ' Tüm verileri sil</button>' +
-      '    </div></div>' +
-      '  <div class="card"><div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:10px">' +
-      '    <div><div class="strong">Sürüm ' + SURUM + '</div><div class="sub">' + YENILIKLER[0].t + ' · son güncelleme</div></div>' +
-      '    <button class="btn btn-sm" data-act="open-changelog">' + ICONS.history + ' Yenilikler</button>' +
+      '<div class="card"><div class="card-head"><div><h2>Çalışma tercihleri</h2></div></div>' +
+      '  <div class="card-body">' +
+      '    <label class="switch"><input type="checkbox" id="autoSaveChk"' + (S.autosave ? ' checked' : '') + '><span class="track"></span>' +
+      '    <span>Her değişiklikte otomatik kaydet</span></label>' +
+      '    <p class="muted small" style="margin:8px 0 0">Kapalıysa Ctrl+S ile veya üstteki Kaydet düğmesiyle kaydedin.</p>' +
       '  </div></div>' +
+      '<div class="card"><div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:10px">' +
+      '  <div><div class="strong">Sürüm ' + SURUM + '</div><div class="sub">' + YENILIKLER[0].t + ' · son güncelleme</div></div>' +
+      '  <button class="btn btn-sm" data-act="open-changelog">' + ICONS.history + ' Yenilikler</button>' +
+      '</div></div>';
+
+    var katalog = '<div class="grid-2 even">' +
+      '<div class="card"><div class="card-head"><div><h2>Renkler</h2><div class="sub">Model kartlarında kullanılır</div></div>' +
+      '<button class="btn btn-sm" data-act="color-new">' + ICONS.plus + ' Yeni renk</button></div>' +
+      '<div class="table-wrap" style="max-height:none"><table class="data"><thead><tr><th>Renk</th><th class="right">Kullanım</th><th></th></tr></thead><tbody>' +
+      (renkRows || '<tr><td colspan="3"><div class="empty">Henüz renk yok.</div></td></tr>') + '</tbody></table></div></div>' +
+      '<div class="card"><div class="card-head"><div><h2>Asorti şablonları</h2><div class="sub">Çift / koli dağılımı</div></div>' +
+      '<button class="btn btn-sm" data-act="sablon-new">' + ICONS.plus + ' Yeni şablon</button></div>' +
+      '<div class="table-wrap" style="max-height:none"><table class="data"><thead><tr><th>Şablon</th><th class="right">Toplam</th><th class="right">Kullanım</th><th></th></tr></thead><tbody>' +
+      (sablonRows || '<tr><td colspan="4"><div class="empty">Henüz şablon yok.</div></td></tr>') + '</tbody></table></div></div>' +
+      '</div>';
+
+    var kullanicilar = '<div class="card"><div class="card-head"><div><h2>Kullanıcılar</h2><div class="sub">Giriş, rol ve şifre yönetimi</div></div>' +
+      '<button class="btn btn-sm" data-act="user-new">' + ICONS.plus + ' Yeni kullanıcı</button></div>' +
+      '<div class="table-wrap" style="max-height:none"><table class="data"><thead><tr><th>Ad soyad</th><th>Kullanıcı adı</th><th>Yetki</th><th>Son giriş</th><th></th></tr></thead><tbody>' +
+      userRows + '</tbody></table></div>' +
+      '<div class="card-body" style="border-top:1px solid var(--line);display:flex;justify-content:flex-end">' +
+      '<button class="btn btn-sm" data-act="change-pass">' + ICONS.lock + ' Şifremi değiştir</button></div></div>' +
+      '<div class="card"><div class="card-head"><div><h2>Güvenlik ve kayıtlar</h2><div class="sub">Silinen kayıtlar, işlem geçmişi ve dosya kontrolü</div></div></div>' +
+      '<div class="card-body"><div class="settings-actions">' +
+      '<button class="btn btn-sm" data-act="open-trash">' + ICONS.trash + ' Çöp kutusu</button>' +
+      '<button class="btn btn-sm" data-act="open-audit">' + ICONS.history + ' İşlem günlüğü</button>' +
+      '<button class="btn btn-sm" data-act="open-health">' + ICONS.check + ' Dosya kontrolü</button>' +
+      '</div><p class="muted small" style="margin:10px 0 0">Personel ve maaş ekranları yalnızca yöneticiye açıktır. Excel dosyası tüm veriyi düz metin olarak içerir; dosyayı güvenli bir klasörde tutun.</p></div></div>';
+
+    var veri = '<div class="grid-2 even">' +
+      '<div class="card"><div class="card-head"><div><h2>Veri dosyası</h2><div class="sub">Tüm kayıtlar seçili Excel dosyasında tutulur</div></div></div>' +
+      '<div class="card-body">' +
+      '<div class="kv"><span>Dosya</span><b title="' + esc(fname) + '">' + esc(fname) + '</b></div>' +
+      '<div class="kv"><span>Durum</span><b>' + fstat + '</b></div>' +
+      '<div class="kv"><span>Son kayıt</span><b>' + last + '</b></div>' +
+      '<div class="settings-actions" style="margin-top:14px">' +
+      '<button class="btn btn-primary btn-sm" data-act="save">' + ICONS.save + ' Kaydet</button>' +
+      '<button class="btn btn-sm" data-act="open-file">' + ICONS.folder + ' Dosya aç</button>' +
+      '<button class="btn btn-sm" data-act="save-as">' + ICONS.save + ' Farklı kaydet</button>' +
+      '</div></div></div>' +
+      '<div class="card"><div class="card-head"><div><h2>Yedekler</h2><div class="sub">Otomatik ve manuel yedekler</div></div></div>' +
+      '<div class="card-body"><p class="muted small" style="margin:0 0 12px">Kaydetmeden önce tarayıcıda otomatik yedek tutulur.</p>' +
+      '<div class="settings-actions">' +
+      '<button class="btn btn-sm" data-act="open-backups">' + ICONS.history + ' Yedekleri aç</button>' +
+      '<button class="btn btn-sm" data-act="backup-now">' + ICONS.save + ' Yedek al</button>' +
+      '<button class="btn btn-sm" data-act="backup-file">' + ICONS.download + ' Yedeği indir</button>' +
+      '</div></div></div></div>' +
+      '<div class="card danger-zone"><div class="card-head"><div><h2>Veri işlemleri</h2><div class="sub">İçe aktarma ve tehlikeli işlemler</div></div></div>' +
+      '<div class="card-body"><div class="settings-actions">' +
+      '<button class="btn btn-sm" data-act="import-cari">' + ICONS.upload + ' Excel dosyasından cari aktar</button>' +
+      '<button class="btn btn-sm" data-act="import-legacy">' + ICONS.upload + ' Eski dosyadan yeni veritabanı oluştur</button>' +
+      '<button class="btn btn-sm" data-act="new-file">' + ICONS.file + ' Yeni boş dosya oluştur</button>' +
+      '<button class="btn btn-sm btn-danger" data-act="clear-all">' + ICONS.trash + ' Tüm verileri sil</button>' +
+      '</div><p class="muted small" style="margin:10px 0 0"><b>Tüm verileri sil</b> geri alınamaz. Önce yedek almanız önerilir.</p></div></div>';
+
+    function group(key, html) {
+      return '<div class="settings-group' + (active === key ? ' active' : '') + '" data-settings-group="' + key + '">' + html + '</div>';
+    }
+
+    return '<div class="settings-shell">' +
+      '<div class="settings-top">' +
+      '<div class="settings-file"><div class="settings-file-name">' + ICONS.file + '<b>' + esc(fname) + '</b></div><div class="settings-file-meta">' + fstat + '<span>Son kayıt: ' + last + '</span></div></div>' +
+      '<div class="settings-actions"><button class="btn btn-primary" data-act="save">' + ICONS.save + ' Kaydet</button>' +
+      '<button class="btn" data-act="save-as">' + ICONS.save + ' Farklı kaydet</button></div>' +
       '</div>' +
+      '<div class="settings-tabs">' + tabHtml + '</div>' +
+      group('genel', genel) +
+      group('katalog', katalog) +
+      group('kullanicilar', kullanicilar) +
+      group('veri', veri) +
       '</div>';
   }
 
@@ -5834,6 +5870,13 @@ function viewShipments() {
   }, true);
 
   document.addEventListener('click', function (e) {
+    var st = e.target.closest('[data-settings-tab]');
+    if (st) {
+      S.ui.settingsTab = st.dataset.settingsTab;
+      $$('[data-settings-tab]').forEach(function (b) { b.classList.toggle('active', b === st); });
+      $$('[data-settings-group]').forEach(function (g) { g.classList.toggle('active', g.dataset.settingsGroup === S.ui.settingsTab); });
+      return;
+    }
     var pt = e.target.closest('[data-personel-tab]');
     if (pt) {
       S.ui.personelTab = pt.dataset.personelTab;

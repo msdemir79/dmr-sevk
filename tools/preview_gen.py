@@ -140,6 +140,13 @@ BOOT = r"""
     if (h === 'all-dashboard') { APP.S.ui.cariId = 0; APP.updateChrome(); APP.renderView(); }
     if (h === 'cariler') { APP.S.view = 'cariler'; APP.updateChrome(); APP.renderView(); }
     if (h === 'settings') { APP.S.view = 'settings'; APP.updateChrome(); APP.renderView(); }
+    if (h === 'settings-katalog' || h === 'settings-kullanicilar' || h === 'settings-veri') {
+      APP.S.view = 'settings'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-settings-tab="' + h.replace('settings-', '') + '"]');
+        if (b) b.click();
+      }, 250);
+    }
     if (h === 'check-update-new') {
       APP.S.view = 'dashboard'; APP.updateChrome(); APP.renderView();
       var gercekFetch = window.fetch;
