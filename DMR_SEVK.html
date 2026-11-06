@@ -1102,6 +1102,14 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
 @media (max-width: 700px) { .pj-grid .pj-person { min-width: 118px; max-width: 118px; } .pj-wrap { max-height: calc(100vh - 430px); } }
 
 
+.settings-checks { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 9px 0; }
+.settings-checks .check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+.settings-checks input { width: 15px; height: 15px; accent-color: var(--brand-2); }
+
+.pj-grid .pj-dh.weekend { background: #f3e8ff; color: #6b21a8; }
+.pj-grid td.weekend { background: #fbf7ff; }
+.pj-grid td.weekend .pj-day { box-shadow: inset 0 0 0 1px #e9d5ff; }
+
 </style>
 </head>
 <body>
@@ -2403,6 +2411,8 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
       sonSiparisNo: 0,
       sonFisNo: 0,
       varsayilanAsorti: 10,
+      personelGunlukSaat: 8,
+      personelHaftaTatili: '0,6',
       logo: '',
       kurulum: ''
     };
@@ -3090,7 +3100,10 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
       gorev: String(input.gorev || '').trim(),
       maas: round2(num(input.maas)),
       gunlukSaat: num(input.gunlukSaat) || 8,
+      cinsiyet: (function (x) { x = String(x || '').toUpperCase(); return x === 'BAY' || x === 'BAYAN' ? x : ''; })(input.cinsiyet),
       iseGiris: toISODate(input.iseGiris) || '',
+      cikisTarihi: toISODate(input.cikisTarihi) || '',
+      cikisSebebi: String(input.cikisSebebi || '').trim(),
       aktif: !(input.aktif === false || input.aktif === 'false' || input.aktif === 0 || input.aktif === 'HAYIR'),
       not: String(input.not || '').trim()
     };
@@ -3101,6 +3114,10 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
   }
 
   function addPersonel(data, input, kullanici) {
+    input = input || {};
+    if (input.gunlukSaat === undefined || input.gunlukSaat === '' || input.gunlukSaat === null) {
+      input.gunlukSaat = data.settings.personelGunlukSaat || 8;
+    }
     var p = normalizePersonel(input);
     if (!p.ad) throw new Error('Personel adı zorunlu.');
     if (p.maas < 0) throw new Error('Maaş negatif olamaz.');
@@ -3109,6 +3126,14 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
     data.personel.push(p);
     audit(data, kullanici, 'PERSONEL EKLE', p.ad + ' · ' + money(p.maas));
     return p;
+  }
+
+  function cikisMaasOdenmis(data, p) {
+    if (!p || !p.cikisTarihi) return false;
+    var ay = String(p.cikisTarihi).slice(0, 7);
+    return (data.puantaj || []).some(function (r) {
+      return r.personelId === p.id && r.durum === 'ODENDI' && String(r.ay) >= ay;
+    });
   }
 
   function updatePersonel(data, id, input, kullanici) {
@@ -3122,6 +3147,7 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
     if (!np.ad) throw new Error('Personel adı zorunlu.');
     if (np.maas < 0) throw new Error('Maaş negatif olamaz.');
     if (np.gunlukSaat <= 0 || np.gunlukSaat > 24) throw new Error('Günlük çalışma saati 1–24 arasında olmalı.');
+    if (cikisMaasOdenmis(data, np)) np.aktif = false;
     data.personel = data.personel.map(function (x) { return x.id === id ? np : x; });
     audit(data, kullanici, 'PERSONEL DÜZENLE', np.ad + ' · ' + money(np.maas));
     return np;
@@ -3154,11 +3180,16 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
     return n;
   }
 
-  function gridDays(rec, ay) {
+  function gridDays(rec, ay, weekends) {
     var n = monthDays(ay);
     var src = normalizeGunler(rec && rec.gunler, ay);
+    var wk = weekends || [];
+    var m = /^(\d{4})-(\d{2})$/.exec(String(ay || ''));
     var arr = [];
-    for (var i = 0; i < n; i++) arr.push(src[i] || 'T');
+    for (var i = 0; i < n; i++) {
+      var wd = m ? new Date(Number(m[1]), Number(m[2]) - 1, i + 1).getDay() : -1;
+      arr.push(src[i] || (wk.indexOf(wd) >= 0 ? 'H' : 'T'));
+    }
     if (!src && rec && num(rec.eksikGun) > 0) {
       var cnt = Math.min(n, Math.round(num(rec.eksikGun)));
       for (i = n - cnt; i < n; i++) arr[i] = 'Y';
@@ -3270,6 +3301,10 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
     if (!rec) throw new Error('Puantaj kaydı bulunamadı.');
     rec.durum = durum === 'ODENDI' ? 'ODENDI' : durum === 'KESIN' ? 'KESIN' : 'TASLAK';
     rec.odemeTarihi = rec.durum === 'ODENDI' ? (toISODate(odemeTarihi) || todayISO()) : '';
+    if (rec.durum === 'ODENDI') {
+      var pp = personelById(data, rec.personelId);
+      if (pp && pp.cikisTarihi && rec.ay >= String(pp.cikisTarihi).slice(0, 7)) pp.aktif = false;
+    }
     audit(data, kullanici, 'PUANTAJ DURUM', (rec.personelAd || '') + ' · ' + rec.durum);
     return rec;
   }
@@ -3740,7 +3775,7 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
     });
 
     var personelRows = (data.personel || []).map(function (p) {
-      return [p.id, p.ad, p.gorev || '', money(p.maas), num(p.gunlukSaat), p.iseGiris || '', p.aktif === false ? 'HAYIR' : 'EVET', p.not || ''];
+      return [p.id, p.ad, p.gorev || '', p.cinsiyet || '', money(p.maas), num(p.gunlukSaat), p.iseGiris || '', p.cikisTarihi || '', p.cikisSebebi || '', p.aktif === false ? 'HAYIR' : 'EVET', p.not || ''];
     });
 
     var puantajRows = (data.puantaj || []).map(function (r) {
@@ -3810,7 +3845,8 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
           name: SHEET.PERSONEL,
           columns: [
             { header: 'ID', width: 6 }, { header: 'AD SOYAD', width: 26 }, { header: 'GÖREV', width: 18 },
-            { header: 'AYLIK MAAŞ', width: 13 }, { header: 'GÜNLÜK SAAT', width: 12 }, { header: 'İŞE GİRİŞ', width: 12 },
+            { header: 'CİNSİYET', width: 10 }, { header: 'AYLIK MAAŞ', width: 13 }, { header: 'GÜNLÜK SAAT', width: 12 },
+            { header: 'İŞE GİRİŞ', width: 12 }, { header: 'ÇIKIŞ TARİHİ', width: 12 }, { header: 'ÇIKIŞ SEBEBİ', width: 22 },
             { header: 'AKTİF', width: 9 }, { header: 'NOT', width: 30 }
           ],
           rows: personelRows
@@ -3965,7 +4001,8 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
   };
   var PERSONEL_KEYS = {
     ID: 'id', AD: 'ad', ADSOYAD: 'ad', GOREV: 'gorev', GOREVI: 'gorev', MAAS: 'maas', AYLIKMAAS: 'maas',
-    GUNLUKSAAT: 'gunlukSaat', CALISMASAATI: 'gunlukSaat', ISEGIRIS: 'iseGiris', ISEGIRISTARIHI: 'iseGiris',
+    GUNLUKSAAT: 'gunlukSaat', CALISMASAATI: 'gunlukSaat', CINSIYET: 'cinsiyet', CINSIYETI: 'cinsiyet',
+    ISEGIRIS: 'iseGiris', ISEGIRISTARIHI: 'iseGiris', CIKISTARIHI: 'cikisTarihi', CIKISSEBEBI: 'cikisSebebi',
     AKTIF: 'aktif', NOT: 'not'
   };
   var PUANTAJ_KEYS = {
@@ -4122,7 +4159,10 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
           gorev: pick(prow, pm, 'gorev'),
           maas: pick(prow, pm, 'maas'),
           gunlukSaat: pick(prow, pm, 'gunlukSaat'),
+          cinsiyet: pick(prow, pm, 'cinsiyet'),
           iseGiris: pick(prow, pm, 'iseGiris'),
+          cikisTarihi: pick(prow, pm, 'cikisTarihi'),
+          cikisSebebi: pick(prow, pm, 'cikisSebebi'),
           aktif: pick(prow, pm, 'aktif'),
           not: pick(prow, pm, 'not')
         }));
@@ -4780,6 +4820,7 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
     deleteKullanici: deleteKullanici,
     kullaniciById: kullaniciById,
     personelById: personelById,
+    cikisMaasOdenmis: cikisMaasOdenmis,
     normalizePersonel: normalizePersonel,
     addPersonel: addPersonel,
     updatePersonel: updatePersonel,
@@ -7343,7 +7384,7 @@ var qrcode = function() {
       shipListSearch: '', shipListPage: 1,
       reportMonth: Core.todayISO().slice(0, 7),
     reportTab: 'ozet', reportPreset: 'last30', reportOnlyOpen: false,
-    personelTab: 'liste', personelMonth: Core.todayISO().slice(0, 7), settingsTab: 'genel',
+    personelTab: 'liste', personelMonth: Core.todayISO().slice(0, 7), settingsTab: 'genel', reportPersonelMonth: Core.todayISO().slice(0, 7),
     reportFrom: (function () { var d = new Date(); d.setDate(d.getDate() - 29); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(),
     reportTo: Core.todayISO(),
     },
@@ -8343,7 +8384,7 @@ var qrcode = function() {
         case 'puantaj-pusula': openPayslip(id, el.dataset.ay); break;
         case 'puantaj-grid': togglePuantajDay(el); break;
         case 'puantaj-grid-all': setAllPuantajDays(el.dataset.ay); break;
-        case 'puantaj-grid-h': setSundayPuantaj(el.dataset.ay); break;
+        case 'puantaj-grid-h': setWeekendPuantaj(el.dataset.ay); break;
         case 'report-toggle-open': S.ui.reportOnlyOpen = !S.ui.reportOnlyOpen; renderView(); break;
         case 'report-excel': reportExportExcel(); break;
         case 'report-csv': reportExportCsv(); break;
@@ -9248,6 +9289,12 @@ function viewShipments() {
     return S.ui.personelMonth || Core.todayISO().slice(0, 7);
   }
 
+  function personelWeekends() {
+    var raw = data.settings.personelHaftaTatili;
+    if (raw === undefined || raw === null) raw = '0,6';
+    return String(raw).split(',').map(function (x) { return Number(x); }).filter(function (x) { return x === 0 || x === 6; });
+  }
+
   function personelDurumPill(d) {
     if (d === 'ODENDI') return '<span class="pill ok">Ödendi</span>';
     if (d === 'KESIN') return '<span class="pill info">Kesin</span>';
@@ -9258,10 +9305,12 @@ function viewShipments() {
     if (!isAdmin()) return '<div class="card"><div class="card-body"><p class="muted">Bu ekran için yönetici yetkisi gerekli.</p></div></div>';
     var ay = personelMonth();
     var rows = Core.payrollRows(data, ay);
-    var aktif = (data.personel || []).filter(function (p) { return p.aktif !== false; });
-    var base = aktif.reduce(function (a, p) { return a + Core.num(p.maas); }, 0);
-    var net = Core.payrollTotal(data, ay);
-    var eksikGun = rows.reduce(function (a, r) { return a + Core.num(r.eksikGun); }, 0);
+    var all = data.personel || [];
+    var aktif = all.filter(function (p) { return p.aktif !== false; });
+    var bay = aktif.filter(function (p) { return p.cinsiyet === 'BAY'; }).length;
+    var bayan = aktif.filter(function (p) { return p.cinsiyet === 'BAYAN'; }).length;
+    var baslayan = all.filter(function (p) { return String(p.iseGiris || '').slice(0, 7) === ay; }).length;
+    var cikan = all.filter(function (p) { return String(p.cikisTarihi || '').slice(0, 7) === ay; }).length;
     var tabs = [['liste', 'Personel'], ['toplu', 'Toplu Puantaj'], ['puantaj', 'Puantaj'], ['maas', 'Maaş']];
     var content;
     if (S.ui.personelTab === 'toplu') content = personelTopluHtml(rows, ay);
@@ -9277,10 +9326,12 @@ function viewShipments() {
       '<div style="flex:1"></div>' +
       '<button class="btn btn-primary" data-act="personel-new">' + ICONS.plus + ' Yeni personel</button></div>' +
       '<div class="card-body"><div class="kpis report-kpis">' +
-      rKpi('Aktif personel', nf0(aktif.length), (data.personel || []).length + ' kayıt', '', '') +
-      rKpi('Aylık maaş toplamı', money(base), 'aktif personel', 'info', '') +
-      '<div class="kpi ok"><div class="kpi-label">' + monthName(ay) + ' net</div><div class="kpi-value" id="personelKpiNet">' + money(net) + '</div><div class="kpi-foot">' + rows.length + ' personel</div></div>' +
-      '<div class="kpi warn"><div class="kpi-label">Eksik gün</div><div class="kpi-value" id="personelKpiEgun">' + nf1(eksikGun) + '</div><div class="kpi-foot">bu dönem</div></div>' +
+      rKpi('Çalışan', nf0(aktif.length), 'aktif personel', 'ok', '') +
+      rKpi('Bay', nf0(bay), 'aktif', 'info', '') +
+      rKpi('Bayan', nf0(bayan), 'aktif', 'info', '') +
+      rKpi('Bu ay başlayan', nf0(baslayan), monthName(ay), '', '') +
+      rKpi('Bu ay işten çıkan', nf0(cikan), monthName(ay), 'warn', '') +
+      rKpi('Toplam personel', nf0(all.length), 'tüm kayıtlar', '', '') +
       '</div></div>' +
       '<div class="personel-body">' + content + '</div></div>';
   }
@@ -9289,11 +9340,13 @@ function viewShipments() {
     var list = data.personel || [];
     if (!list.length) return emptyState('users', 'Henüz personel yok', 'İlk personeli ekleyerek puantaj ve maaş takibine başlayın.',
       '<button class="btn btn-primary" data-act="personel-new">' + ICONS.plus + ' Yeni personel</button>');
-    return '<div class="table-wrap"><table class="data"><thead><tr><th>Personel</th><th>Görev</th><th class="right">Aylık maaş</th><th class="right">Günlük saat</th><th class="right">İşe giriş</th><th>Durum</th><th></th></tr></thead><tbody>' +
+    return '<div class="table-wrap"><table class="data"><thead><tr><th>Personel</th><th>Görev</th><th>Cinsiyet</th><th class="right">Aylık maaş</th><th class="right">Günlük saat</th><th class="right">İşe giriş</th><th>Çıkış</th><th>Durum</th><th></th></tr></thead><tbody>' +
       list.map(function (p) {
         return '<tr><td><div class="strong">' + esc(p.ad) + '</div>' + (p.not ? '<div class="sub">' + esc(p.not) + '</div>' : '') + '</td>' +
-          '<td>' + esc(p.gorev || '—') + '</td><td class="right">' + money(p.maas) + '</td><td class="right">' + nf1(p.gunlukSaat) + '</td>' +
-          '<td class="right">' + (p.iseGiris ? dateTR(p.iseGiris) : '—') + '</td><td>' + (p.aktif === false ? '<span class="pill muted">Pasif</span>' : '<span class="pill ok">Aktif</span>') + '</td>' +
+          '<td>' + esc(p.gorev || '—') + '</td><td>' + (p.cinsiyet === 'BAY' ? 'Bay' : p.cinsiyet === 'BAYAN' ? 'Bayan' : '—') + '</td><td class="right">' + money(p.maas) + '</td><td class="right">' + nf1(p.gunlukSaat) + '</td>' +
+          '<td class="right">' + (p.iseGiris ? dateTR(p.iseGiris) : '—') + '</td>' +
+          '<td class="sub">' + (p.cikisTarihi ? dateTR(p.cikisTarihi) + (p.cikisSebebi ? '<div class="sub">' + esc(p.cikisSebebi) + '</div>' : '') : '—') + '</td>' +
+          '<td>' + (p.aktif === false ? '<span class="pill muted">' + (p.cikisTarihi ? 'Ayrıldı' : 'Pasif') + '</span>' : '<span class="pill ok">Aktif</span>') + '</td>' +
           '<td><div class="row-actions">' +
           '<button class="btn btn-icon" data-act="personel-edit" data-id="' + p.id + '" title="Düzenle" aria-label="Düzenle">' + ICONS.edit + '</button>' +
           '<button class="btn btn-icon" data-act="puantaj-edit" data-id="' + p.id + '" data-ay="' + esc(ay) + '" title="Puantaj" aria-label="Puantaj">' + ICONS.wallet + '</button>' +
@@ -9305,21 +9358,23 @@ function viewShipments() {
   function personelTopluHtml(rows, ay) {
     if (!rows.length) return emptyState('users', 'Personel yok', 'Personel ekleyince toplu puantaj gridi burada görünür.', '');
     var n = Core.monthDays(ay);
+    var wk = personelWeekends();
     var yil = Number(ay.slice(0, 4)), ayNo = Number(ay.slice(5, 7));
     var etiket = { T: 'Tam geldi', Y: 'Gelmedi / ücretsiz', I: 'Ücretli izin', R: 'Rapor', H: 'Hafta tatili' };
     var gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
     var head = '';
     for (var d = 1; d <= n; d++) {
       var wd = new Date(yil, ayNo - 1, d).getDay();
-      head += '<th class="pj-dh' + (wd === 0 ? ' sun' : wd === 6 ? ' sat' : '') + '" title="' + d + ' ' + gunAdi[wd] + '">' + d + '</th>';
+      head += '<th class="pj-dh' + (wk.indexOf(wd) >= 0 ? ' weekend' : '') + (wd === 0 ? ' sun' : wd === 6 ? ' sat' : '') + '" title="' + d + ' ' + gunAdi[wd] + '">' + d + '</th>';
     }
     var body = rows.map(function (r) {
-      var chars = Core.gridDays(r, ay);
+      var chars = Core.gridDays(r, ay, wk);
       var yCount = chars.filter(function (x) { return x === 'Y'; }).length;
       var net = Core.calculatePuantaj(Object.assign({}, r, { eksikGun: yCount })).net;
       var locked = r.durum === 'ODENDI';
       var cells = chars.map(function (ch, i) {
-        return '<td><button type="button" class="pj-day st-' + ch + (locked ? ' locked' : '') + '" data-act="puantaj-grid" data-personel-id="' + r.personelId + '" data-ay="' + esc(ay) + '" data-day="' + (i + 1) + '" title="' + esc(etiket[ch] || ch) + '"' + (locked ? ' disabled' : '') + '>' + (ch === 'I' ? 'İ' : ch) + '</button></td>';
+        var wd = new Date(yil, ayNo - 1, i + 1).getDay();
+        return '<td class="' + (wk.indexOf(wd) >= 0 ? 'weekend' : '') + '"><button type="button" class="pj-day st-' + ch + (locked ? ' locked' : '') + '" data-act="puantaj-grid" data-personel-id="' + r.personelId + '" data-ay="' + esc(ay) + '" data-day="' + (i + 1) + '" title="' + esc(etiket[ch] || ch) + '"' + (locked ? ' disabled' : '') + '>' + (ch === 'I' ? 'İ' : ch) + '</button></td>';
       }).join('');
       return '<tr class="' + (locked ? 'pj-locked-row' : '') + '">' +
         '<td class="pj-person"><div class="pj-person-top"><b>' + esc(r.personelAd) + '</b>' +
@@ -9335,7 +9390,7 @@ function viewShipments() {
     return '<div class="pj-toolbar">' +
       '<div class="pj-legend"><span><i class="st-T">T</i> Tam</span><span><i class="st-Y">Y</i> Gelmedi</span><span><i class="st-I">İ</i> İzin</span><span><i class="st-R">R</i> Rapor</span><span><i class="st-H">H</i> Hafta tatili</span></div>' +
       '<div style="flex:1"></div>' +
-      '<button class="btn btn-sm" data-act="puantaj-grid-h" data-ay="' + esc(ay) + '">Pazarları H yap</button>' +
+      '<button class="btn btn-sm" data-act="puantaj-grid-h" data-ay="' + esc(ay) + '">Hafta tatillerini H yap</button>' +
       '<button class="btn btn-sm" data-act="puantaj-grid-all" data-ay="' + esc(ay) + '">Tümünü T yap</button>' +
       '</div>' +
       '<div class="pj-wrap"><table class="pj-grid"><thead><tr><th class="pj-person">Personel</th>' + head +
@@ -9383,16 +9438,21 @@ function viewShipments() {
   function openPersonelForm(p) {
     if (!isAdmin()) return toast('Bu işlem için yönetici yetkisi gerekli.', 'err');
     var isEdit = !!p;
-    var x = p || { ad: '', gorev: '', maas: '', gunlukSaat: 8, iseGiris: Core.todayISO(), aktif: true, not: '' };
+    var x = p || { ad: '', gorev: '', cinsiyet: '', maas: '', gunlukSaat: data.settings.personelGunlukSaat || 8, iseGiris: Core.todayISO(), cikisTarihi: '', cikisSebebi: '', aktif: true, not: '' };
     var m = openModal({
       title: isEdit ? 'Personeli düzenle' : 'Yeni personel',
       subtitle: 'İç maaş hesabı · resmî bordro değildir',
       body: '<form id="personelForm" class="form-grid g2" autocomplete="off">' +
         '<div class="field span2"><label for="prAd">Ad soyad *</label><input id="prAd" class="input" required value="' + esc(x.ad) + '"></div>' +
         '<div class="field"><label for="prGorev">Görev</label><input id="prGorev" class="input" value="' + esc(x.gorev) + '"></div>' +
+        '<div class="field"><label for="prCinsiyet">Cinsiyet</label><select id="prCinsiyet" class="select"><option value="">Seçin</option>' +
+        '<option value="BAY"' + (x.cinsiyet === 'BAY' ? ' selected' : '') + '>Bay</option><option value="BAYAN"' + (x.cinsiyet === 'BAYAN' ? ' selected' : '') + '>Bayan</option></select></div>' +
         '<div class="field"><label for="prMaas">Aylık maaş *</label><input id="prMaas" class="input num" inputmode="decimal" value="' + esc(x.maas) + '"></div>' +
         '<div class="field"><label for="prSaat">Günlük çalışma saati</label><input id="prSaat" class="input num" inputmode="decimal" value="' + esc(x.gunlukSaat) + '"></div>' +
         '<div class="field"><label for="prGiris">İşe giriş</label><input id="prGiris" class="input" type="date" value="' + esc(x.iseGiris) + '"></div>' +
+        '<div class="field"><label for="prCikis">Çıkış tarihi</label><input id="prCikis" class="input" type="date" value="' + esc(x.cikisTarihi) + '"></div>' +
+        '<div class="field span2"><label for="prCikisSebep">Çıkış sebebi</label><input id="prCikisSebep" class="input" value="' + esc(x.cikisSebebi) + '"></div>' +
+        '<div class="span2 muted small">Çıkış tarihi girildiğinde, o ayın maaşı <b>Ödendi</b> işaretlenince personel otomatik pasif olur.</div>' +
         '<div class="field span2"><label for="prNot">Not</label><input id="prNot" class="input" value="' + esc(x.not) + '"></div>' +
         '<div class="field span2"><label class="switch"><input id="prAktif" type="checkbox"' + (x.aktif === false ? '' : ' checked') + '><span class="track"></span><span>Aktif</span></label></div>' +
         '<div class="span2 auth-err" id="prErr"></div></form>',
@@ -9401,8 +9461,10 @@ function viewShipments() {
     $('#personelForm', m.el).addEventListener('submit', function (e) {
       e.preventDefault();
       var payload = {
-        ad: $('#prAd', m.el).value, gorev: $('#prGorev', m.el).value, maas: $('#prMaas', m.el).value,
-        gunlukSaat: $('#prSaat', m.el).value, iseGiris: $('#prGiris', m.el).value, not: $('#prNot', m.el).value,
+        ad: $('#prAd', m.el).value, gorev: $('#prGorev', m.el).value, cinsiyet: $('#prCinsiyet', m.el).value,
+        maas: $('#prMaas', m.el).value, gunlukSaat: $('#prSaat', m.el).value,
+        iseGiris: $('#prGiris', m.el).value, cikisTarihi: $('#prCikis', m.el).value,
+        cikisSebebi: $('#prCikisSebep', m.el).value, not: $('#prNot', m.el).value,
         aktif: $('#prAktif', m.el).checked
       };
       try {
@@ -9431,7 +9493,7 @@ function viewShipments() {
     var rec = Core.getPuantaj(data, personelId, ay);
     if (!rec) return;
     if (rec.durum === 'ODENDI') { toast('Ödenmiş ay kilitli; önce ödemeyi geri alın.', 'err'); return; }
-    var chars = Core.gridDays(rec, ay);
+    var chars = Core.gridDays(rec, ay, personelWeekends());
     var cycle = ['T', 'Y', 'I', 'R', 'H'];
     var next = cycle[(cycle.indexOf(chars[day - 1]) + 1) % cycle.length];
     chars[day - 1] = next;
@@ -9482,16 +9544,17 @@ function viewShipments() {
     });
   }
 
-  function setSundayPuantaj(ay) {
+  function setWeekendPuantaj(ay) {
     if (!isAdmin()) return;
     var rows = Core.payrollRows(data, ay);
     if (!rows.length) return;
-    confirmDialog({ title: 'Pazar günleri H yapılsın mı?', message: 'Ödenmemiş personelde Pazar günleri "Hafta tatili" olarak işaretlenecek; diğer günler "Tam" olacak.', confirmText: 'Pazarları H yap' }).then(function (ok) {
+    confirmDialog({ title: 'Hafta tatilleri H yapılsın mı?', message: 'Ödenmemiş personelde seçili hafta tatili günleri "H" olarak işaretlenecek; diğer günler "Tam" olacak.', confirmText: 'Hafta tatillerini H yap' }).then(function (ok) {
       if (!ok) return;
       var n = Core.monthDays(ay);
+      var wk = personelWeekends();
       var yil = Number(ay.slice(0, 4)), ayNo = Number(ay.slice(5, 7));
       var chars = [];
-      for (var d = 1; d <= n; d++) chars.push(new Date(yil, ayNo - 1, d).getDay() === 0 ? 'H' : 'T');
+      for (var d = 1; d <= n; d++) chars.push(wk.indexOf(new Date(yil, ayNo - 1, d).getDay()) >= 0 ? 'H' : 'T');
       var all = chars.join('');
       var say = 0;
       rows.forEach(function (r) {
@@ -9503,7 +9566,7 @@ function viewShipments() {
         }, S.user ? S.user.ad : '');
         say++;
       });
-      setDirty(true); renderView(); toast(say + ' personel için Pazar günleri H yapıldı', 'ok');
+      setDirty(true); renderView(); toast(say + ' personel için hafta tatilleri H yapıldı', 'ok');
     });
   }
 
@@ -9995,6 +10058,26 @@ function viewShipments() {
     return { rows: rows, totals: totals };
   }
 
+  function reportPersonelData(ay) {
+    ay = ay || S.ui.reportPersonelMonth || Core.todayISO().slice(0, 7);
+    var all = data.personel || [];
+    var rows = all.map(function (p) {
+      var rec = Core.getPuantaj(data, p.id, ay);
+      var has = (data.puantaj || []).some(function (x) { return x.personelId === p.id && x.ay === ay; });
+      var net = has || p.aktif !== false ? rec.net : 0;
+      return { p: p, r: rec, has: has, net: net };
+    });
+    var aktif = all.filter(function (p) { return p.aktif !== false; });
+    return {
+      ay: ay, all: all, aktif: aktif, rows: rows,
+      bay: aktif.filter(function (p) { return p.cinsiyet === 'BAY'; }).length,
+      bayan: aktif.filter(function (p) { return p.cinsiyet === 'BAYAN'; }).length,
+      baslayan: all.filter(function (p) { return String(p.iseGiris || '').slice(0, 7) === ay; }).length,
+      cikan: all.filter(function (p) { return String(p.cikisTarihi || '').slice(0, 7) === ay; }).length,
+      net: rows.reduce(function (a, x) { return a + Core.num(x.net); }, 0)
+    };
+  }
+
   function reportBuild() {
     var r = rRange(), cid = S.ui.cariId;
     var cur = reportCollect(r.from, r.to, cid);
@@ -10009,6 +10092,7 @@ function viewShipments() {
       orderStatus: reportOrderStatus(cur.orders),
       customerStatus: reportCustomerStatus(cur.orders),
       size: reportSize(cur.lines), colors: reportColors(cur.lines), asorti: reportAsorti(cur.lines),
+      personel: reportPersonelData(),
       quality: reportQuality(cur, profit)
     };
   }
@@ -10078,6 +10162,7 @@ function viewShipments() {
 
   function reportToolbar(ctx) {
     var tabs = [['ozet', 'Özet'], ['kar', 'Kârlılık'], ['cari', 'Cari'], ['siparis', 'Sipariş / Sevk / Kalan'], ['sevk', 'Sevkiyat'], ['urun', 'Ürün']];
+    if (isAdmin()) tabs.push(['personel', 'Personel']);
     return '<div class="card report-shell"><div class="report-toolbar">' +
       '<div class="field"><label for="reportPreset">Hızlı dönem</label><select id="reportPreset" class="select" data-role="report-preset">' +
       [['last30', 'Son 30 gün'], ['month', 'Bu ay'], ['last', 'Geçen ay'], ['quarter', 'Bu çeyrek'], ['ytd', 'Yıl başından'], ['custom', 'Özel aralık']].map(function (x) {
@@ -10296,12 +10381,42 @@ function viewShipments() {
       '<tfoot><tr><td colspan="2">TOPLAM</td><td class="right">' + nf0(t.sipC) + '</td><td class="right">' + nf1(t.sipK) + '</td><td class="right">' + nf0(t.sevC) + '</td><td class="right">' + nf1(t.sevK) + '</td><td class="right strong">' + nf0(t.kalanC) + '</td><td class="right strong">' + nf1(t.kalanK) + '</td><td class="right">' + (t.sipC ? '%' + nf1(t.sevC / t.sipC * 100) : '—') + '</td><td></td></tr></tfoot></table></div></div>';
   }
 
+  function reportPersonelHtml(ctx) {
+    var d = ctx.personel;
+    var rows = d.rows;
+    return '<div class="card"><div class="report-toolbar">' +
+      '<div class="field" style="max-width:190px"><label for="reportPersonelMonth">Personel dönemi</label><input id="reportPersonelMonth" type="month" class="input" data-role="report-personel-month" value="' + esc(d.ay) + '"></div>' +
+      '<div class="report-range">' + esc(monthName(d.ay)) + ' · personel ve maaş özeti</div>' +
+      '<div style="flex:1"></div></div>' +
+      '<div class="card-body"><div class="kpis report-kpis">' +
+      rKpi('Çalışan', nf0(d.aktif.length), 'aktif', 'ok', '') +
+      rKpi('Bay', nf0(d.bay), 'aktif', 'info', '') +
+      rKpi('Bayan', nf0(d.bayan), 'aktif', 'info', '') +
+      rKpi('Bu ay başlayan', nf0(d.baslayan), monthName(d.ay), '', '') +
+      rKpi('Bu ay işten çıkan', nf0(d.cikan), monthName(d.ay), 'warn', '') +
+      rKpi('Toplam personel', nf0(d.all.length), 'tüm kayıtlar', '', '') +
+      '</div></div>' +
+      '<div class="table-wrap"><table class="data"><thead><tr><th>Personel</th><th>Cinsiyet</th><th>Görev</th><th>Giriş</th><th>Çıkış</th><th class="right">Maaş</th><th class="right">Eksik gün</th><th class="right">FM</th><th class="right">Net</th><th>Durum</th></tr></thead><tbody>' +
+      (rows.length ? rows.map(function (x) {
+        var p = x.p, r = x.r;
+        return '<tr><td><div class="strong">' + esc(p.ad) + '</div>' + (p.not ? '<div class="sub">' + esc(p.not) + '</div>' : '') + '</td>' +
+          '<td>' + (p.cinsiyet === 'BAY' ? 'Bay' : p.cinsiyet === 'BAYAN' ? 'Bayan' : '—') + '</td>' +
+          '<td>' + esc(p.gorev || '—') + '</td><td class="sub">' + (p.iseGiris ? dateTR(p.iseGiris) : '—') + '</td>' +
+          '<td class="sub">' + (p.cikisTarihi ? dateTR(p.cikisTarihi) + (p.cikisSebebi ? '<div class="sub">' + esc(p.cikisSebebi) + '</div>' : '') : '—') + '</td>' +
+          '<td class="right">' + money(r.maas) + '</td><td class="right">' + nf1(r.eksikGun) + '</td><td class="right">' + nf1(r.fazlaMesai) + '</td>' +
+          '<td class="right strong">' + money(x.net) + '</td><td>' + (p.aktif === false ? '<span class="pill muted">Ayrıldı</span>' : x.has ? personelDurumPill(r.durum) : '<span class="pill warn">Tam ay</span>') + '</td></tr>';
+      }).join('') : '<tr><td colspan="10"><div class="empty">Personel kaydı yok.</div></td></tr>') +
+      '</tbody><tfoot><tr><td colspan="8">TOPLAM</td><td class="right strong">' + money(d.net) + '</td><td></td></tr></tfoot></table></div>' +
+      '<p class="muted small" style="padding:10px 14px;margin:0">Bu rapor iç hesaplamadır; SGK, vergi ve yasal kesintiler içermez.</p></div>';
+  }
+
   function reportTabHtml(ctx) {
     if (S.ui.reportTab === 'kar') return reportProfitHtml(ctx);
     if (S.ui.reportTab === 'cari') return reportCariHtml(ctx) + reportQualityHtml(ctx);
     if (S.ui.reportTab === 'siparis') return reportOrderStatusHtml(ctx);
     if (S.ui.reportTab === 'sevk') return reportSevkHtml(ctx) + reportQualityHtml(ctx);
     if (S.ui.reportTab === 'urun') return reportUrunHtml(ctx) + reportQualityHtml(ctx);
+    if (S.ui.reportTab === 'personel') return isAdmin() ? reportPersonelHtml(ctx) : '<div class="card"><div class="card-body"><p class="muted">Personel raporu için yönetici yetkisi gerekli.</p></div></div>';
     return reportOverview(ctx) + reportQualityHtml(ctx);
   }
 
@@ -10313,9 +10428,19 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.4.0';
+  var SURUM = '3.5.0';
 
   var YENILIKLER = [
+    {
+      v: '3.5.0', t: '07.11.2026', m: [
+        'Ayarlar → Personel: varsayılan günlük saat ve Cumartesi/Pazar hafta tatili',
+        'Hafta tatili günleri toplu puantajda H olarak başlar; sütunlar ayrı renkte',
+        'Personel kartına cinsiyet, çıkış tarihi ve çıkış sebebi',
+        'Çıkış tarihi olan personel, son maaşı ödenince otomatik pasif',
+        'KPI: çalışan, bay, bayan, bu ay başlayan/çıkan, toplam personel',
+        'Raporlar → Personel raporu (yönetici)'
+      ]
+    },
     {
       v: '3.4.0', t: '07.11.2026', m: [
         'Toplu Puantaj: personel satırları ve gün gün T / Y / İ / R / H işaretleme',
@@ -11726,9 +11851,10 @@ function viewShipments() {
     }).join('');
 
     var active = S.ui.settingsTab || 'genel';
-    if (['genel', 'katalog', 'kullanicilar', 'veri'].indexOf(active) < 0) active = 'genel';
+    if (['genel', 'personel', 'katalog', 'kullanicilar', 'veri'].indexOf(active) < 0) active = 'genel';
     var tabs = [
       ['genel', 'Genel', ''],
+      ['personel', 'Personel', ''],
       ['katalog', 'Katalog', (data.renkler || []).length + ' renk · ' + (data.asortiSablonlari || []).length + ' şablon'],
       ['kullanicilar', 'Kullanıcılar & Güvenlik', (data.kullanicilar || []).length + ' kullanıcı'],
       ['veri', 'Veri', S.file.dirty ? '●' : '']
@@ -11787,6 +11913,18 @@ function viewShipments() {
       '  <button class="btn btn-sm" data-act="open-changelog">' + ICONS.history + ' Yenilikler</button>' +
       '</div></div>';
 
+    var wd = String(s.personelHaftaTatili === undefined ? '0,6' : s.personelHaftaTatili).split(',');
+    var cmt = wd.indexOf('6') >= 0, paz = wd.indexOf('0') >= 0;
+    var personelAyar = '<div class="card"><div class="card-head"><div><h2>Personel varsayılanları</h2><div class="sub">Yeni personel ve toplu puantaj için geçerli</div></div></div>' +
+      '<form id="personelAyarForm" class="card-body form-grid g2">' +
+      '  <div class="field"><label for="setPersonelSaat">Günlük çalışma saati</label><input id="setPersonelSaat" name="personelGunlukSaat" class="input num" type="number" min="1" max="24" step="0.5" value="' + esc(s.personelGunlukSaat || 8) + '"></div>' +
+      '  <div class="field"><label>Hafta tatili günleri</label><div class="settings-checks">' +
+      '    <label class="check"><input type="checkbox" id="setHaftaCmt"' + (cmt ? ' checked' : '') + '> Cumartesi</label>' +
+      '    <label class="check"><input type="checkbox" id="setHaftaPaz"' + (paz ? ' checked' : '') + '> Pazar</label>' +
+      '  </div></div>' +
+      '  <div class="span2 muted small">Hafta tatili seçilen günler toplu puantajda <b>H</b> olarak başlar; mevcut kayıtların işaretleri değişmez.</div>' +
+      '  <div class="span2" style="display:flex;justify-content:flex-end;border-top:1px solid var(--line);padding-top:14px"><button type="submit" class="btn btn-primary">' + ICONS.check + ' Personel ayarlarını kaydet</button></div>' +
+      '</form></div>';
     var katalog = '<div class="grid-2 even">' +
       '<div class="card"><div class="card-head"><div><h2>Renkler</h2><div class="sub">Model kartlarında kullanılır</div></div>' +
       '<button class="btn btn-sm" data-act="color-new">' + ICONS.plus + ' Yeni renk</button></div>' +
@@ -11849,6 +11987,7 @@ function viewShipments() {
       '</div>' +
       '<div class="settings-tabs">' + tabHtml + '</div>' +
       group('genel', genel) +
+      group('personel', personelAyar) +
       group('katalog', katalog) +
       group('kullanicilar', kullanicilar) +
       group('veri', veri) +
@@ -12970,6 +13109,17 @@ function viewShipments() {
           ['Cari/sevk farkı', q.recon]
         ] }
       ];
+      if (isAdmin()) {
+        sheets.push({ name: 'PERSONEL RAPOR', columns: [
+          { header: 'PERSONEL', width: 26 }, { header: 'CİNSİYET', width: 10 }, { header: 'GÖREV', width: 18 },
+          { header: 'GİRİŞ', width: 12 }, { header: 'ÇIKIŞ', width: 12 }, { header: 'MAAŞ', width: 12 },
+          { header: 'EKSİK GÜN', width: 10 }, { header: 'FAZLA MESAİ', width: 11 }, { header: 'NET', width: 12 }, { header: 'DURUM', width: 12 }
+        ], rows: ctx.personel.rows.map(function (x) {
+          return [x.p.ad, x.p.cinsiyet === 'BAY' ? 'Bay' : x.p.cinsiyet === 'BAYAN' ? 'Bayan' : '', x.p.gorev || '',
+            x.p.iseGiris || '', x.p.cikisTarihi || '', x.r.maas, x.r.eksikGun, x.r.fazlaMesai, x.net,
+            x.p.aktif === false ? 'Ayrıldı' : x.has ? (x.r.durum || 'TASLAK') : 'Tam ay'];
+        }) });
+      }
       var bytes = XLSXLite.writeWorkbook({ sheets: sheets }, { creator: 'DMR AYAKKABI' });
       download(bytes, reportFileBase() + '.xlsx');
       toast('Excel raporu indirildi', 'ok');
@@ -13006,6 +13156,16 @@ function viewShipments() {
       add(['CARI YASLANDIRMA']); add(['Cari', 'Bakiye', '0-30', '31-60', '61-90', '90+', 'Ort. gün']);
       ctx.aging.rows.forEach(function (r) { add([r.ad, r.bakiye, r.buckets[0], r.buckets[1], r.buckets[2], r.buckets[3], r.avgDays]); });
       add([]);
+      if (isAdmin()) {
+      add(['PERSONEL RAPORU']);
+      add(['Personel', 'Cinsiyet', 'Görev', 'Giriş', 'Çıkış', 'Maaş', 'Eksik gün', 'Fazla mesai', 'Net', 'Durum']);
+      ctx.personel.rows.forEach(function (x) {
+        add([x.p.ad, x.p.cinsiyet === 'BAY' ? 'Bay' : x.p.cinsiyet === 'BAYAN' ? 'Bayan' : '', x.p.gorev || '',
+          x.p.iseGiris || '', x.p.cikisTarihi || '', x.r.maas, x.r.eksikGun, x.r.fazlaMesai, x.net,
+          x.p.aktif === false ? 'Ayrıldı' : x.has ? (x.r.durum || 'TASLAK') : 'Tam ay']);
+      });
+      add([]);
+      }
       add(['VERI KALITESI']); add(['Kontrol', 'Adet/Fark']);
       add(['Maliyetsiz model', q.missingCost.length]); add(['Maliyetsiz satır', q.maliyetsiz]);
       add(['Kartsız sevk satırı', q.kartsiz]); add(['Fiyatsız sipariş', q.noPrice.length]); add(['Cari/sevk farkı', q.recon]);
@@ -13055,6 +13215,9 @@ function viewShipments() {
       ctx.orderStatus.rows.slice(0, 25).map(function (r) {
         return '<tr><td>' + esc(r.model) + '</td><td>' + esc(r.renk) + '</td><td class="n">' + nf0(r.sipC) + '</td><td class="n">' + nf0(r.sevC) + '</td><td class="n">' + nf0(r.kalanC) + '</td><td>' + esc(r.durum) + '</td></tr>';
       }).join('') + '</tbody></table>' +
+      (isAdmin() ? '<h3 class="pf-h">Personel</h3><table class="pf-table"><thead><tr><th>PERSONEL</th><th>CİNSİYET</th><th>GİRİŞ</th><th>ÇIKIŞ</th><th class="n">NET</th><th>DURUM</th></tr></thead><tbody>' + ctx.personel.rows.map(function (x) {
+        return '<tr><td>' + esc(x.p.ad) + '</td><td>' + (x.p.cinsiyet === 'BAY' ? 'Bay' : x.p.cinsiyet === 'BAYAN' ? 'Bayan' : '—') + '</td><td>' + (x.p.iseGiris ? dateTR(x.p.iseGiris) : '—') + '</td><td>' + (x.p.cikisTarihi ? dateTR(x.p.cikisTarihi) : '—') + '</td><td class="n">' + money(x.net) + '</td><td>' + (x.p.aktif === false ? 'Ayrıldı' : 'Aktif') + '</td></tr>';
+      }).join('') + '</tbody></table>' : '') +
       '<h3 class="pf-h">Cari yaşlandırma</h3><table class="pf-table"><thead><tr><th>CARİ</th><th class="n">BAKİYE</th><th class="n">0–30</th><th class="n">31–60</th><th class="n">61–90</th><th class="n">90+</th></tr></thead><tbody>' + ageHtml + '</tbody></table>' +
       '<p class="pf-note">Veri kalitesi: ' + esc(note) + '</p>' +
       '<div class="pf-foot"><span>' + esc(data.settings.firmaAdi) + '</span><span>' + esc(S.user ? S.user.ad : '') + ' · ' + dateTR(Core.todayISO()) + '</span></div></div>');
@@ -13103,6 +13266,9 @@ function viewShipments() {
       renderView();
       var inp = $('[data-role="ship-list-search"]');
       if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    } else if (t.dataset.role === 'report-personel-month') {
+      S.ui.reportPersonelMonth = t.value || Core.todayISO().slice(0, 7);
+      renderView();
     } else if (t.dataset.role === 'personel-month') {
       S.ui.personelMonth = t.value || Core.todayISO().slice(0, 7);
       renderView();
@@ -13244,6 +13410,18 @@ function viewShipments() {
 
   document.addEventListener('submit', function (e) {
     var f = e.target;
+    if (f.id === 'personelAyarForm') {
+      e.preventDefault();
+      data.settings.personelGunlukSaat = Math.max(1, Math.min(24, Core.num($('#setPersonelSaat').value) || 8));
+      var wd = [];
+      if ($('#setHaftaCmt').checked) wd.push('6');
+      if ($('#setHaftaPaz').checked) wd.push('0');
+      data.settings.personelHaftaTatili = wd.join(',');
+      setDirty(true);
+      renderView();
+      toast('Personel varsayılanları kaydedildi', 'ok');
+      return;
+    }
     if (f.id === 'settingsForm') {
       e.preventDefault();
       var fd = new FormData(f);

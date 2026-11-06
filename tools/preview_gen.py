@@ -122,8 +122,10 @@ BOOT = r"""
     Matris.migrateMaster(d);
     Matris.ensureLines(d);
 
-    var pp1 = Core.addPersonel(d, { ad: 'Ahmet Yılmaz', gorev: 'Satış', maas: 10000, gunlukSaat: 8, iseGiris: '2025-03-01' }, 'preview');
-    var pp2 = Core.addPersonel(d, { ad: 'Elif Kaya', gorev: 'Muhasebe', maas: 12000, gunlukSaat: 8, iseGiris: '2024-11-15' }, 'preview');
+    var pp1 = Core.addPersonel(d, { ad: 'Ahmet Yılmaz', gorev: 'Satış', maas: 10000, gunlukSaat: 8, cinsiyet: 'BAY', iseGiris: '2025-03-01' }, 'preview');
+    var pp2 = Core.addPersonel(d, { ad: 'Elif Kaya', gorev: 'Muhasebe', maas: 12000, gunlukSaat: 8, cinsiyet: 'BAYAN', iseGiris: '2024-11-15' }, 'preview');
+    var pp3 = Core.addPersonel(d, { ad: 'Mehmet Demir', gorev: 'Depo', maas: 9500, gunlukSaat: 8, cinsiyet: 'BAY', iseGiris: '2026-11-01' }, 'preview');
+    var pp4 = Core.addPersonel(d, { ad: 'Fatma Şahin', gorev: 'Satış', maas: 9000, gunlukSaat: 8, cinsiyet: 'BAYAN', iseGiris: '2024-01-10', cikisTarihi: '2026-11-05', cikisSebebi: 'İstifa', aktif: false }, 'preview');
     Core.savePuantaj(d, { personelId: pp1.id, ay: '2026-11', eksikGun: 2, eksikSaat: 4, fazlaMesai: 10, avans: 1000 }, 'preview');
     Core.savePuantaj(d, { personelId: pp2.id, ay: '2026-11', eksikGun: 0, eksikSaat: 0, fazlaMesai: 5 }, 'preview');
 
@@ -140,7 +142,7 @@ BOOT = r"""
     if (h === 'all-dashboard') { APP.S.ui.cariId = 0; APP.updateChrome(); APP.renderView(); }
     if (h === 'cariler') { APP.S.view = 'cariler'; APP.updateChrome(); APP.renderView(); }
     if (h === 'settings') { APP.S.view = 'settings'; APP.updateChrome(); APP.renderView(); }
-    if (h === 'settings-katalog' || h === 'settings-kullanicilar' || h === 'settings-veri') {
+    if (h === 'settings-personel' || h === 'settings-katalog' || h === 'settings-kullanicilar' || h === 'settings-veri') {
       APP.S.view = 'settings'; APP.updateChrome(); APP.renderView();
       setTimeout(function () {
         var b = document.querySelector('[data-settings-tab="' + h.replace('settings-', '') + '"]');
@@ -277,6 +279,9 @@ BOOT = r"""
     if (h === 'puantaj-form') {
       APP.S.view = 'personel'; APP.S.ui.personelTab = 'puantaj'; APP.updateChrome(); APP.renderView();
       setTimeout(function () { var b = document.querySelector('[data-act="puantaj-edit"]'); if (b) b.click(); }, 250);
+    }
+    if (h === 'report-personel') {
+      APP.S.view = 'reports'; APP.S.ui.reportTab = 'personel'; APP.updateChrome(); APP.renderView();
     }
     if (h === 'reports') { APP.S.view = 'reports'; APP.updateChrome(); APP.renderView(); }
     if (h === 'ledger-all') { APP.S.ui.cariId = 0; APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView(); }

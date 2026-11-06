@@ -18,6 +18,7 @@ Tek bir HTML dosyası olarak çalışan, verilerini seçtiğiniz **Excel (.xlsx)
 - Personel puantajı ve basit iç maaş hesabı (yönetici)
 - Dört sekmeli, dosya durumu sabit Ayarlar ekranı
 - Toplu puantaj gridi (T/Y/İ/R/H)
+- Personel ayarları, cinsiyet/çıkış bilgileri ve personel raporu
 - Model/renk bazlı Sipariş / Sevk / Kalan raporu
 - Sevk fişinde isteğe bağlı beden dökümü
 - Yeni sürüm bildirimi ve çevrimiçi tekrar kontrol
@@ -74,7 +75,7 @@ Planlanan geliştirmeler ve tasarım notları: [ROADMAP.md](ROADMAP.md). Örnek:
 
 ## Sürüm
 
-Güncel sürüm: **v3.4.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
+Güncel sürüm: **v3.5.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
 
 ### Yeni sürüm çıkarma
 

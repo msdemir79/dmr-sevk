@@ -153,6 +153,8 @@
       sonSiparisNo: 0,
       sonFisNo: 0,
       varsayilanAsorti: 10,
+      personelGunlukSaat: 8,
+      personelHaftaTatili: '0,6',
       logo: '',
       kurulum: ''
     };
@@ -840,7 +842,10 @@
       gorev: String(input.gorev || '').trim(),
       maas: round2(num(input.maas)),
       gunlukSaat: num(input.gunlukSaat) || 8,
+      cinsiyet: (function (x) { x = String(x || '').toUpperCase(); return x === 'BAY' || x === 'BAYAN' ? x : ''; })(input.cinsiyet),
       iseGiris: toISODate(input.iseGiris) || '',
+      cikisTarihi: toISODate(input.cikisTarihi) || '',
+      cikisSebebi: String(input.cikisSebebi || '').trim(),
       aktif: !(input.aktif === false || input.aktif === 'false' || input.aktif === 0 || input.aktif === 'HAYIR'),
       not: String(input.not || '').trim()
     };
@@ -851,6 +856,10 @@
   }
 
   function addPersonel(data, input, kullanici) {
+    input = input || {};
+    if (input.gunlukSaat === undefined || input.gunlukSaat === '' || input.gunlukSaat === null) {
+      input.gunlukSaat = data.settings.personelGunlukSaat || 8;
+    }
     var p = normalizePersonel(input);
     if (!p.ad) throw new Error('Personel adı zorunlu.');
     if (p.maas < 0) throw new Error('Maaş negatif olamaz.');
@@ -859,6 +868,14 @@
     data.personel.push(p);
     audit(data, kullanici, 'PERSONEL EKLE', p.ad + ' · ' + money(p.maas));
     return p;
+  }
+
+  function cikisMaasOdenmis(data, p) {
+    if (!p || !p.cikisTarihi) return false;
+    var ay = String(p.cikisTarihi).slice(0, 7);
+    return (data.puantaj || []).some(function (r) {
+      return r.personelId === p.id && r.durum === 'ODENDI' && String(r.ay) >= ay;
+    });
   }
 
   function updatePersonel(data, id, input, kullanici) {
@@ -872,6 +889,7 @@
     if (!np.ad) throw new Error('Personel adı zorunlu.');
     if (np.maas < 0) throw new Error('Maaş negatif olamaz.');
     if (np.gunlukSaat <= 0 || np.gunlukSaat > 24) throw new Error('Günlük çalışma saati 1–24 arasında olmalı.');
+    if (cikisMaasOdenmis(data, np)) np.aktif = false;
     data.personel = data.personel.map(function (x) { return x.id === id ? np : x; });
     audit(data, kullanici, 'PERSONEL DÜZENLE', np.ad + ' · ' + money(np.maas));
     return np;
@@ -904,11 +922,16 @@
     return n;
   }
 
-  function gridDays(rec, ay) {
+  function gridDays(rec, ay, weekends) {
     var n = monthDays(ay);
     var src = normalizeGunler(rec && rec.gunler, ay);
+    var wk = weekends || [];
+    var m = /^(\d{4})-(\d{2})$/.exec(String(ay || ''));
     var arr = [];
-    for (var i = 0; i < n; i++) arr.push(src[i] || 'T');
+    for (var i = 0; i < n; i++) {
+      var wd = m ? new Date(Number(m[1]), Number(m[2]) - 1, i + 1).getDay() : -1;
+      arr.push(src[i] || (wk.indexOf(wd) >= 0 ? 'H' : 'T'));
+    }
     if (!src && rec && num(rec.eksikGun) > 0) {
       var cnt = Math.min(n, Math.round(num(rec.eksikGun)));
       for (i = n - cnt; i < n; i++) arr[i] = 'Y';
@@ -1020,6 +1043,10 @@
     if (!rec) throw new Error('Puantaj kaydı bulunamadı.');
     rec.durum = durum === 'ODENDI' ? 'ODENDI' : durum === 'KESIN' ? 'KESIN' : 'TASLAK';
     rec.odemeTarihi = rec.durum === 'ODENDI' ? (toISODate(odemeTarihi) || todayISO()) : '';
+    if (rec.durum === 'ODENDI') {
+      var pp = personelById(data, rec.personelId);
+      if (pp && pp.cikisTarihi && rec.ay >= String(pp.cikisTarihi).slice(0, 7)) pp.aktif = false;
+    }
     audit(data, kullanici, 'PUANTAJ DURUM', (rec.personelAd || '') + ' · ' + rec.durum);
     return rec;
   }
@@ -1490,7 +1517,7 @@
     });
 
     var personelRows = (data.personel || []).map(function (p) {
-      return [p.id, p.ad, p.gorev || '', money(p.maas), num(p.gunlukSaat), p.iseGiris || '', p.aktif === false ? 'HAYIR' : 'EVET', p.not || ''];
+      return [p.id, p.ad, p.gorev || '', p.cinsiyet || '', money(p.maas), num(p.gunlukSaat), p.iseGiris || '', p.cikisTarihi || '', p.cikisSebebi || '', p.aktif === false ? 'HAYIR' : 'EVET', p.not || ''];
     });
 
     var puantajRows = (data.puantaj || []).map(function (r) {
@@ -1560,7 +1587,8 @@
           name: SHEET.PERSONEL,
           columns: [
             { header: 'ID', width: 6 }, { header: 'AD SOYAD', width: 26 }, { header: 'GÖREV', width: 18 },
-            { header: 'AYLIK MAAŞ', width: 13 }, { header: 'GÜNLÜK SAAT', width: 12 }, { header: 'İŞE GİRİŞ', width: 12 },
+            { header: 'CİNSİYET', width: 10 }, { header: 'AYLIK MAAŞ', width: 13 }, { header: 'GÜNLÜK SAAT', width: 12 },
+            { header: 'İŞE GİRİŞ', width: 12 }, { header: 'ÇIKIŞ TARİHİ', width: 12 }, { header: 'ÇIKIŞ SEBEBİ', width: 22 },
             { header: 'AKTİF', width: 9 }, { header: 'NOT', width: 30 }
           ],
           rows: personelRows
@@ -1715,7 +1743,8 @@
   };
   var PERSONEL_KEYS = {
     ID: 'id', AD: 'ad', ADSOYAD: 'ad', GOREV: 'gorev', GOREVI: 'gorev', MAAS: 'maas', AYLIKMAAS: 'maas',
-    GUNLUKSAAT: 'gunlukSaat', CALISMASAATI: 'gunlukSaat', ISEGIRIS: 'iseGiris', ISEGIRISTARIHI: 'iseGiris',
+    GUNLUKSAAT: 'gunlukSaat', CALISMASAATI: 'gunlukSaat', CINSIYET: 'cinsiyet', CINSIYETI: 'cinsiyet',
+    ISEGIRIS: 'iseGiris', ISEGIRISTARIHI: 'iseGiris', CIKISTARIHI: 'cikisTarihi', CIKISSEBEBI: 'cikisSebebi',
     AKTIF: 'aktif', NOT: 'not'
   };
   var PUANTAJ_KEYS = {
@@ -1872,7 +1901,10 @@
           gorev: pick(prow, pm, 'gorev'),
           maas: pick(prow, pm, 'maas'),
           gunlukSaat: pick(prow, pm, 'gunlukSaat'),
+          cinsiyet: pick(prow, pm, 'cinsiyet'),
           iseGiris: pick(prow, pm, 'iseGiris'),
+          cikisTarihi: pick(prow, pm, 'cikisTarihi'),
+          cikisSebebi: pick(prow, pm, 'cikisSebebi'),
           aktif: pick(prow, pm, 'aktif'),
           not: pick(prow, pm, 'not')
         }));
@@ -2530,6 +2562,7 @@
     deleteKullanici: deleteKullanici,
     kullaniciById: kullaniciById,
     personelById: personelById,
+    cikisMaasOdenmis: cikisMaasOdenmis,
     normalizePersonel: normalizePersonel,
     addPersonel: addPersonel,
     updatePersonel: updatePersonel,

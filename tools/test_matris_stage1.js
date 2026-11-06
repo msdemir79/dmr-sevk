@@ -156,6 +156,15 @@ gchar[0] = 'Y'; gchar[1] = 'I'; gchar[2] = 'R'; gchar[3] = 'H';
 const aralik = Core.savePuantaj(dp, { personelId: per.id, ay: '2026-12', gunler: gchar.join('') }, 'test');
 ok(Core.monthDays('2026-12') === 31 && Core.gridDays(aralik, '2026-12').length === 31, 'ay gün sayısı ve grid');
 ok(aralik.eksikGun === 1 && aralik.net === 11600, 'gridde Y eksik gün, İ/R/H kesintisiz');
+const wg = Core.gridDays({ ay: '2026-11' }, '2026-11', [0, 6]);
+ok(wg[0] === 'H' && wg[1] === 'T' && wg.length === 30, 'hafta tatili günleri H başlıyor');
+const dp3 = Core.newData();
+const p3 = Core.addPersonel(dp3, { ad: 'Çıkış Test', maas: 9000, cinsiyet: 'BAY', cikisTarihi: '2026-11-30' }, 'test');
+ok(dp3.settings.personelGunlukSaat === 8 && dp3.settings.personelHaftaTatili === '0,6' && p3.cinsiyet === 'BAY', 'personel varsayılanları ve cinsiyet');
+const r3 = Core.savePuantaj(dp3, { personelId: p3.id, ay: '2026-11' }, 'test');
+ok(Core.personelById(dp3, p3.id).aktif === true, 'çıkış maaşı ödenmeden aktif');
+Core.setPuantajStatus(dp3, r3.id, 'ODENDI', '2026-11-30', 'test');
+ok(Core.personelById(dp3, p3.id).aktif === false, 'çıkış maaşı ödenince otomatik pasif');
 let silHata = false;
 try { Core.deletePersonel(dp, per.id, 'test'); } catch (e) { silHata = true; }
 ok(silHata, 'puantajı olan personel silinemiyor');

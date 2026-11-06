@@ -2,6 +2,19 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.5.0 — 07.11.2026
+
+### Eklendi
+- **Ayarlar → Personel** sekmesi:
+  - Varsayılan günlük çalışma saati
+  - Cumartesi / Pazar hafta tatili seçimi
+- Toplu puantajda hafta tatili günleri **H** olarak başlar; sütunlar ayrı renkte.
+- Personel kartına **cinsiyet**, **çıkış tarihi**, **çıkış sebebi**.
+- Çıkış tarihi olan personel, çıkış ayı maaşı **Ödendi** olunca otomatik **pasif**.
+- Personel KPI’ları: çalışan, bay, bayan, bu ay başlayan, bu ay işten çıkan, toplam personel.
+- **Raporlar → Personel** sekmesi; Excel/CSV/personel raporu (yönetici).
+- Excel PERSONEL sayfasına cinsiyet ve çıkış sütunları.
+
 ## v3.4.0 — 07.11.2026
 
 ### Eklendi
