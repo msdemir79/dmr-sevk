@@ -2,6 +2,16 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.6.0 — 08.11.2026
+
+### Eklendi
+- Sol menü **daraltılabilir**; tercih tarayıcıda saklanır.
+- Toplu puantajda **sağ tık menüsü**:
+  - Bu personel için tüm günler T/Y/İ/R/H
+  - Tüm personel için T/Y/İ/R/H
+- **Tümünü T yap** artık hafta tatili **H** günlerini korur.
+- Ödenmiş personel sağ tık işlemlerinde değiştirilmez.
+
 ## v3.5.0 — 07.11.2026
 
 ### Eklendi

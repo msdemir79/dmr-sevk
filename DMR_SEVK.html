@@ -1110,6 +1110,24 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
 .pj-grid td.weekend { background: #fbf7ff; }
 .pj-grid td.weekend .pj-day { box-shadow: inset 0 0 0 1px #e9d5ff; }
 
+/* --- daraltılabilir sol menü --- */
+.side { position: relative; transition: width .16s ease, flex-basis .16s ease, padding .16s ease; }
+.side-toggle { position: absolute; right: -11px; top: 25px; z-index: 8; width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(255,255,255,.16); background: #123746; color: #d7e8f0; font: 700 14px/1 system-ui, sans-serif; display: grid; place-items: center; cursor: pointer; padding: 0; }
+.side-toggle:hover { background: #1a4b5d; }
+.app.side-collapsed .side { width: 76px; flex-basis: 76px; padding: 18px 10px; }
+.app.side-collapsed .brand-text, .app.side-collapsed .nav-btn span.lbl, .app.side-collapsed .nav-count, .app.side-collapsed .side-foot { display: none; }
+.app.side-collapsed .brand { justify-content: center; padding-bottom: 18px; }
+.app.side-collapsed .nav-btn { justify-content: center; }
+@media (max-width: 820px) { .side-toggle { display: none; } .app.side-collapsed .side { width: 100%; flex-basis: auto; padding: 10px 12px; } .app.side-collapsed .side-foot { display: none; } }
+
+/* --- puantaj sağ tık menüsü --- */
+.pj-menu { position: fixed; z-index: 300; width: 252px; padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 11px; box-shadow: 0 18px 45px rgba(15,27,45,.22); font-size: 11.5px; }
+.pj-menu-title { padding: 7px 9px 5px; font-weight: 800; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pj-menu-label { padding: 5px 9px; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.pj-menu button { display: block; width: 100%; border: 0; background: transparent; color: var(--ink); text-align: left; padding: 6px 9px; border-radius: 6px; font: inherit; cursor: pointer; }
+.pj-menu button:hover { background: var(--surface-2); color: var(--brand-dark); }
+.pj-menu-sep { height: 1px; background: var(--line); margin: 5px 3px; }
+
 </style>
 </head>
 <body>
@@ -7384,7 +7402,7 @@ var qrcode = function() {
       shipListSearch: '', shipListPage: 1,
       reportMonth: Core.todayISO().slice(0, 7),
     reportTab: 'ozet', reportPreset: 'last30', reportOnlyOpen: false,
-    personelTab: 'liste', personelMonth: Core.todayISO().slice(0, 7), settingsTab: 'genel', reportPersonelMonth: Core.todayISO().slice(0, 7),
+    personelTab: 'liste', personelMonth: Core.todayISO().slice(0, 7), settingsTab: 'genel', reportPersonelMonth: Core.todayISO().slice(0, 7), sideCollapsed: false,
     reportFrom: (function () { var d = new Date(); d.setDate(d.getDate() - 29); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(),
     reportTo: Core.todayISO(),
     },
@@ -8102,19 +8120,21 @@ var qrcode = function() {
   }
 
   function renderShell() {
+    try { S.ui.sideCollapsed = localStorage.getItem('dmr:sideCollapsed') === '1'; } catch (e) { S.ui.sideCollapsed = !!S.ui.sideCollapsed; }
     var nav = navItems().map(function (n) {
-      return '<button class="nav-btn' + (S.view === n.key ? ' active' : '') + '" data-view="' + n.key + '">' +
+      return '<button class="nav-btn' + (S.view === n.key ? ' active' : '') + '" data-view="' + n.key + '" title="' + esc(n.label) + '">' +
         ICONS[n.icon] + '<span class="lbl">' + n.label + '</span>' +
         (n.count ? '<span class="nav-count">' + n.count + '</span>' : '') + '</button>';
     }).join('');
 
     document.getElementById('root').innerHTML =
-      '<div class="app">' +
+      '<div class="app' + (S.ui.sideCollapsed ? ' side-collapsed' : '') + '">' +
       '  <aside class="side">' +
       '    <div class="brand">' +
       brandMark('brand-mark') +
       '      <div class="brand-text"><b>' + esc(markaAdi()) + '</b><span>' + esc(markaAlt()) + '</span></div>' +
       '    </div>' +
+      '    <button type="button" class="side-toggle" data-act="toggle-side" aria-expanded="' + (S.ui.sideCollapsed ? 'false' : 'true') + '" title="Menüyü daralt / genişlet" aria-label="Menüyü daralt veya genişlet">' + (S.ui.sideCollapsed ? '›' : '‹') + '</button>' +
       '    <nav class="nav" id="nav">' + nav + '</nav>' +
       '    <div class="side-foot">' +
       '      <div class="side-user" id="userChip"></div>' +
@@ -8319,6 +8339,17 @@ var qrcode = function() {
       }
       switch (act) {
         case 'save': saveFile(); break;
+        case 'toggle-side':
+          S.ui.sideCollapsed = !S.ui.sideCollapsed;
+          try { localStorage.setItem('dmr:sideCollapsed', S.ui.sideCollapsed ? '1' : '0'); } catch (e) { }
+          var appEl = document.querySelector('.app');
+          if (appEl) appEl.classList.toggle('side-collapsed', S.ui.sideCollapsed);
+          var sideBtn = document.querySelector('.side-toggle');
+          if (sideBtn) {
+            sideBtn.textContent = S.ui.sideCollapsed ? '›' : '‹';
+            sideBtn.setAttribute('aria-expanded', S.ui.sideCollapsed ? 'false' : 'true');
+          }
+          break;
         case 'order-new': openOrderForm(null); break;
         case 'order-edit': openOrderForm(findOrder(id)); break;
         case 'order-del': removeOrder(id); break;
@@ -8402,7 +8433,21 @@ var qrcode = function() {
       }
     });
 
-    document.addEventListener('change', function (e) {
+    document.addEventListener('contextmenu', function (e) {
+    var row = e.target.closest('.pj-grid tr.pj-row');
+    if (!row) return;
+    e.preventDefault();
+    openPjMenu(e.clientX, e.clientY, Core.num(row.dataset.pjPerson), row.dataset.pjAy);
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.pj-menu')) closePjMenu();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closePjMenu();
+  });
+  window.addEventListener('scroll', closePjMenu, true);
+
+  document.addEventListener('change', function (e) {
       var t = e.target;
       if (t.id === 'fileInput' && t.files && t.files[0]) { loadFromFileObject(t.files[0]); t.value = ''; }
       if (t.id === 'legacyInput' && t.files && t.files[0]) { importLegacyFile(t.files[0]); t.value = ''; }
@@ -9376,7 +9421,7 @@ function viewShipments() {
         var wd = new Date(yil, ayNo - 1, i + 1).getDay();
         return '<td class="' + (wk.indexOf(wd) >= 0 ? 'weekend' : '') + '"><button type="button" class="pj-day st-' + ch + (locked ? ' locked' : '') + '" data-act="puantaj-grid" data-personel-id="' + r.personelId + '" data-ay="' + esc(ay) + '" data-day="' + (i + 1) + '" title="' + esc(etiket[ch] || ch) + '"' + (locked ? ' disabled' : '') + '>' + (ch === 'I' ? 'İ' : ch) + '</button></td>';
       }).join('');
-      return '<tr class="' + (locked ? 'pj-locked-row' : '') + '">' +
+      return '<tr class="pj-row ' + (locked ? 'pj-locked-row' : '') + '" data-pj-person="' + r.personelId + '" data-pj-ay="' + esc(ay) + '">' +
         '<td class="pj-person"><div class="pj-person-top"><b>' + esc(r.personelAd) + '</b>' +
         '<button class="btn btn-icon pj-edit" data-act="puantaj-edit" data-id="' + r.personelId + '" data-ay="' + esc(ay) + '" title="Eksik saat / fazla mesai düzenle" aria-label="Düzenle">' + ICONS.edit + '</button></div>' +
         '<span>' + esc(r.gorev || '') + (r.durum === 'ODENDI' ? ' · Ödendi' : r.durum === 'KESIN' ? ' · Kesin' : '') + '</span></td>' + cells +
@@ -9391,7 +9436,7 @@ function viewShipments() {
       '<div class="pj-legend"><span><i class="st-T">T</i> Tam</span><span><i class="st-Y">Y</i> Gelmedi</span><span><i class="st-I">İ</i> İzin</span><span><i class="st-R">R</i> Rapor</span><span><i class="st-H">H</i> Hafta tatili</span></div>' +
       '<div style="flex:1"></div>' +
       '<button class="btn btn-sm" data-act="puantaj-grid-h" data-ay="' + esc(ay) + '">Hafta tatillerini H yap</button>' +
-      '<button class="btn btn-sm" data-act="puantaj-grid-all" data-ay="' + esc(ay) + '">Tümünü T yap</button>' +
+      '<button class="btn btn-sm" data-act="puantaj-grid-all" data-ay="' + esc(ay) + '">Tümünü T yap (H korunur)</button>' +
       '</div>' +
       '<div class="pj-wrap"><table class="pj-grid"><thead><tr><th class="pj-person">Personel</th>' + head +
       '<th>Eksik gün</th><th>Eksik saat</th><th>FM</th><th>Net</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
@@ -9485,6 +9530,68 @@ function viewShipments() {
     });
   }
 
+  function closePjMenu() {
+    var old = document.getElementById('pjMenu');
+    if (old) old.remove();
+  }
+
+  function applyPjRowStatus(ids, ay, status) {
+    var wk = personelWeekends();
+    var labels = { T: 'Geldi', Y: 'Gelmedi', I: 'İzin', R: 'Rapor', H: 'Hafta tatili' };
+    var rows = Core.payrollRows(data, ay);
+    var say = 0;
+    rows.forEach(function (r) {
+      if (ids && ids.indexOf(r.personelId) < 0) return;
+      if (r.durum === 'ODENDI') return;
+      var chars = Core.gridDays(r, ay, wk).map(function (ch) {
+        if (status === 'H') return 'H';
+        return ch === 'H' ? 'H' : status;
+      });
+      Core.savePuantaj(data, {
+        personelId: r.personelId, ay: ay, maas: r.maas, gunlukSaat: r.gunlukSaat, gunler: chars.join(''),
+        eksikSaat: r.eksikSaat, fazlaMesai: r.fazlaMesai, ekOdeme: r.ekOdeme, kesinti: r.kesinti,
+        avans: r.avans, durum: r.durum, odemeTarihi: r.odemeTarihi, not: r.not
+      }, S.user ? S.user.ad : '');
+      say++;
+    });
+    if (!say) { toast('Ödenmiş kayıtlar değiştirilemez.', 'err'); return; }
+    setDirty(true); renderView();
+    toast(say + ' personel için tüm günler ' + (labels[status] || status) + ' yapıldı', 'ok');
+  }
+
+  function openPjMenu(x, y, personelId, ay) {
+    closePjMenu();
+    var p = Core.personelById(data, personelId);
+    if (!p) return;
+    var labels = { T: 'Tümünü T (Geldi)', Y: 'Tümünü Y (Gelmedi)', I: 'Tümünü İ (İzin)', R: 'Tümünü R (Rapor)', H: 'Tümünü H (Hafta tatili)' };
+    var keys = ['T', 'Y', 'I', 'R', 'H'];
+    var one = keys.map(function (k) {
+      return '<button type="button" data-pj-status="' + k + '" data-pj-scope="one">' + labels[k] + '</button>';
+    }).join('');
+    var all = keys.map(function (k) {
+      return '<button type="button" data-pj-status="' + k + '" data-pj-scope="all">Tüm personel · ' + (k === 'I' ? 'İzin' : k === 'T' ? 'Geldi' : k === 'Y' ? 'Gelmedi' : k === 'R' ? 'Rapor' : 'Hafta tatili') + '</button>';
+    }).join('');
+    var menu = document.createElement('div');
+    menu.id = 'pjMenu';
+    menu.className = 'pj-menu';
+    menu.setAttribute('role', 'menu');
+    menu.innerHTML = '<div class="pj-menu-title">' + esc(p.ad) + '</div>' +
+      '<div class="pj-menu-label">Bu personel · tüm günler</div>' + one +
+      '<div class="pj-menu-sep"></div><div class="pj-menu-label">Tüm personel</div>' + all;
+    document.body.appendChild(menu);
+    var w = menu.offsetWidth || 250, h = menu.offsetHeight || 360;
+    menu.style.left = Math.max(6, Math.min(x, window.innerWidth - w - 8)) + 'px';
+    menu.style.top = Math.max(6, Math.min(y, window.innerHeight - h - 8)) + 'px';
+    menu.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-pj-status]');
+      if (!b) return;
+      var status = b.dataset.pjStatus;
+      var scope = b.dataset.pjScope;
+      closePjMenu();
+      applyPjRowStatus(scope === 'one' ? [personelId] : null, ay, status);
+    });
+  }
+
   function togglePuantajDay(el) {
     if (!isAdmin()) return;
     var personelId = Core.num(el.dataset.personelId);
@@ -9526,13 +9633,14 @@ function viewShipments() {
     if (!isAdmin()) return;
     var rows = Core.payrollRows(data, ay);
     if (!rows.length) return;
-    confirmDialog({ title: 'Tüm günler T yapılsın mı?', message: 'Ödenmemiş tüm personelin günleri "Tam" olarak işaretlenecek. Mevcut İ/Y/R/H işaretleri silinir.', confirmText: 'Tümünü T yap', danger: true }).then(function (ok) {
+    confirmDialog({ title: 'Tüm günler T yapılsın mı?', message: 'Ödenmemiş tüm personelde hafta tatili (H) günleri korunur; diğer günler "Tam" olur. Mevcut Y/İ/R işaretleri silinir.', confirmText: 'Tümünü T yap', danger: true }).then(function (ok) {
       if (!ok) return;
       var n = Core.monthDays(ay);
-      var all = new Array(n + 1).join('T');
+      var wk = personelWeekends();
       var say = 0;
       rows.forEach(function (r) {
         if (r.durum === 'ODENDI') return;
+        var all = Core.gridDays(r, ay, wk).map(function (ch) { return ch === 'H' ? 'H' : 'T'; }).join('');
         Core.savePuantaj(data, {
           personelId: r.personelId, ay: ay, maas: r.maas, gunlukSaat: r.gunlukSaat, gunler: all,
           eksikSaat: r.eksikSaat, fazlaMesai: r.fazlaMesai, ekOdeme: r.ekOdeme, kesinti: r.kesinti,
@@ -10428,9 +10536,17 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.5.0';
+  var SURUM = '3.6.0';
 
   var YENILIKLER = [
+    {
+      v: '3.6.0', t: '08.11.2026', m: [
+        'Sol menü daraltılabilir; tercih hatırlanır',
+        'Toplu puantajda sağ tık menüsü: bu personel / tüm personel, T/Y/İ/R/H',
+        'Tümünü T yap işleminde hafta tatili (H) günleri korunur',
+        'Menüde ödenmiş kayıtlar değiştirilmez'
+      ]
+    },
     {
       v: '3.5.0', t: '07.11.2026', m: [
         'Ayarlar → Personel: varsayılan günlük saat ve Cumartesi/Pazar hafta tatili',

@@ -272,6 +272,27 @@ BOOT = r"""
       APP.S.view = 'personel'; APP.S.ui.personelTab = 'toplu'; APP.updateChrome(); APP.renderView();
       setTimeout(function () { var b = document.querySelector('[data-act="puantaj-grid"]'); if (b) b.click(); }, 300);
     }
+    if (h === 'side-collapsed') {
+      APP.S.view = 'dashboard'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var b = document.querySelector('[data-act="toggle-side"]'); if (b) b.click(); }, 300);
+    }
+    if (h === 'toplu-all') {
+      APP.S.view = 'personel'; APP.S.ui.personelTab = 'toplu'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var b = document.querySelector('[data-act="puantaj-grid-all"]');
+        if (b) b.click();
+        setTimeout(function () { var y = document.querySelector('[data-yes]'); if (y) y.click(); }, 350);
+      }, 300);
+    }
+    if (h === 'pj-menu') {
+      APP.S.view = 'personel'; APP.S.ui.personelTab = 'toplu'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var row = document.querySelector('.pj-grid tr.pj-row');
+        if (!row) return;
+        var r = row.getBoundingClientRect();
+        row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 320, clientY: r.top + 20 }));
+      }, 300);
+    }
     if (h === 'personel-form') {
       APP.S.view = 'personel'; APP.updateChrome(); APP.renderView();
       setTimeout(function () { var b = document.querySelector('[data-act="personel-new"]'); if (b) b.click(); }, 250);
