@@ -190,7 +190,7 @@
       shipListSearch: '', shipListPage: 1,
       reportMonth: Core.todayISO().slice(0, 7),
     reportTab: 'ozet', reportPreset: 'last30', reportOnlyOpen: false,
-    personelTab: 'liste', personelMonth: Core.todayISO().slice(0, 7), settingsTab: 'genel', reportPersonelMonth: Core.todayISO().slice(0, 7), sideCollapsed: false,
+    personelTab: 'liste', personelMonth: Core.todayISO().slice(0, 7), settingsTab: 'genel', reportPersonelMonth: Core.todayISO().slice(0, 7), sideCollapsed: false, dashFeedCollapsed: false,
     reportFrom: (function () { var d = new Date(); d.setDate(d.getDate() - 29); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(),
     reportTo: Core.todayISO(),
     },
@@ -1127,6 +1127,18 @@
       }
       switch (act) {
         case 'save': saveFile(); break;
+        case 'toggle-feed':
+          S.ui.dashFeedCollapsed = !S.ui.dashFeedCollapsed;
+          try { localStorage.setItem('dmr:feedCollapsed', S.ui.dashFeedCollapsed ? '1' : '0'); } catch (e) { }
+          var rcard = document.getElementById('recentCard');
+          if (rcard) rcard.classList.toggle('feed-collapsed', S.ui.dashFeedCollapsed);
+          var fbtn = rcard ? rcard.querySelector('[data-act="toggle-feed"]') : null;
+          if (fbtn) {
+            var fsp = fbtn.querySelector('span');
+            if (fsp) fsp.textContent = S.ui.dashFeedCollapsed ? 'Aç' : 'Daralt';
+            fbtn.setAttribute('aria-expanded', S.ui.dashFeedCollapsed ? 'false' : 'true');
+          }
+          break;
         case 'toggle-side':
           S.ui.sideCollapsed = !S.ui.sideCollapsed;
           try { localStorage.setItem('dmr:sideCollapsed', S.ui.sideCollapsed ? '1' : '0'); } catch (e) { }
@@ -1475,6 +1487,7 @@
   }
 
   function viewDashboard() {
+    try { S.ui.dashFeedCollapsed = localStorage.getItem('dmr:feedCollapsed') === '1'; } catch (e) { }
     var cid = S.ui.cariId;
     var cari = activeCari();
     var st = Core.stats(data, cid);
@@ -1579,9 +1592,10 @@
 
     return '<div class="kpis">' + kpiHtml + '</div>' +
       '<div class="grid-2">' + solKart +
-      '  <div class="card">' +
+      '  <div class="card' + (S.ui.dashFeedCollapsed ? ' feed-collapsed' : '') + '" id="recentCard">' +
       '    <div class="card-head"><div><h2>Son hareketler</h2><div class="sub">' + (cid ? esc(cari.ad) : 'Tüm cariler') + '</div></div>' +
-      '      <button class="btn btn-sm" data-act="go-ledger">Cari hesap ' + ICONS.right + '</button></div>' +
+      '      <div class="row-actions"><button class="btn btn-sm" data-act="toggle-feed" aria-expanded="' + (S.ui.dashFeedCollapsed ? 'false' : 'true') + '" title="Son hareketleri daralt / aç"><span>' + (S.ui.dashFeedCollapsed ? 'Aç' : 'Daralt') + '</span></button>' +
+      '      <button class="btn btn-sm" data-act="go-ledger">Cari hesap ' + ICONS.right + '</button></div></div>' +
       '    <div class="card-body flush"><div class="feed">' + recentHtml + '</div></div>' +
       '  </div>' +
       '</div>' +
@@ -3324,9 +3338,16 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.6.0';
+  var SURUM = '3.7.0';
 
   var YENILIKLER = [
+    {
+      v: '3.7.0', t: '08.11.2026', m: [
+        'Ana sayfada sol menü kayması düzeltildi; menü artık tam yükseklikte sabit kalıyor',
+        'Son hareketler paneli Daralt / Aç ile katlanabiliyor',
+        'Daraltma tercihi hatırlanıyor; panel kapalıyken dashboard daha kısa'
+      ]
+    },
     {
       v: '3.6.0', t: '08.11.2026', m: [
         'Sol menü daraltılabilir; tercih hatırlanır',

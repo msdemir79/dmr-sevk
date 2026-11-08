@@ -276,6 +276,23 @@ BOOT = r"""
       APP.S.view = 'dashboard'; APP.updateChrome(); APP.renderView();
       setTimeout(function () { var b = document.querySelector('[data-act="toggle-side"]'); if (b) b.click(); }, 300);
     }
+    if (h === 'feed-collapsed') {
+      APP.S.view = 'dashboard'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var b = document.querySelector('[data-act="toggle-feed"]'); if (b) b.click(); }, 300);
+    }
+    if (h === 'scroll-dash') {
+      APP.S.view = 'dashboard'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () {
+        var t = document.querySelector('[data-act="toggle-side"]');
+        if (t) t.click();
+        window.scrollTo(0, 500);
+        setTimeout(function () {
+          var s = document.querySelector('.side');
+          var r = s ? s.getBoundingClientRect() : { top: 0, height: 0 };
+          document.title = 'sideTop=' + r.top + ' sideH=' + r.height + ' scroll=' + window.scrollY + ' pos=' + (s ? getComputedStyle(s).position : '');
+        }, 400);
+      }, 350);
+    }
     if (h === 'toplu-all') {
       APP.S.view = 'personel'; APP.S.ui.personelTab = 'toplu'; APP.updateChrome(); APP.renderView();
       setTimeout(function () {

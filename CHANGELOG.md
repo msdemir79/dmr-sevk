@@ -2,6 +2,16 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.7.0 — 08.11.2026
+
+### Düzeltildi
+- Sol menünün sayfa kaydırılınca yukarı kayması / yarım kalması giderildi.
+- Menü tekrar **sticky** ve tam yükseklikte sabit kalıyor.
+
+### Eklendi
+- Dashboard’daki **Son hareketler** paneli **Daralt / Aç** ile katlanabiliyor.
+- Tercih tarayıcıda saklanıyor.
+
 ## v3.6.0 — 08.11.2026
 
 ### Eklendi
