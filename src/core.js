@@ -33,6 +33,8 @@
     LINES: 'SEVK SATIRLARI',
     PERSONEL: 'PERSONEL',
     PUANTAJ: 'PUANTAJ',
+    HESAPLAR: 'HESAPLAR',
+    KASA: 'KASA HAREKETLERİ',
     AUDIT: 'İŞLEM GÜNLÜĞÜ',
     TRASH: 'ÇÖP KUTUSU',
     IMAGES: 'RESİMLER',
@@ -164,13 +166,21 @@
   function emptyData() {
     return {
       cariler: [], kullanicilar: [], modeller: [], renkler: [], asortiSablonlari: [], modelRenkleri: [], orders: [], orderLines: [], ledger: [], shipments: [],
-      lines: [], personel: [], puantaj: [], audit: [], trash: [], images: {}, modelImages: {}, settings: defaultSettings()
+      lines: [], personel: [], puantaj: [], hesaplar: [], kasa: [], audit: [], trash: [], images: {}, modelImages: {}, settings: defaultSettings()
     };
+  }
+
+  function defaultHesaplar() {
+    return [
+      { id: 1, ad: 'Merkez Kasa', tur: 'NAKIT', acilis: 0, iban: '', aktif: true, not: '' },
+      { id: 2, ad: 'Banka', tur: 'BANKA', acilis: 0, iban: '', aktif: true, not: '' }
+    ];
   }
 
   /** Yeni dosya: boş veri + varsayılan cari hesap. */
   function newData() {
     var d = emptyData();
+    d.hesaplar = defaultHesaplar();
     d.cariler.push(defaultCari(d.settings.cariAdi || 'YENİ CARİ'));
     d.settings.kurulum = new Date().toISOString();
     return d;
@@ -766,6 +776,130 @@
   /* ------------------------------------------------------------------ */
   /* Cari hesap                                                          */
   /* ------------------------------------------------------------------ */
+  function normalizeHesap(input) {
+    input = input || {};
+    var tur = String(input.tur || 'NAKIT').toUpperCase();
+    if (tur !== 'NAKIT' && tur !== 'BANKA') tur = 'NAKIT';
+    return {
+      id: num(input.id), ad: String(input.ad || '').trim(), tur: tur,
+      acilis: round2(num(input.acilis)), iban: String(input.iban || '').trim(),
+      aktif: !(input.aktif === false || input.aktif === 'false' || input.aktif === 0 || input.aktif === 'HAYIR'),
+      not: String(input.not || '').trim()
+    };
+  }
+
+  function hesapById(data, id) {
+    return (data.hesaplar || []).filter(function (h) { return h.id === id; })[0] || null;
+  }
+
+  function hesapBakiye(data, id) {
+    var h = hesapById(data, id);
+    if (!h) return 0;
+    var b = num(h.acilis);
+    (data.kasa || []).forEach(function (k) {
+      if (k.hesapId !== id) return;
+      b += k.yon === 'GIRIS' ? num(k.tutar) : -num(k.tutar);
+    });
+    return round2(b);
+  }
+
+  function hesapToplam(data) {
+    return round2((data.hesaplar || []).reduce(function (a, h) { return a + hesapBakiye(data, h.id); }, 0));
+  }
+
+  function addHesap(data, input, kullanici) {
+    var h = normalizeHesap(input);
+    if (!h.ad) throw new Error('Hesap adı zorunlu.');
+    h.id = nextId(data.hesaplar);
+    data.hesaplar.push(h);
+    audit(data, kullanici, 'HESAP EKLE', h.ad);
+    return h;
+  }
+
+  function updateHesap(data, id, input, kullanici) {
+    var h = hesapById(data, id);
+    if (!h) throw new Error('Hesap bulunamadı.');
+    var merged = {};
+    Object.keys(h).forEach(function (k) { merged[k] = h[k]; });
+    Object.keys(input || {}).forEach(function (k) { merged[k] = input[k]; });
+    var nh = normalizeHesap(merged);
+    nh.id = id;
+    if (!nh.ad) throw new Error('Hesap adı zorunlu.');
+    data.hesaplar = data.hesaplar.map(function (x) { return x.id === id ? nh : x; });
+    audit(data, kullanici, 'HESAP DÜZENLE', nh.ad);
+    return nh;
+  }
+
+  function deleteHesap(data, id, kullanici) {
+    if ((data.kasa || []).some(function (k) { return k.hesapId === id || k.karsiHesapId === id; })) {
+      throw new Error('Bu hesabın kasa hareketleri var; önce hareketleri silin veya hesabı pasif yapın.');
+    }
+    var h = hesapById(data, id);
+    if (!h) return;
+    data.hesaplar = data.hesaplar.filter(function (x) { return x.id !== id; });
+    audit(data, kullanici, 'HESAP SİL', h.ad);
+  }
+
+  function normalizeKasa(input) {
+    input = input || {};
+    var yon = String(input.yon || 'GIRIS').toUpperCase() === 'CIKIS' ? 'CIKIS' : 'GIRIS';
+    var tur = String(input.tur || 'DIGER').toUpperCase();
+    return {
+      id: num(input.id), tarih: toISODate(input.tarih) || todayISO(),
+      hesapId: num(input.hesapId), yon: yon, tutar: round2(num(input.tutar)), tur: tur,
+      cariId: num(input.cariId) || 0, personelId: num(input.personelId) || 0,
+      ledgerId: num(input.ledgerId) || 0, puantajId: num(input.puantajId) || 0,
+      karsiHesapId: num(input.karsiHesapId) || 0, aciklama: String(input.aciklama || '').trim()
+    };
+  }
+
+  function kasaById(data, id) {
+    return (data.kasa || []).filter(function (k) { return k.id === id; })[0] || null;
+  }
+
+  function addKasa(data, input, kullanici) {
+    var k = normalizeKasa(input);
+    if (!hesapById(data, k.hesapId)) throw new Error('Kasa/banka hesabı seçin.');
+    if (k.tutar <= 0) throw new Error('Tutar sıfırdan büyük olmalı.');
+    if (k.yon === 'CIKIS' && k.hesapId && hesapBakiye(data, k.hesapId) < k.tutar) {
+      throw new Error('Bu hesapta yeterli bakiye yok. Mevcut: ' + money(hesapBakiye(data, k.hesapId)));
+    }
+    k.id = nextId(data.kasa);
+    data.kasa.push(k);
+    audit(data, kullanici, 'KASA HAREKET', (k.yon === 'GIRIS' ? 'Giriş ' : 'Çıkış ') + money(k.tutar));
+    return k;
+  }
+
+  function deleteKasa(data, id, kullanici) {
+    var k = kasaById(data, id);
+    if (!k) return;
+    if (k.ledgerId) data.ledger = (data.ledger || []).filter(function (r) { return r.id !== k.ledgerId; });
+    if (k.puantajId) {
+      var r = (data.puantaj || []).filter(function (x) { return x.id === k.puantajId; })[0];
+      if (r && r.odemeKasaId === id) {
+        r.durum = 'KESIN'; r.odemeKasaId = 0; r.odemeTarihi = '';
+        var pp = personelById(data, r.personelId);
+        if (pp && num(r.avans) > 0) pp.avansBakiye = round2(num(pp.avansBakiye) + num(r.avans));
+      }
+    }
+    if (k.tur === 'AVANS' && k.personelId) {
+      var pa = personelById(data, k.personelId);
+      if (pa) pa.avansBakiye = round2(Math.max(0, num(pa.avansBakiye) - num(k.tutar)));
+    }
+    data.kasa = data.kasa.filter(function (x) { return x.id !== id; });
+    audit(data, kullanici, 'KASA SİL', money(k.tutar) + ' · ' + (k.aciklama || ''));
+  }
+
+  function kasaRows(data, opts) {
+    opts = opts || {};
+    return (data.kasa || []).filter(function (k) {
+      if (opts.hesapId && k.hesapId !== opts.hesapId) return false;
+      if (opts.from && k.tarih < opts.from) return false;
+      if (opts.to && k.tarih > opts.to) return false;
+      return true;
+    }).slice().sort(function (a, b) { return a.tarih === b.tarih ? a.id - b.id : (a.tarih < b.tarih ? 1 : -1); });
+  }
+
   function addLedgerEntry(data, input) {
     var islem = input.islem || TYPES.DIGER;
     var tutar = round2(num(input.tutar));
@@ -791,7 +925,8 @@
       grup: String(input.grup || '').trim(),
       kod: String(input.kod || '').trim(),
       sevkFisNo: '',
-      sevkId: 0
+      sevkId: 0,
+      kasaId: num(input.kasaId) || 0
     };
     data.ledger.push(entry);
     return entry;
@@ -801,6 +936,7 @@
     var row = data.ledger.filter(function (r) { return r.id === id; })[0];
     if (!row) throw new Error('Cari kaydı bulunamadı.');
     if (row.sevkId) throw new Error('Sevk fişinden gelen kayıt buradan değiştirilemez.');
+    if (row.kasaId) throw new Error('Kasa/banka bağlı kayıt düzenlenemez; silip yeniden oluşturun.');
     ['tarih', 'aciklama', 'fisNo', 'sipno', 'koli', 'cift', 'fiyat', 'grup', 'kod'].forEach(function (k) {
       if (input[k] !== undefined) row[k] = (k === 'tarih' ? toISODate(input[k]) : input[k]);
     });
@@ -827,6 +963,7 @@
 
   function deleteLedgerEntry(data, id, kullanici) {
     var row = data.ledger.filter(function (r) { return r.id === id; })[0];
+    if (row && row.kasaId) data.kasa = (data.kasa || []).filter(function (k) { return k.id !== row.kasaId; });
     if (row && row.sevkId) throw new Error('Sevk fişinden gelen kayıt silinemez. Sevk fişini silin.');
     if (!row) return;
     trashPush(data, kullanici, 'hareket', (row.islem || '') + ' · ' + (row.aciklama || ''), { row: row });
@@ -964,6 +1101,7 @@
       net: round2(num(input.net)),
       durum: durum,
       odemeTarihi: toISODate(input.odemeTarihi) || '',
+      odemeKasaId: num(input.odemeKasaId) || 0,
       not: String(input.not || '').trim()
     };
   }
@@ -1042,11 +1180,12 @@
     return rec;
   }
 
-  function setPuantajStatus(data, id, durum, odemeTarihi, kullanici) {
+  function setPuantajStatus(data, id, durum, odemeTarihi, kullanici, odemeKasaId) {
     var rec = (data.puantaj || []).filter(function (r) { return r.id === id; })[0];
     if (!rec) throw new Error('Puantaj kaydı bulunamadı.');
     rec.durum = durum === 'ODENDI' ? 'ODENDI' : durum === 'KESIN' ? 'KESIN' : 'TASLAK';
     rec.odemeTarihi = rec.durum === 'ODENDI' ? (toISODate(odemeTarihi) || todayISO()) : '';
+    if (rec.durum === 'ODENDI' && odemeKasaId !== undefined) rec.odemeKasaId = num(odemeKasaId) || 0;
     if (rec.durum === 'ODENDI') {
       var pp = personelById(data, rec.personelId);
       if (pp && pp.cikisTarihi && rec.ay >= String(pp.cikisTarihi).slice(0, 7)) pp.aktif = false;
@@ -1520,6 +1659,15 @@
       return [u.id, u.ad, u.kullanici, u.tuz, u.sifre, u.rol, u.aktif === false ? 'HAYIR' : 'EVET', u.sonGiris || ''];
     });
 
+    var hesapRows = (data.hesaplar || []).map(function (h) {
+      return [h.id, h.ad, h.tur || 'NAKIT', num(h.acilis), h.iban || '', h.aktif === false ? 'HAYIR' : 'EVET', h.not || ''];
+    });
+    var kasaRowsData = (data.kasa || []).map(function (k) {
+      var h = hesapById(data, k.hesapId);
+      return [k.id, dcell(k.tarih), k.hesapId, h ? h.ad : '', k.yon, num(k.tutar), k.tur || '',
+        num(k.cariId), num(k.personelId), num(k.ledgerId), num(k.puantajId), num(k.karsiHesapId), k.aciklama || ''];
+    });
+
     var personelRows = (data.personel || []).map(function (p) {
       return [p.id, p.ad, p.gorev || '', p.cinsiyet || '', num(p.izinHakki), money(p.avansBakiye), money(p.maas), num(p.gunlukSaat), p.iseGiris || '', p.cikisTarihi || '', p.cikisSebebi || '', p.aktif === false ? 'HAYIR' : 'EVET', p.not || ''];
     });
@@ -1527,7 +1675,7 @@
     var puantajRows = (data.puantaj || []).map(function (r) {
       return [r.id, r.personelId, r.personelAd || '', r.ay, r.gunler || '', money(r.maas), num(r.gunlukSaat),
         num(r.eksikGun), num(r.eksikSaat), num(r.fazlaMesai), money(r.ekOdeme), money(r.kesinti), money(r.avans),
-        money(r.net), r.durum || 'TASLAK', r.odemeTarihi || '', r.not || ''];
+        money(r.net), r.durum || 'TASLAK', r.odemeTarihi || '', num(r.odemeKasaId), r.not || ''];
     });
 
     var modelRows = (data.modeller || []).map(function (m) {
@@ -1604,9 +1752,27 @@
             { header: 'AY', width: 10 }, { header: 'GÜNLER', width: 18 }, { header: 'MAAŞ', width: 12 }, { header: 'GÜNLÜK SAAT', width: 11 },
             { header: 'EKSİK GÜN', width: 10 }, { header: 'EKSİK SAAT', width: 10 }, { header: 'FAZLA MESAİ', width: 11 },
             { header: 'EK ÖDEME', width: 11 }, { header: 'KESİNTİ', width: 11 }, { header: 'AVANS', width: 11 },
-            { header: 'NET', width: 12 }, { header: 'DURUM', width: 10 }, { header: 'ÖDEME TARİHİ', width: 12 }, { header: 'NOT', width: 26 }
+            { header: 'NET', width: 12 }, { header: 'DURUM', width: 10 }, { header: 'ÖDEME TARİHİ', width: 12 }, { header: 'ÖDEME HESABI', width: 10 }, { header: 'NOT', width: 26 }
           ],
           rows: puantajRows
+        },
+        {
+          name: SHEET.HESAPLAR,
+          columns: [
+            { header: 'ID', width: 6 }, { header: 'HESAP ADI', width: 24 }, { header: 'TÜR', width: 10 },
+            { header: 'AÇILIŞ BAKİYESİ', width: 15 }, { header: 'IBAN', width: 28 }, { header: 'AKTİF', width: 9 }, { header: 'NOT', width: 28 }
+          ],
+          rows: hesapRows
+        },
+        {
+          name: SHEET.KASA,
+          columns: [
+            { header: 'ID', width: 6 }, { header: 'TARİH', width: 12 }, { header: 'HESAP ID', width: 8 }, { header: 'HESAP', width: 20 },
+            { header: 'YÖN', width: 8 }, { header: 'TUTAR', width: 13 }, { header: 'TÜR', width: 12 },
+            { header: 'CARİ ID', width: 8 }, { header: 'PERSONEL ID', width: 10 }, { header: 'LEDGER ID', width: 9 },
+            { header: 'PUANTAJ ID', width: 9 }, { header: 'KARŞI HESAP ID', width: 12 }, { header: 'AÇIKLAMA', width: 32 }
+          ],
+          rows: kasaRowsData
         },
         {
           name: SHEET.MODELLER,
@@ -1756,7 +1922,16 @@
     ID: 'id', PERSONELID: 'personelId', PERSONEL: 'personelAd', AY: 'ay', DONEM: 'ay', GUNLER: 'gunler',
     MAAS: 'maas', GUNLUKSAAT: 'gunlukSaat', EKSIKGUN: 'eksikGun', EKSIKSAAT: 'eksikSaat',
     FAZLAMESAI: 'fazlaMesai', FAZLAMESAISAAT: 'fazlaMesai', EKODEME: 'ekOdeme', KESINTI: 'kesinti',
-    AVANS: 'avans', NET: 'net', DURUM: 'durum', ODEMETARIHI: 'odemeTarihi', NOT: 'not'
+    AVANS: 'avans', NET: 'net', DURUM: 'durum', ODEMETARIHI: 'odemeTarihi', ODEMEKASAID: 'odemeKasaId', NOT: 'not'
+  };
+  var HESAP_KEYS = {
+    ID: 'id', AD: 'ad', HESAPADI: 'ad', HESAP: 'ad', TUR: 'tur', HESAPTURU: 'tur',
+    ACILIS: 'acilis', ACILISBAKIYESI: 'acilis', IBAN: 'iban', AKTIF: 'aktif', NOT: 'not'
+  };
+  var KASA_KEYS = {
+    ID: 'id', TARIH: 'tarih', HESAPID: 'hesapId', HESAP: 'hesapAd', HESAPADI: 'hesapAd',
+    YON: 'yon', TUTAR: 'tutar', TUR: 'tur', CARIID: 'cariId', PERSONELID: 'personelId',
+    LEDGERID: 'ledgerId', PUANTAJID: 'puantajId', KARSIHESAPID: 'karsiHesapId', ACIKLAMA: 'aciklama'
   };
   var MODEL_KEYS = {
     ID: 'id', MODEL: 'model', MODELBILGISI: 'model', FIYAT: 'fiyat', ASORTI: 'asorti', MALIYET: 'maliyet',
@@ -1823,6 +1998,24 @@
       }
     }
     data.settings = Object.assign(defaultSettings(), data.settings);
+
+    // --- kasa / banka hesapları
+    var hs = sheetByName(sheets, SHEET.HESAPLAR);
+    if (hs) {
+      var hm = headerMap(hs.rows[0], HESAP_KEYS);
+      for (var hi = 1; hi < hs.rows.length; hi++) {
+        var hrow = hs.rows[hi];
+        if (!hrow) continue;
+        var had = pick(hrow, hm, 'ad');
+        if (!had) continue;
+        data.hesaplar.push(normalizeHesap({
+          id: num(pick(hrow, hm, 'id')) || nextId(data.hesaplar),
+          ad: had, tur: pick(hrow, hm, 'tur'), acilis: pick(hrow, hm, 'acilis'),
+          iban: pick(hrow, hm, 'iban'), aktif: pick(hrow, hm, 'aktif'), not: pick(hrow, hm, 'not')
+        }));
+      }
+    }
+    if (!data.hesaplar.length) data.hesaplar = defaultHesaplar();
 
     // --- cariler
     var cariSheet = sheetByName(sheets, SHEET.CARILER);
@@ -1949,9 +2142,34 @@
           net: pick(urow, um, 'net'),
           durum: pick(urow, um, 'durum'),
           odemeTarihi: pick(urow, um, 'odemeTarihi'),
+          odemeKasaId: pick(urow, um, 'odemeKasaId'),
           not: pick(urow, um, 'not')
         });
         data.puantaj.push(rec);
+      }
+    }
+
+    // --- kasa hareketleri
+    var ksch = sheetByName(sheets, SHEET.KASA);
+    if (ksch) {
+      var ksm = headerMap(ksch.rows[0], KASA_KEYS);
+      for (var ksi = 1; ksi < ksch.rows.length; ksi++) {
+        var krow = ksch.rows[ksi];
+        if (!krow) continue;
+        var khid = num(pick(krow, ksm, 'hesapId'));
+        var khad = pick(krow, ksm, 'hesapAd');
+        if (!khid && khad) {
+          var foundH = data.hesaplar.filter(function (h) { return normKey(h.ad) === normKey(khad); })[0];
+          if (foundH) khid = foundH.id;
+        }
+        if (!khid) continue;
+        data.kasa.push(normalizeKasa({
+          id: num(pick(krow, ksm, 'id')) || nextId(data.kasa),
+          tarih: pick(krow, ksm, 'tarih'), hesapId: khid, yon: pick(krow, ksm, 'yon'), tutar: pick(krow, ksm, 'tutar'),
+          tur: pick(krow, ksm, 'tur'), cariId: pick(krow, ksm, 'cariId'), personelId: pick(krow, ksm, 'personelId'),
+          ledgerId: pick(krow, ksm, 'ledgerId'), puantajId: pick(krow, ksm, 'puantajId'),
+          karsiHesapId: pick(krow, ksm, 'karsiHesapId'), aciklama: pick(krow, ksm, 'aciklama')
+        }));
       }
     }
 
@@ -2564,6 +2782,19 @@
     cariName: cariName,
     defaultCariId: defaultCariId,
     normalizeKullanici: normalizeKullanici,
+    defaultHesaplar: defaultHesaplar,
+    normalizeHesap: normalizeHesap,
+    hesapById: hesapById,
+    hesapBakiye: hesapBakiye,
+    hesapToplam: hesapToplam,
+    addHesap: addHesap,
+    updateHesap: updateHesap,
+    deleteHesap: deleteHesap,
+    normalizeKasa: normalizeKasa,
+    kasaById: kasaById,
+    addKasa: addKasa,
+    deleteKasa: deleteKasa,
+    kasaRows: kasaRows,
     addKullanici: addKullanici,
     updateKullanici: updateKullanici,
     deleteKullanici: deleteKullanici,

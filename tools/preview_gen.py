@@ -27,6 +27,9 @@ BOOT = r"""
     st.textContent = '.modal-backdrop{animation:none!important;opacity:1!important}';
     document.head.appendChild(st);
     var d = Core.emptyData();
+    d.hesaplar = Core.defaultHesaplar();
+    d.hesaplar[0].acilis = 50000;
+    d.hesaplar[1].acilis = 100000;
     d.settings.firmaAdi = 'DMR AYAKKABI - FABRİKA';
     d.settings.firmaAdres = 'SEFAKÖY / İSTANBUL';
     d.settings.firmaTel = '0212 555 44 33';
@@ -275,6 +278,17 @@ BOOT = r"""
     if (h === 'side-collapsed') {
       APP.S.view = 'dashboard'; APP.updateChrome(); APP.renderView();
       setTimeout(function () { var b = document.querySelector('[data-act="toggle-side"]'); if (b) b.click(); }, 300);
+    }
+    if (h === 'kasa') {
+      APP.S.view = 'kasa'; APP.updateChrome(); APP.renderView();
+    }
+    if (h === 'cari-tahsilat') {
+      APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var b = document.querySelector('[data-act="ledger-tahsilat"]'); if (b) b.click(); }, 300);
+    }
+    if (h === 'maas-pay') {
+      APP.S.view = 'personel'; APP.S.ui.personelTab = 'puantaj'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var b = document.querySelector('[data-act="puantaj-paid"]'); if (b) b.click(); }, 300);
     }
     if (h === 'ekstre-panel') {
       APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView();

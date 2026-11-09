@@ -882,6 +882,7 @@
     models: { title: 'Modeller', sub: 'Fiyat, maliyet, barkod ve model özeti' },
     reports: { title: 'Raporlar', sub: 'Dönem, kârlılık, cari ve sevkiyat analizi' },
   personel: { title: 'Personel', sub: 'Puantaj ve iç maaş hesabı' },
+  kasa: { title: 'Kasa & Banka', sub: 'Nakit, banka ve kasa hareketleri' },
     settings: { title: 'Ayarlar', sub: 'Firma bilgileri, dosya ve tercihler' }
   };
 
@@ -903,7 +904,10 @@
       { key: 'reports', icon: 'chart', label: 'Raporlar' },
       { key: 'settings', icon: 'settings', label: 'Ayarlar' }
     ];
-    if (isAdmin()) items.splice(items.length - 1, 0, { key: 'personel', icon: 'users', label: 'Personel' });
+    if (isAdmin()) {
+      items.splice(items.length - 1, 0, { key: 'kasa', icon: 'wallet', label: 'Kasa & Banka' });
+      items.splice(items.length - 1, 0, { key: 'personel', icon: 'users', label: 'Personel' });
+    }
     return items;
   }
 
@@ -1105,6 +1109,7 @@
       case 'models': html = viewModels(); break;
       case 'reports': html = viewReports(); break;
         case 'personel': html = isAdmin() ? viewPersonel() : '<div class="card"><div class="card-body"><p class="muted">Bu ekran için yönetici yetkisi gerekli.</p></div></div>'; break;
+      case 'kasa': html = isAdmin() ? viewKasa() : '<div class="card"><div class="card-body"><p class="muted">Bu ekran için yönetici yetkisi gerekli.</p></div></div>'; break;
       case 'settings': html = viewSettings(); break;
       default: html = viewDashboard();
     }
@@ -1121,7 +1126,7 @@
       if (!el) return;
       var act = el.dataset.act;
       var id = el.dataset.id ? parseInt(el.dataset.id, 10) : null;
-      var ADMIN_ONLY = { 'new-file': 1, 'clear-all': 1, 'import-legacy': 1, 'import-cari': 1, 'user-new': 1, 'user-edit': 1, 'user-del': 1, 'user-pass': 1, 'personel-new': 1, 'personel-edit': 1, 'personel-del': 1, 'puantaj-edit': 1, 'puantaj-paid': 1, 'puantaj-pusula': 1, 'puantaj-grid': 1, 'puantaj-grid-all': 1, 'puantaj-grid-h': 1, 'personel-ekstre': 1 };
+      var ADMIN_ONLY = { 'new-file': 1, 'clear-all': 1, 'import-legacy': 1, 'import-cari': 1, 'user-new': 1, 'user-edit': 1, 'user-del': 1, 'user-pass': 1, 'personel-new': 1, 'personel-edit': 1, 'personel-del': 1, 'puantaj-edit': 1, 'puantaj-paid': 1, 'puantaj-pusula': 1, 'puantaj-grid': 1, 'puantaj-grid-all': 1, 'puantaj-grid-h': 1, 'personel-ekstre': 1, 'personel-avans': 1, 'kasa-new': 1, 'kasa-del': 1, 'kasa-hesap-new': 1, 'kasa-hesap-edit': 1 };
       if (ADMIN_ONLY[act] && !isAdmin()) {
         toast('Bu işlem için yönetici yetkisi gerekli.', 'err');
         return;
@@ -1215,6 +1220,11 @@
         case 'personel-edit': openPersonelForm(Core.personelById(data, id)); break;
         case 'personel-del': removePersonel(id); break;
         case 'personel-ekstre': openPersonelEkstre(id); break;
+        case 'personel-avans': openAvansForm(id); break;
+        case 'kasa-new': openKasaForm(); break;
+        case 'kasa-del': removeKasa(id); break;
+        case 'kasa-hesap-new': openHesapForm(null); break;
+        case 'kasa-hesap-edit': openHesapForm(Core.hesapById(data, id)); break;
         case 'puantaj-edit': openPuantajForm(id, el.dataset.ay); break;
         case 'puantaj-paid': markPuantajPaid(id, el.dataset.personelId, el.dataset.ay); break;
         case 'puantaj-pusula': openPayslip(id, el.dataset.ay); break;
@@ -2207,6 +2217,125 @@ function viewShipments() {
     return '<span class="pill muted">Taslak</span>';
   }
 
+  function hesapAdi(id) {
+    var h = Core.hesapById(data, id);
+    return h ? h.ad : '—';
+  }
+
+  function hesapOptions(selected) {
+    return '<option value="">Kasa / banka seçin</option>' + (data.hesaplar || []).filter(function (h) { return h.aktif !== false; }).map(function (h) {
+      return '<option value="' + h.id + '"' + (Core.num(selected) === h.id ? ' selected' : '') + '>' + esc(h.ad) + ' · ' + money(Core.hesapBakiye(data, h.id)) + '</option>';
+    }).join('');
+  }
+
+  function askAdminPassword(title, message) {
+    return new Promise(function (resolve) {
+      var m = openModal({
+        title: title || 'Yönetici şifresi',
+        subtitle: 'Bu işlem için yönetici şifresi gerekli',
+        body: '<p class="muted small" style="margin:0 0 10px">' + esc(message || '') + '</p><form id="admPassForm"><div class="field"><label for="admPass">Yönetici şifresi</label><input id="admPass" class="input" type="password" autocomplete="current-password" required></div><div class="auth-err" id="admPassErr"></div></form>',
+        footer: '<button class="btn" data-modal-close>Vazgeç</button><button class="btn btn-danger" type="submit" form="admPassForm">' + ICONS.check + ' Onayla</button>',
+        onClose: function () { resolve(false); }
+      });
+      $('#admPassForm', m.el).addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var pass = $('#admPass', m.el).value;
+        if (!isAdmin()) { $('#admPassErr', m.el).textContent = 'Yönetici yetkisi gerekli.'; return; }
+        var h = await sifreHash(S.user.kullanici, pass, S.user.tuz);
+        if (h !== S.user.sifre) { $('#admPassErr', m.el).textContent = 'Yönetici şifresi hatalı.'; return; }
+        resolve(true); m.close();
+      });
+    });
+  }
+
+  function viewKasa() {
+    var total = Core.hesapToplam(data);
+    var rows = Core.kasaRows(data, {});
+    var accounts = data.hesaplar || [];
+    return '<div class="card"><div class="report-toolbar">' +
+      '<div class="seg"><span class="report-tab active">Kasa & Banka</span></div><div style="flex:1"></div>' +
+      '<button class="btn" data-act="kasa-hesap-new">' + ICONS.plus + ' Hesap ekle</button>' +
+      '<button class="btn btn-primary" data-act="kasa-new">' + ICONS.plus + ' Kasa hareketi</button></div>' +
+      '<div class="card-body"><div class="kpis report-kpis">' +
+      rKpi('Kasa + Banka', money(total), accounts.length + ' hesap', 'ok', '') +
+      accounts.map(function (h) {
+        return rKpi(h.ad, money(Core.hesapBakiye(data, h.id)), h.tur === 'BANKA' ? 'Banka' : 'Nakit', h.tur === 'BANKA' ? 'info' : '', '');
+      }).join('') +
+      '</div></div>' +
+      '<div class="settings-actions" style="padding:10px 14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)">' +
+      accounts.map(function (h) { return '<button class="btn btn-sm" data-act="kasa-hesap-edit" data-id="' + h.id + '">' + ICONS.edit + ' ' + esc(h.ad) + '</button>'; }).join('') +
+      '</div>' +
+      '<div class="table-wrap"><table class="data"><thead><tr><th>Tarih</th><th>Hesap</th><th>Tür</th><th>Açıklama</th><th class="right">Giriş</th><th class="right">Çıkış</th><th></th></tr></thead><tbody>' +
+      (rows.length ? rows.map(function (k) {
+        return '<tr><td>' + dateTR(k.tarih) + '</td><td><div class="strong">' + esc(hesapAdi(k.hesapId)) + '</div></td><td>' + esc(k.tur || '—') + '</td>' +
+          '<td>' + esc(k.aciklama || '') + (k.cariId ? '<div class="sub">' + esc(cariAdi(k.cariId)) + '</div>' : '') + '</td>' +
+          '<td class="right" style="color:var(--alacak)">' + (k.yon === 'GIRIS' ? money(k.tutar) : '—') + '</td>' +
+          '<td class="right" style="color:var(--borc)">' + (k.yon === 'CIKIS' ? money(k.tutar) : '—') + '</td>' +
+          '<td><button class="btn btn-icon danger" data-act="kasa-del" data-id="' + k.id + '" title="Sil (yönetici şifresi)" aria-label="Sil">' + ICONS.trash + '</button></td></tr>';
+      }).join('') : '<tr><td colspan="7">' + emptyState('wallet', 'Kasa hareketi yok', 'Tahsilat, gider veya devir ekleyin.', '') + '</td></tr>') +
+      '</tbody></table></div></div>';
+  }
+
+  function openHesapForm(h) {
+    var isEdit = !!h;
+    var x = h || { ad: '', tur: 'NAKIT', acilis: 0, iban: '', aktif: true, not: '' };
+    var m = openModal({
+      title: isEdit ? 'Hesabı düzenle' : 'Kasa / banka hesabı',
+      subtitle: isEdit ? 'Hesap bilgileri' : 'Yeni nakit veya banka hesabı',
+      body: '<form id="hesapForm" class="form-grid g2">' +
+        '<div class="field span2"><label for="hsAd">Hesap adı *</label><input id="hsAd" class="input" value="' + esc(x.ad) + '" required></div>' +
+        '<div class="field"><label for="hsTur">Tür</label><select id="hsTur" class="select"><option value="NAKIT"' + (x.tur === 'NAKIT' ? ' selected' : '') + '>Nakit Kasa</option><option value="BANKA"' + (x.tur === 'BANKA' ? ' selected' : '') + '>Banka</option></select></div>' +
+        '<div class="field"><label for="hsAcilis">Açılış bakiyesi</label><input id="hsAcilis" class="input num" inputmode="decimal" value="' + esc(x.acilis) + '"></div>' +
+        '<div class="field span2"><label for="hsIban">IBAN</label><input id="hsIban" class="input" value="' + esc(x.iban || '') + '"></div>' +
+        '<div class="field span2"><label class="switch"><input id="hsAktif" type="checkbox"' + (x.aktif === false ? '' : ' checked') + '><span class="track"></span><span>Aktif</span></label></div>' +
+        '<div class="field span2"><label for="hsNot">Not</label><input id="hsNot" class="input" value="' + esc(x.not || '') + '"></div><div class="span2 auth-err" id="hsErr"></div></form>',
+      footer: '<button class="btn" data-modal-close>Vazgeç</button><button class="btn btn-primary" type="submit" form="hesapForm">' + ICONS.check + ' Kaydet</button>'
+    });
+    $('#hesapForm', m.el).addEventListener('submit', function (e) {
+      e.preventDefault();
+      var payload = { ad: $('#hsAd', m.el).value, tur: $('#hsTur', m.el).value, acilis: $('#hsAcilis', m.el).value, iban: $('#hsIban', m.el).value, aktif: $('#hsAktif', m.el).checked, not: $('#hsNot', m.el).value };
+      try {
+        if (isEdit) Core.updateHesap(data, h.id, payload, S.user ? S.user.ad : '');
+        else Core.addHesap(data, payload, S.user ? S.user.ad : '');
+        setDirty(true); m.close(); renderView(); toast(isEdit ? 'Hesap güncellendi' : 'Hesap eklendi', 'ok');
+      } catch (err) { $('#hsErr', m.el).textContent = err.message; }
+    });
+  }
+
+  function openKasaForm() {
+    if (!(data.hesaplar || []).length) { toast('Önce kasa/banka hesabı ekleyin.', 'err'); return; }
+    var m = openModal({
+      title: 'Kasa hareketi',
+      subtitle: 'Nakit veya banka hesabına giriş/çıkış',
+      body: '<form id="kasaForm" class="form-grid g2">' +
+        '<div class="field"><label for="ksHesap">Hesap</label><select id="ksHesap" class="select">' + hesapOptions(data.hesaplar[0].id) + '</select></div>' +
+        '<div class="field"><label for="ksTarih">Tarih</label><input id="ksTarih" type="date" class="input" value="' + esc(Core.todayISO()) + '"></div>' +
+        '<div class="field"><label for="ksYon">Yön</label><select id="ksYon" class="select"><option value="GIRIS">Giriş</option><option value="CIKIS">Çıkış</option></select></div>' +
+        '<div class="field"><label for="ksTutar">Tutar</label><input id="ksTutar" class="input num" inputmode="decimal" required placeholder="0,00"></div>' +
+        '<div class="field"><label for="ksTur">Tür</label><select id="ksTur" class="select"><option>DEVIR</option><option>GIDER</option><option>DIGER</option></select></div>' +
+        '<div class="field"><label for="ksAciklama">Açıklama</label><input id="ksAciklama" class="input" placeholder="Devir, kira, kargo…"></div>' +
+        '<div class="span2 auth-err" id="ksErr"></div></form>',
+      footer: '<button class="btn" data-modal-close>Vazgeç</button><button class="btn btn-primary" type="submit" form="kasaForm">' + ICONS.check + ' Kaydet</button>'
+    });
+    $('#kasaForm', m.el).addEventListener('submit', function (e) {
+      e.preventDefault();
+      try {
+        Core.addKasa(data, { hesapId: $('#ksHesap', m.el).value, tarih: $('#ksTarih', m.el).value, yon: $('#ksYon', m.el).value, tutar: $('#ksTutar', m.el).value, tur: $('#ksTur', m.el).value, aciklama: $('#ksAciklama', m.el).value }, S.user ? S.user.ad : '');
+        setDirty(true); m.close(); renderView(); toast('Kasa hareketi eklendi', 'ok');
+      } catch (err) { $('#ksErr', m.el).textContent = err.message; }
+    });
+  }
+
+  function removeKasa(id) {
+    var k = Core.kasaById(data, id);
+    if (!k) return;
+    askAdminPassword('Kasa hareketi silinsin mi?', 'Bağlı cari kaydı varsa o da silinecek. Bu işlem geri alınamaz.').then(function (ok) {
+      if (!ok) return;
+      try { Core.deleteKasa(data, id, S.user ? S.user.ad : ''); setDirty(true); renderView(); toast('Kasa hareketi silindi', 'ok'); }
+      catch (e) { toast(e.message, 'err'); }
+    });
+  }
+
   function viewPersonel() {
     if (!isAdmin()) return '<div class="card"><div class="card-body"><p class="muted">Bu ekran için yönetici yetkisi gerekli.</p></div></div>';
     var ay = personelMonth();
@@ -2257,6 +2386,7 @@ function viewShipments() {
           '<td><div class="row-actions">' +
           '<button class="btn btn-icon" data-act="personel-edit" data-id="' + p.id + '" title="Düzenle" aria-label="Düzenle">' + ICONS.edit + '</button>' +
           '<button class="btn btn-icon" data-act="personel-ekstre" data-id="' + p.id + '" title="Personel ekstresi" aria-label="Personel ekstresi">' + ICONS.receipt + '</button>' +
+          '<button class="btn btn-icon" data-act="personel-avans" data-id="' + p.id + '" title="Avans öde" aria-label="Avans öde">' + ICONS.wallet + '</button>' +
           '<button class="btn btn-icon" data-act="puantaj-edit" data-id="' + p.id + '" data-ay="' + esc(ay) + '" title="Puantaj" aria-label="Puantaj">' + ICONS.wallet + '</button>' +
           '<button class="btn btn-icon danger" data-act="personel-del" data-id="' + p.id + '" title="Sil" aria-label="Sil">' + ICONS.trash + '</button>' +
           '</div></td></tr>';
@@ -2661,13 +2791,68 @@ function viewShipments() {
 
   function markPuantajPaid(id, personelId, ay) {
     try {
+      if (!(data.hesaplar || []).length) { toast('Önce Kasa & Banka hesabı ekleyin.', 'err'); return; }
+      var p = Core.personelById(data, Core.num(personelId));
+      if (!p) return;
+      var rec = Core.getPuantaj(data, p.id, ay);
       if (!id) {
-        var rec = Core.savePuantaj(data, { personelId: num(personelId), ay: ay }, S.user ? S.user.ad : '');
-        id = rec.id;
+        var saved = Core.savePuantaj(data, { personelId: p.id, ay: ay }, S.user ? S.user.ad : '');
+        id = saved.id;
+        rec = Core.getPuantaj(data, p.id, ay);
       }
-      Core.setPuantajStatus(data, id, 'ODENDI', Core.todayISO(), S.user ? S.user.ad : '');
-      setDirty(true); renderView(); toast('Maaş ödendi olarak işaretlendi', 'ok');
+      var m = openModal({
+        title: 'Maaş ödemesi · ' + p.ad,
+        subtitle: monthName(ay) + ' · net ' + money(rec.net),
+        body: '<form id="maasPayForm" class="form-grid g2">' +
+          '<div class="field"><label for="mpHesap">Ödeme hesabı</label><select id="mpHesap" class="select">' + hesapOptions((data.hesaplar || [])[0] ? data.hesaplar[0].id : 0) + '</select></div>' +
+          '<div class="field"><label for="mpTarih">Ödeme tarihi</label><input id="mpTarih" type="date" class="input" value="' + esc(Core.todayISO()) + '"></div>' +
+          '<div class="field"><label for="mpTutar">Ödenen tutar</label><input id="mpTutar" class="input num" inputmode="decimal" value="' + esc(rec.net) + '"></div>' +
+          '<div class="field"><label>Avans mahsubu</label><div class="input" style="background:var(--surface-2)">' + money(rec.avans) + '</div></div>' +
+          '<div class="field span2"><label for="mpNot">Not</label><input id="mpNot" class="input" placeholder="Banka havalesi, nakit…"></div>' +
+          '<div class="span2 muted small">Net tutar avans düşüldükten sonraki tutardır. Ödeme yapılınca personel avans bakiyesinden mahsup edilir.</div>' +
+          '<div class="span2 auth-err" id="mpErr"></div></form>',
+        footer: '<button class="btn" data-modal-close>Vazgeç</button><button class="btn btn-primary" type="submit" form="maasPayForm">' + ICONS.check + ' Öde</button>'
+      });
+      $('#maasPayForm', m.el).addEventListener('submit', function (e) {
+        e.preventDefault();
+        try {
+          var hesapId = Core.num($('#mpHesap', m.el).value);
+          var tutar = Core.num($('#mpTutar', m.el).value);
+          if (!hesapId) throw new Error('Kasa/banka hesabı seçin.');
+          var k = Core.addKasa(data, { hesapId: hesapId, tarih: $('#mpTarih', m.el).value, yon: 'CIKIS', tutar: tutar, tur: 'MAAS', personelId: p.id, puantajId: id, aciklama: 'Maaş ödemesi · ' + monthName(ay) + ( $('#mpNot', m.el).value ? ' · ' + $('#mpNot', m.el).value : '') }, S.user ? S.user.ad : '');
+          Core.setPuantajStatus(data, id, 'ODENDI', $('#mpTarih', m.el).value, S.user ? S.user.ad : '', hesapId);
+          var mahsup = Math.min(Core.num(rec.avans), Core.num(p.avansBakiye));
+          if (mahsup > 0) p.avansBakiye = Core.round2(Core.num(p.avansBakiye) - mahsup);
+          setDirty(true); m.close(); renderView(); updateChrome(); toast('Maaş ödendi · ' + money(tutar), 'ok');
+        } catch (err) { $('#mpErr', m.el).textContent = err.message; }
+      });
     } catch (err) { toast(err.message, 'err'); }
+  }
+
+  function openAvansForm(personelId) {
+    var p = Core.personelById(data, personelId);
+    if (!p) return;
+    if (!(data.hesaplar || []).length) { toast('Önce Kasa & Banka hesabı ekleyin.', 'err'); return; }
+    var m = openModal({
+      title: 'Avans ödemesi · ' + p.ad,
+      subtitle: 'Mevcut avans bakiyesi: ' + money(p.avansBakiye),
+      body: '<form id="avansForm" class="form-grid g2">' +
+        '<div class="field"><label for="avHesap">Ödeme hesabı</label><select id="avHesap" class="select">' + hesapOptions((data.hesaplar || [])[0] ? data.hesaplar[0].id : 0) + '</select></div>' +
+        '<div class="field"><label for="avTarih">Tarih</label><input id="avTarih" type="date" class="input" value="' + esc(Core.todayISO()) + '"></div>' +
+        '<div class="field"><label for="avTutar">Avans tutarı</label><input id="avTutar" class="input num" inputmode="decimal" required placeholder="0,00"></div>' +
+        '<div class="field"><label for="avNot">Not</label><input id="avNot" class="input" placeholder="Nakit avans…"></div>' +
+        '<div class="span2 auth-err" id="avErr"></div></form>',
+      footer: '<button class="btn" data-modal-close>Vazgeç</button><button class="btn btn-primary" type="submit" form="avansForm">' + ICONS.check + ' Avans öde</button>'
+    });
+    $('#avansForm', m.el).addEventListener('submit', function (e) {
+      e.preventDefault();
+      try {
+        var tutar = Core.num($('#avTutar', m.el).value);
+        Core.addKasa(data, { hesapId: $('#avHesap', m.el).value, tarih: $('#avTarih', m.el).value, yon: 'CIKIS', tutar: tutar, tur: 'AVANS', personelId: p.id, aciklama: 'Avans · ' + p.ad + ( $('#avNot', m.el).value ? ' · ' + $('#avNot', m.el).value : '') }, S.user ? S.user.ad : '');
+        p.avansBakiye = Core.round2(Core.num(p.avansBakiye) + tutar);
+        setDirty(true); m.close(); renderView(); toast('Avans ödendi · ' + money(tutar), 'ok');
+      } catch (err) { $('#avErr', m.el).textContent = err.message; }
+    });
   }
 
   function openPayslip(personelId, ay) {
@@ -3524,9 +3709,18 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.11.0';
+  var SURUM = '3.12.0';
 
   var YENILIKLER = [
+    {
+      v: '3.12.0', t: '10.11.2026', m: [
+        'Kasa & Banka: nakit ve banka hesapları, giriş/çıkış hareketleri',
+        'Cari tahsilat/gider aynı anda kasa veya banka hareketi oluşturur',
+        'Personel maaş ve avans ödemeleri kasa/banka hesabından yapılır',
+        'Kasa hareketi silme yönetici şifresi ister; bağlı cari kaydı da silinir',
+        'HESAPLAR ve KASA HAREKETLERİ Excel sayfaları'
+      ]
+    },
     {
       v: '3.11.0', t: '10.11.2026', m: [
         'Ayarlar → Genel: bir sonraki sevk fişi numarası',
@@ -5706,6 +5900,7 @@ function viewShipments() {
       '<option value="ALACAK"' + (yon === 'ALACAK' ? ' selected' : '') + '>Alacak (tahsilat / ödeme)</option>' +
       '<option value="BORC"' + (yon === 'BORC' ? ' selected' : '') + '>Borç (satış / gider)</option>' +
       '</select></div>' +
+      (isEdit ? '' : '<div class="field span2"><label for="lfHesap">Kasa / banka hesabı <span class="hint">(tahsilat/giderde)</span></label><select id="lfHesap" name="hesapId" class="select">' + hesapOptions((data.hesaplar || [])[0] ? data.hesaplar[0].id : 0) + '</select></div>') +
       '  <div class="field span2"><label for="lfAciklama">Açıklama</label><input id="lfAciklama" name="aciklama" class="input" value="' + esc(r.aciklama) + '" placeholder="Örn. Nakit tahsilat, kargo, kira…"></div>' +
       '  <div class="field"><label for="lfFisNo">Fiş / belge no</label><input id="lfFisNo" name="fisNo" class="input" value="' + esc(r.fisNo) + '"></div>' +
       '  <div class="field"><label for="lfSipno">Sipariş no <span class="hint">(isteğe bağlı)</span></label><input id="lfSipno" name="sipno" class="input" value="' + esc(r.sipno) + '"></div>' +
@@ -5736,7 +5931,21 @@ function viewShipments() {
         sipno: $('#lfSipno', wrap).value
       };
       try {
+        var hesapId = isEdit ? 0 : Core.num($('#lfHesap', wrap).value);
         var lk = isEdit ? Core.updateLedgerEntry(data, row.id, payload) : Core.addLedgerEntry(data, payload);
+        if (!isEdit && hesapId && (payload.islem === 'TAHSİLAT' || payload.islem === 'GİDER')) {
+          try {
+            var kk = Core.addKasa(data, {
+              hesapId: hesapId, tarih: payload.tarih, yon: payload.yon === 'ALACAK' ? 'GIRIS' : 'CIKIS',
+              tutar: payload.tutar, tur: payload.islem === 'TAHSİLAT' ? 'TAHSILAT' : 'GIDER',
+              cariId: lk.cariId, ledgerId: lk.id, aciklama: payload.aciklama || payload.islem
+            }, S.user ? S.user.ad : '');
+            lk.kasaId = kk.id;
+          } catch (cashErr) {
+            data.ledger = data.ledger.filter(function (x) { return x.id !== lk.id; });
+            throw cashErr;
+          }
+        }
         log(isEdit ? 'HAREKET DÜZENLE' : 'HAREKET EKLE', lk.islem + ' · ' + money(lk.tutar) + ' · ' + cariAdi(lk.cariId));
         setDirty(true);
         m.close();
@@ -5747,16 +5956,18 @@ function viewShipments() {
   }
 
   function removeLedger(id) {
-    confirmDialog({ title: 'Hareket silinsin mi?', message: 'Cari hesap kaydı kalıcı olarak silinecek.', confirmText: 'Sil', danger: true })
-      .then(function (ok) {
-        if (!ok) return;
-        try {
-          Core.deleteLedgerEntry(data, id, S.user ? (S.user.ad || S.user.kullanici) : '');
-          log('HAREKET SİL', 'cari hareket #' + id);
-          setDirty(true); renderView();
-          toast('Hareket silindi (çöp kutusundan geri alınabilir)', 'ok');
-        } catch (e) { toast(e.message, 'err'); }
-      });
+    var row = data.ledger.filter(function (r) { return r.id === id; })[0];
+    if (!row) return;
+    var p = row.kasaId ? askAdminPassword('Cari hareket silinsin mi?', 'Bağlı kasa/banka hareketi de silinecek. Bu işlem geri alınamaz.') : Promise.resolve(true);
+    p.then(function (ok) {
+      if (!ok) return;
+      try {
+        Core.deleteLedgerEntry(data, id, S.user ? (S.user.ad || S.user.kullanici) : '');
+        log('HAREKET SİL', 'cari hareket #' + id);
+        setDirty(true); renderView();
+        toast('Hareket silindi (çöp kutusundan geri alınabilir)', 'ok');
+      } catch (e) { toast(e.message, 'err'); }
+    });
   }
 
   function removeShipment(id) {

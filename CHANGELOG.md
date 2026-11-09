@@ -2,6 +2,29 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.12.0 — 10.11.2026
+
+### Eklendi
+- **Kasa & Banka** ekranı:
+  - Nakit ve banka hesapları
+  - Açılış bakiyesi
+  - Giriş / çıkış hareketleri
+  - Hesap bakiyeleri hareketlerden hesaplanır
+- **Cari tahsilat/gider** kaydı aynı anda seçilen kasa/banka hesabına işlenir.
+- **Personel maaş ödemesi** seçilen hesaptan yapılır.
+- **Personel avansı** seçilen hesaptan ödenir; avans bakiyesine eklenir.
+- Kasa hareketi silme **yönetici şifresi** ister.
+- Cari tahsilatı silinirse bağlı kasa/banka hareketi de silinir.
+- Excel: **HESAPLAR**, **KASA HAREKETLERİ** sayfaları.
+
+### Not
+- POS, çek/senet bu sürümde yok.
+- Kasa/banka çıkışında yetersiz bakiye engellenir.
+- Ters kayıt yerine doğrudan silme + şifre kullanılır.
+
+### Doğrulama
+- 71 çekirdek test.
+
 ## v3.11.0 — 10.11.2026
 
 ### Eklendi
