@@ -30,6 +30,10 @@ BOOT = r"""
     d.hesaplar = Core.defaultHesaplar();
     d.hesaplar[0].acilis = 50000;
     d.hesaplar[1].acilis = 100000;
+    d.hesaplar[0].acilis = 50000;
+    Core.addKasa(d, { hesapId: d.hesaplar[0].id, tarih: '2026-11-09', yon: 'GIRIS', tutar: 25000, tur: 'TAHSILAT', aciklama: 'Nakit tahsilat', belgeNo: 'TH-01' }, 'preview');
+    Core.addKasa(d, { hesapId: d.hesaplar[0].id, tarih: '2026-11-09', yon: 'CIKIS', tutar: 5000, tur: 'GIDER', aciklama: 'Kargo gideri', belgeNo: 'G-01' }, 'preview');
+    Core.addKasa(d, { hesapId: d.hesaplar[1].id, tarih: '2026-11-09', yon: 'GIRIS', tutar: 40000, tur: 'TAHSILAT', aciklama: 'Banka havalesi', belgeNo: 'TH-02' }, 'preview');
     d.settings.firmaAdi = 'DMR AYAKKABI - FABRİKA';
     d.settings.firmaAdres = 'SEFAKÖY / İSTANBUL';
     d.settings.firmaTel = '0212 555 44 33';
@@ -281,6 +285,10 @@ BOOT = r"""
     }
     if (h === 'kasa') {
       APP.S.view = 'kasa'; APP.updateChrome(); APP.renderView();
+    }
+    if (h === 'kasa-daily') {
+      APP.S.view = 'kasa'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var b = document.querySelector('[data-act="kasa-daily"]'); if (b) b.click(); }, 300);
     }
     if (h === 'cari-tahsilat') {
       APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView();

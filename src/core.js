@@ -849,7 +849,8 @@
       hesapId: num(input.hesapId), yon: yon, tutar: round2(num(input.tutar)), tur: tur,
       cariId: num(input.cariId) || 0, personelId: num(input.personelId) || 0,
       ledgerId: num(input.ledgerId) || 0, puantajId: num(input.puantajId) || 0,
-      karsiHesapId: num(input.karsiHesapId) || 0, aciklama: String(input.aciklama || '').trim()
+      karsiHesapId: num(input.karsiHesapId) || 0, karsiKasaId: num(input.karsiKasaId) || 0,
+      belgeNo: String(input.belgeNo || '').trim(), aciklama: String(input.aciklama || '').trim()
     };
   }
 
@@ -870,9 +871,44 @@
     return k;
   }
 
+  function updateKasa(data, id, input, kullanici) {
+    var k = kasaById(data, id);
+    if (!k) throw new Error('Kasa hareketi bulunamadı.');
+    if (k.ledgerId || k.puantajId) throw new Error('Cari/personel bağlı hareket düzenlenemez; silip yeniden oluşturun.');
+    if (k.tur === 'TRANSFER') throw new Error('Transfer hareketi düzenlenemez; silip yeniden oluşturun.');
+    var merged = {};
+    Object.keys(k).forEach(function (x) { merged[x] = k[x]; });
+    Object.keys(input || {}).forEach(function (x) { merged[x] = input[x]; });
+    var nk = normalizeKasa(merged); nk.id = id;
+    var h = hesapById(data, nk.hesapId);
+    if (!h) throw new Error('Kasa/banka hesabı seçin.');
+    if (nk.tutar <= 0) throw new Error('Tutar sıfırdan büyük olmalı.');
+    var base = hesapBakiye(data, nk.hesapId);
+    if (k.hesapId === nk.hesapId) base += k.yon === 'GIRIS' ? -num(k.tutar) : num(k.tutar);
+    if (nk.yon === 'CIKIS' && base < nk.tutar) throw new Error('Bu hesapta yeterli bakiye yok. Mevcut: ' + money(base));
+    data.kasa = data.kasa.map(function (x) { return x.id === id ? nk : x; });
+    audit(data, kullanici, 'KASA DÜZENLE', money(nk.tutar) + ' · ' + (nk.aciklama || ''));
+    return nk;
+  }
+
+  function transferKasa(data, input, kullanici) {
+    var from = num(input.fromHesapId), to = num(input.toHesapId), tutar = round2(num(input.tutar));
+    if (!from || !to || from === to) throw new Error('Farklı iki hesap seçin.');
+    if (!hesapById(data, from) || !hesapById(data, to)) throw new Error('Hesap bulunamadı.');
+    if (tutar <= 0) throw new Error('Tutar sıfırdan büyük olmalı.');
+    if (hesapBakiye(data, from) < tutar) throw new Error('Kaynak hesapta yeterli bakiye yok.');
+    var out = addKasa(data, { hesapId: from, tarih: input.tarih, yon: 'CIKIS', tutar: tutar, tur: 'TRANSFER', karsiHesapId: to, aciklama: input.aciklama || 'Hesaplar arası transfer' }, kullanici);
+    var inn = addKasa(data, { hesapId: to, tarih: input.tarih, yon: 'GIRIS', tutar: tutar, tur: 'TRANSFER', karsiHesapId: from, aciklama: input.aciklama || 'Hesaplar arası transfer' }, kullanici);
+    out.karsiKasaId = inn.id; inn.karsiKasaId = out.id;
+    return { out: out, in: inn };
+  }
+
   function deleteKasa(data, id, kullanici) {
     var k = kasaById(data, id);
     if (!k) return;
+    var ids = [id];
+    if (k.karsiKasaId) ids.push(k.karsiKasaId);
+    (data.kasa || []).forEach(function (x) { if (ids.indexOf(x.id) >= 0 && x.karsiKasaId) ids.push(x.karsiKasaId); });
     if (k.ledgerId) data.ledger = (data.ledger || []).filter(function (r) { return r.id !== k.ledgerId; });
     if (k.puantajId) {
       var r = (data.puantaj || []).filter(function (x) { return x.id === k.puantajId; })[0];
@@ -886,7 +922,7 @@
       var pa = personelById(data, k.personelId);
       if (pa) pa.avansBakiye = round2(Math.max(0, num(pa.avansBakiye) - num(k.tutar)));
     }
-    data.kasa = data.kasa.filter(function (x) { return x.id !== id; });
+    data.kasa = data.kasa.filter(function (x) { return ids.indexOf(x.id) < 0; });
     audit(data, kullanici, 'KASA SİL', money(k.tutar) + ' · ' + (k.aciklama || ''));
   }
 
@@ -894,6 +930,9 @@
     opts = opts || {};
     return (data.kasa || []).filter(function (k) {
       if (opts.hesapId && k.hesapId !== opts.hesapId) return false;
+      if (opts.tur && k.tur !== opts.tur) return false;
+      if (opts.cariId && k.cariId !== opts.cariId) return false;
+      if (opts.personelId && k.personelId !== opts.personelId) return false;
       if (opts.from && k.tarih < opts.from) return false;
       if (opts.to && k.tarih > opts.to) return false;
       return true;
@@ -1665,7 +1704,7 @@
     var kasaRowsData = (data.kasa || []).map(function (k) {
       var h = hesapById(data, k.hesapId);
       return [k.id, dcell(k.tarih), k.hesapId, h ? h.ad : '', k.yon, num(k.tutar), k.tur || '',
-        num(k.cariId), num(k.personelId), num(k.ledgerId), num(k.puantajId), num(k.karsiHesapId), k.aciklama || ''];
+        num(k.cariId), num(k.personelId), num(k.ledgerId), num(k.puantajId), num(k.karsiHesapId), num(k.karsiKasaId), k.belgeNo || '', k.aciklama || ''];
     });
 
     var personelRows = (data.personel || []).map(function (p) {
@@ -1770,7 +1809,7 @@
             { header: 'ID', width: 6 }, { header: 'TARİH', width: 12 }, { header: 'HESAP ID', width: 8 }, { header: 'HESAP', width: 20 },
             { header: 'YÖN', width: 8 }, { header: 'TUTAR', width: 13 }, { header: 'TÜR', width: 12 },
             { header: 'CARİ ID', width: 8 }, { header: 'PERSONEL ID', width: 10 }, { header: 'LEDGER ID', width: 9 },
-            { header: 'PUANTAJ ID', width: 9 }, { header: 'KARŞI HESAP ID', width: 12 }, { header: 'AÇIKLAMA', width: 32 }
+            { header: 'PUANTAJ ID', width: 9 }, { header: 'KARŞI HESAP ID', width: 12 }, { header: 'KARŞI KASA ID', width: 12 }, { header: 'BELGE NO', width: 14 }, { header: 'AÇIKLAMA', width: 32 }
           ],
           rows: kasaRowsData
         },
@@ -1931,7 +1970,8 @@
   var KASA_KEYS = {
     ID: 'id', TARIH: 'tarih', HESAPID: 'hesapId', HESAP: 'hesapAd', HESAPADI: 'hesapAd',
     YON: 'yon', TUTAR: 'tutar', TUR: 'tur', CARIID: 'cariId', PERSONELID: 'personelId',
-    LEDGERID: 'ledgerId', PUANTAJID: 'puantajId', KARSIHESAPID: 'karsiHesapId', ACIKLAMA: 'aciklama'
+    LEDGERID: 'ledgerId', PUANTAJID: 'puantajId', KARSIHESAPID: 'karsiHesapId', KARSIKASAID: 'karsiKasaId',
+    BELGENO: 'belgeNo', ACIKLAMA: 'aciklama'
   };
   var MODEL_KEYS = {
     ID: 'id', MODEL: 'model', MODELBILGISI: 'model', FIYAT: 'fiyat', ASORTI: 'asorti', MALIYET: 'maliyet',
@@ -2168,7 +2208,8 @@
           tarih: pick(krow, ksm, 'tarih'), hesapId: khid, yon: pick(krow, ksm, 'yon'), tutar: pick(krow, ksm, 'tutar'),
           tur: pick(krow, ksm, 'tur'), cariId: pick(krow, ksm, 'cariId'), personelId: pick(krow, ksm, 'personelId'),
           ledgerId: pick(krow, ksm, 'ledgerId'), puantajId: pick(krow, ksm, 'puantajId'),
-          karsiHesapId: pick(krow, ksm, 'karsiHesapId'), aciklama: pick(krow, ksm, 'aciklama')
+          karsiHesapId: pick(krow, ksm, 'karsiHesapId'), karsiKasaId: pick(krow, ksm, 'karsiKasaId'),
+          belgeNo: pick(krow, ksm, 'belgeNo'), aciklama: pick(krow, ksm, 'aciklama')
         }));
       }
     }
@@ -2793,6 +2834,8 @@
     normalizeKasa: normalizeKasa,
     kasaById: kasaById,
     addKasa: addKasa,
+    updateKasa: updateKasa,
+    transferKasa: transferKasa,
     deleteKasa: deleteKasa,
     kasaRows: kasaRows,
     addKullanici: addKullanici,

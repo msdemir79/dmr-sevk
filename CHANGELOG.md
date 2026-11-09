@@ -2,6 +2,21 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.13.0 — 10.11.2026
+
+### Eklendi
+- **Günlük kasa raporu**: hesap açılış, giriş, çıkış, kapanış; yazdırma.
+- Kasa hareketlerinde **hesap, tür, tarih filtresi**.
+- **Kasa → Banka / Banka → Kasa transfer**.
+- Kasa hareketi **düzenleme**, **belge no**.
+- **Hesap silme** (hareketi yoksa).
+- Dashboard’da **Kasa + Banka** toplamı.
+- Cari ekstre ve personel ekstresinde **ödeme hesabı**.
+- Kasa **Excel** dışa aktarma.
+
+### Doğrulama
+- 72 çekirdek test.
+
 ## v3.12.0 — 10.11.2026
 
 ### Eklendi
