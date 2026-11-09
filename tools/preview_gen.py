@@ -276,6 +276,14 @@ BOOT = r"""
       APP.S.view = 'dashboard'; APP.updateChrome(); APP.renderView();
       setTimeout(function () { var b = document.querySelector('[data-act="toggle-side"]'); if (b) b.click(); }, 300);
     }
+    if (h === 'report-ekstre') {
+      APP.S.view = 'reports'; APP.S.ui.reportTab = 'personel'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var b = document.querySelector('[data-act="personel-ekstre"]'); if (b) b.click(); }, 300);
+    }
+    if (h === 'report-sort') {
+      APP.S.view = 'reports'; APP.S.ui.reportTab = 'kar'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var th = document.querySelector('.report-body table.data thead th:nth-child(4)'); if (th) th.click(); }, 300);
+    }
     if (h === 'feed-collapsed') {
       APP.S.view = 'dashboard'; APP.updateChrome(); APP.renderView();
       setTimeout(function () { var b = document.querySelector('[data-act="toggle-feed"]'); if (b) b.click(); }, 300);

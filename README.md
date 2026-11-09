@@ -20,7 +20,8 @@ Tek bir HTML dosyası olarak çalışan, verilerini seçtiğiniz **Excel (.xlsx)
 - Toplu puantaj gridi (T/Y/İ/R/H)
 - Personel ayarları, cinsiyet/çıkış bilgileri ve personel raporu
 - Daraltılabilir menü, toplu puantaj sağ tık menüsü ve katlanabilir Son hareketler
-- Yönetici özetli, açıklamalı rapor merkezi
+- Yönetici özetli, açıklamalı ve sıralanabilir rapor merkezi
+- Personel bazlı ekstre ve yazdırma
 - Model/renk bazlı Sipariş / Sevk / Kalan raporu
 - Sevk fişinde isteğe bağlı beden dökümü
 - Yeni sürüm bildirimi ve çevrimiçi tekrar kontrol
@@ -77,7 +78,7 @@ Planlanan geliştirmeler ve tasarım notları: [ROADMAP.md](ROADMAP.md). Örnek:
 
 ## Sürüm
 
-Güncel sürüm: **v3.8.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
+Güncel sürüm: **v3.9.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
 
 ### Yeni sürüm çıkarma
 

@@ -2,6 +2,22 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.9.0 — 09.11.2026
+
+### Eklendi
+- Rapor tablolarında **başlığa tıklayarak sıralama** (metin, sayı, tarih, yüzde).
+- Sevkiyat raporundaki bekleyen siparişlerden **sipariş detayına geçiş**.
+- **Personel bazlı ekstre**:
+  - Tüm dönemler, maaş, eksik kesinti, fazla mesai, ek ödeme, kesinti/avans, net.
+  - Ödeme durumu ve tarihi.
+  - Toplam net / ödenen / kalan (yazdırmada).
+  - Raporlar → Personel satırındaki **Ekstre** ve Personel listesindeki ekstre düğmesi.
+- Mobilde rapor sekmeleri yatay kaydırma.
+
+### Doğrulama
+- 68 çekirdek test.
+- Veri şeması değişmedi.
+
 ## v3.8.0 — 09.11.2026
 
 ### Eklendi

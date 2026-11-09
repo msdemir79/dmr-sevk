@@ -1154,6 +1154,23 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
 .report-info b { color: var(--ink-2); font-size: 12px; }
 @media (max-width: 700px) { .report-insight { display: block; } .report-insight > span:not(.report-insight-label) { display: block; border-right: 0; padding: 4px 0; } .report-attention { align-items: flex-start; } }
 
+/* --- rapor sıralama / ekstre --- */
+.report-body table.data thead th { cursor: pointer; user-select: none; }
+.report-body table.data thead th:hover { color: var(--brand-dark); }
+.report-body table.data thead th.sort-asc::after { content: " ▲"; font-size: 8px; }
+.report-body table.data thead th.sort-desc::after { content: " ▼"; font-size: 8px; }
+.ekstre-meta { display: flex; flex-wrap: wrap; gap: 10px 24px; padding: 10px 12px; margin-bottom: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; }
+.ekstre-meta span { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.ekstre-meta b { font-size: 12px; }
+.ekstre-sum { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-top: 10px; font-size: 11.5px; color: var(--muted); }
+.ekstre-sum b { color: var(--ink); }
+@media (max-width: 820px) {
+  .report-tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .report-tabs .report-tab { white-space: nowrap; }
+  .report-toolbar { align-items: stretch; }
+  .report-toolbar .report-range { width: 100%; }
+}
+
 </style>
 </head>
 <body>
@@ -8358,7 +8375,7 @@ var qrcode = function() {
       if (!el) return;
       var act = el.dataset.act;
       var id = el.dataset.id ? parseInt(el.dataset.id, 10) : null;
-      var ADMIN_ONLY = { 'new-file': 1, 'clear-all': 1, 'import-legacy': 1, 'import-cari': 1, 'user-new': 1, 'user-edit': 1, 'user-del': 1, 'user-pass': 1, 'personel-new': 1, 'personel-edit': 1, 'personel-del': 1, 'puantaj-edit': 1, 'puantaj-paid': 1, 'puantaj-pusula': 1, 'puantaj-grid': 1, 'puantaj-grid-all': 1, 'puantaj-grid-h': 1 };
+      var ADMIN_ONLY = { 'new-file': 1, 'clear-all': 1, 'import-legacy': 1, 'import-cari': 1, 'user-new': 1, 'user-edit': 1, 'user-del': 1, 'user-pass': 1, 'personel-new': 1, 'personel-edit': 1, 'personel-del': 1, 'puantaj-edit': 1, 'puantaj-paid': 1, 'puantaj-pusula': 1, 'puantaj-grid': 1, 'puantaj-grid-all': 1, 'puantaj-grid-h': 1, 'personel-ekstre': 1 };
       if (ADMIN_ONLY[act] && !isAdmin()) {
         toast('Bu işlem için yönetici yetkisi gerekli.', 'err');
         return;
@@ -8449,6 +8466,7 @@ var qrcode = function() {
         case 'personel-new': openPersonelForm(null); break;
         case 'personel-edit': openPersonelForm(Core.personelById(data, id)); break;
         case 'personel-del': removePersonel(id); break;
+        case 'personel-ekstre': openPersonelEkstre(id); break;
         case 'puantaj-edit': openPuantajForm(id, el.dataset.ay); break;
         case 'puantaj-paid': markPuantajPaid(id, el.dataset.personelId, el.dataset.ay); break;
         case 'puantaj-pusula': openPayslip(id, el.dataset.ay); break;
@@ -8472,7 +8490,48 @@ var qrcode = function() {
       }
     });
 
-    document.addEventListener('contextmenu', function (e) {
+    function reportSortValue(text) {
+    text = String(text || '').trim();
+    if (!text || text === '—') return { n: null, s: '' };
+    var dm = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(text);
+    if (dm) return { n: Number(dm[3] + dm[2] + dm[1]), s: text };
+    var num = text.replace(/[₺$€£%\s]/g, '').replace(/\./g, '').replace(',', '.');
+    if (/^-?\d+(\.\d+)?$/.test(num)) return { n: Number(num), s: text };
+    return { n: null, s: text.toLocaleLowerCase('tr') };
+  }
+
+  document.addEventListener('click', function (e) {
+    var th = e.target.closest('.report-body table.data thead th');
+    if (!th) return;
+    var table = th.closest('table');
+    var tbody = table ? table.tBodies[0] : null;
+    var head = table && table.tHead ? table.tHead.rows[0] : null;
+    if (!tbody || !head) return;
+    var ths = Array.prototype.slice.call(head.cells);
+    var idx = ths.indexOf(th);
+    if (idx < 0) return;
+    var rows = Array.prototype.slice.call(tbody.rows);
+    if (rows.length < 2 || rows.some(function (r) { return r.cells.length !== ths.length; })) return;
+    var dir = table.dataset.sortIdx === String(idx) && table.dataset.sortDir === 'asc' ? 'desc' : 'asc';
+    rows.sort(function (a, b) {
+      var av = reportSortValue(a.cells[idx] ? a.cells[idx].textContent : '');
+      var bv = reportSortValue(b.cells[idx] ? b.cells[idx].textContent : '');
+      var cmp;
+      if (av.n !== null && bv.n !== null) cmp = av.n - bv.n;
+      else if (av.n !== null) cmp = -1;
+      else if (bv.n !== null) cmp = 1;
+      else cmp = av.s.localeCompare(bv.s, 'tr');
+      return dir === 'asc' ? cmp : -cmp;
+    });
+    rows.forEach(function (r) { tbody.appendChild(r); });
+    table.dataset.sortIdx = String(idx);
+    table.dataset.sortDir = dir;
+    ths.forEach(function (h) { h.classList.remove('sort-asc', 'sort-desc'); h.removeAttribute('aria-sort'); });
+    th.classList.add('sort-' + dir);
+    th.setAttribute('aria-sort', dir === 'asc' ? 'ascending' : 'descending');
+  });
+
+  document.addEventListener('contextmenu', function (e) {
     var row = e.target.closest('.pj-grid tr.pj-row');
     if (!row) return;
     e.preventDefault();
@@ -9435,6 +9494,7 @@ function viewShipments() {
           '<td>' + (p.aktif === false ? '<span class="pill muted">' + (p.cikisTarihi ? 'Ayrıldı' : 'Pasif') + '</span>' : '<span class="pill ok">Aktif</span>') + '</td>' +
           '<td><div class="row-actions">' +
           '<button class="btn btn-icon" data-act="personel-edit" data-id="' + p.id + '" title="Düzenle" aria-label="Düzenle">' + ICONS.edit + '</button>' +
+          '<button class="btn btn-icon" data-act="personel-ekstre" data-id="' + p.id + '" title="Personel ekstresi" aria-label="Personel ekstresi">' + ICONS.receipt + '</button>' +
           '<button class="btn btn-icon" data-act="puantaj-edit" data-id="' + p.id + '" data-ay="' + esc(ay) + '" title="Puantaj" aria-label="Puantaj">' + ICONS.wallet + '</button>' +
           '<button class="btn btn-icon danger" data-act="personel-del" data-id="' + p.id + '" title="Sil" aria-label="Sil">' + ICONS.trash + '</button>' +
           '</div></td></tr>';
@@ -9770,6 +9830,67 @@ function viewShipments() {
         setDirty(true); m.close(); renderView(); updateChrome(); toast('Puantaj kaydedildi', 'ok');
       } catch (err) { $('#pjErr', m.el).textContent = err.message; }
     });
+  }
+
+  function personelEkstreRows(p) {
+    return (data.puantaj || []).filter(function (r) { return r.personelId === p.id; }).slice().sort(function (a, b) { return String(a.ay).localeCompare(String(b.ay)); });
+  }
+
+  function personelEkstreTableHtml(p, rows, print) {
+    var totals = rows.reduce(function (a, r) {
+      var c = Core.getPuantaj(data, p.id, r.ay) || r;
+      a.maas += Core.num(r.maas); a.eksik += Core.num(c.eksikGunKesinti) + Core.num(c.eksikSaatKesinti);
+      a.fm += Core.num(c.fazlaMesaiTutar); a.ek += Core.num(r.ekOdeme); a.kes += Core.num(r.kesinti) + Core.num(r.avans); a.net += Core.num(r.net); return a;
+    }, { maas: 0, eksik: 0, fm: 0, ek: 0, kes: 0, net: 0 });
+    var body = rows.map(function (r) {
+      var c = Core.getPuantaj(data, p.id, r.ay) || r;
+      return '<tr><td class="strong">' + esc(monthName(r.ay)) + '<div class="sub">' + nf1(r.eksikGun) + ' gün · ' + nf1(r.eksikSaat) + ' saat eksik</div></td>' +
+        '<td class="right">' + money(r.maas) + '</td>' +
+        '<td class="right">' + money(Core.num(c.eksikGunKesinti) + Core.num(c.eksikSaatKesinti)) + '</td>' +
+        '<td class="right">' + money(c.fazlaMesaiTutar) + '<div class="sub">' + nf1(r.fazlaMesai) + ' saat</div></td>' +
+        '<td class="right">' + money(r.ekOdeme) + '</td>' +
+        '<td class="right">' + money(Core.num(r.kesinti) + Core.num(r.avans)) + '<div class="sub">kesinti + avans</div></td>' +
+        '<td class="right strong">' + money(r.net) + '</td><td>' + (r.durum === 'ODENDI' ? 'Ödendi' : r.durum === 'KESIN' ? 'Kesin' : 'Taslak') + '</td>' +
+        '<td class="sub">' + (r.odemeTarihi ? dateTR(r.odemeTarihi) : '—') + '</td></tr>';
+    }).join('');
+    return '<table class="' + (print ? 'pf-table' : 'data') + '"><thead><tr><th>Dönem</th><th class="right">Maaş</th><th class="right">Eksik kesinti</th><th class="right">FM tutar</th><th class="right">Ek ödeme</th><th class="right">Kesinti + avans</th><th class="right">Net</th><th>Durum</th><th>Ödeme</th></tr></thead><tbody>' +
+      (body || '<tr><td colspan="9">Puantaj kaydı yok.</td></tr>') + '</tbody><tfoot><tr><td>TOPLAM</td><td class="right">' + money(totals.maas) + '</td><td class="right">' + money(totals.eksik) + '</td><td class="right">' + money(totals.fm) + '</td><td class="right">' + money(totals.ek) + '</td><td class="right">' + money(totals.kes) + '</td><td class="right strong">' + money(totals.net) + '</td><td></td><td></td></tr></tfoot></table>';
+  }
+
+  function openPersonelEkstre(id) {
+    var p = Core.personelById(data, id);
+    if (!p) return;
+    var rows = personelEkstreRows(p);
+    if (!rows.length) { toast('Bu personel için puantaj kaydı yok.', 'err'); return; }
+    var m = openModal({
+      title: 'Personel ekstresi · ' + p.ad,
+      subtitle: (p.gorev || '—') + ' · tüm dönemler · iç hesaplama',
+      size: 'xwide',
+      body: '<div class="ekstre-meta"><div><span>Giriş</span><b>' + (p.iseGiris ? dateTR(p.iseGiris) : '—') + '</b></div><div><span>Çıkış</span><b>' + (p.cikisTarihi ? dateTR(p.cikisTarihi) : '—') + '</b></div><div><span>Durum</span><b>' + (p.aktif === false ? 'Ayrıldı' : 'Aktif') + '</b></div><div><span>Kayıt</span><b>' + rows.length + ' dönem</b></div></div>' +
+        '<div class="table-wrap" style="max-height:none">' + personelEkstreTableHtml(p, rows, false) + '</div><p class="muted small" style="margin:10px 0 0">Bu ekstre resmî bordro değildir; SGK, vergi ve yasal kesintiler içermez.</p>',
+      footer: '<button class="btn" data-modal-close>Kapat</button><button class="btn btn-primary" id="btnEkstrePrint">' + ICONS.print + ' Yazdır</button>'
+    });
+    var b = $('#btnEkstrePrint', m.el);
+    if (b) b.addEventListener('click', function () { m.close(); printPersonelEkstre(id); });
+  }
+
+  function printPersonelEkstre(id) {
+    var p = Core.personelById(data, id);
+    if (!p) return;
+    var rows = personelEkstreRows(p);
+    if (!rows.length) { toast('Bu personel için puantaj kaydı yok.', 'err'); return; }
+    var paid = rows.filter(function (r) { return r.durum === 'ODENDI'; }).reduce(function (a, r) { return a + Core.num(r.net); }, 0);
+    var total = rows.reduce(function (a, r) { return a + Core.num(r.net); }, 0);
+    printHtml('<div class="print-doc">' + docHeader('PERSONEL EKSTRESİ', p.ad) +
+      '<div class="pf-meta"><div class="row"><span class="k">PERSONEL</span><span class="v">' + esc(p.ad) + '</span></div>' +
+      '<div class="row"><span class="k">GÖREV</span><span class="v">' + esc(p.gorev || '—') + '</span></div>' +
+      '<div class="row"><span class="k">GİRİŞ / ÇIKIŞ</span><span class="v">' + (p.iseGiris ? dateTR(p.iseGiris) : '—') + ' / ' + (p.cikisTarihi ? dateTR(p.cikisTarihi) : '—') + '</span></div>' +
+      '<div class="row"><span class="k">DURUM</span><span class="v">' + (p.aktif === false ? 'Ayrıldı' : 'Aktif') + ' · ' + rows.length + ' dönem</span></div></div>' +
+      personelEkstreTableHtml(p, rows, true) +
+      '<div class="ekstre-sum"><span>Toplam net: <b>' + money(total) + '</b></span><span>Ödenen: <b>' + money(paid) + '</b></span><span>Kalan: <b>' + money(total - paid) + '</b></span></div>' +
+      '<p class="pf-note">Bu ekstre resmî bordro değildir; SGK, vergi ve yasal kesintiler içermez.</p>' +
+      '<div class="pf-sign"><div class="line">TESLİM EDEN</div><div class="line">TESLİM ALAN</div></div>' +
+      '<div class="pf-foot"><span>' + esc(data.settings.firmaAdi) + '</span><span>' + esc(p.ad) + '</span></div></div>');
   }
 
   function markPuantajPaid(id, personelId, ay) {
@@ -10514,7 +10635,7 @@ function viewShipments() {
       }).join('') + '</div></div>' +
       '<div class="card" style="margin-top:14px"><div class="card-head"><div><h2>Bekleyen siparişler</h2><div class="sub">Kalan çifte göre</div></div><button class="btn btn-sm" data-act="go-orders">Siparişler ' + ICONS.right + '</button></div><div class="table-wrap"><table class="data"><thead><tr><th>Model</th><th>Cari</th><th class="right">Giden</th><th class="right">Kalan</th><th class="right">Tutar</th></tr></thead><tbody>' +
       (p.pending.length ? p.pending.slice(0, 15).map(function (x) {
-        return '<tr><td class="strong">' + esc(x.o.model) + '</td><td>' + esc(cariAdi(x.o.cariId)) + '</td><td class="right">' + nf0(x.i.giden) + '</td><td class="right strong">' + nf0(x.i.kalan) + '</td><td class="right">' + money(x.i.kalanTutar) + '</td></tr>';
+        return '<tr class="clickable" data-act="report-order" data-id="' + x.o.id + '"><td class="strong">' + esc(x.o.model) + '</td><td>' + esc(cariAdi(x.o.cariId)) + '</td><td class="right">' + nf0(x.i.giden) + '</td><td class="right strong">' + nf0(x.i.kalan) + '</td><td class="right">' + money(x.i.kalanTutar) + '</td></tr>';
       }).join('') : '<tr><td colspan="5">' + emptyState('check', 'Bekleyen yok', 'Tüm siparişler sevk edilmiş.', '') + '</td></tr>') +
       '</tbody></table></div></div>';
   }
@@ -10602,7 +10723,7 @@ function viewShipments() {
       rKpi('Bu ay işten çıkan', nf0(d.cikan), monthName(d.ay), 'warn', '') +
       rKpi('Toplam personel', nf0(d.all.length), 'tüm kayıtlar', '', '') +
       '</div></div>' +
-      '<div class="table-wrap"><table class="data"><thead><tr><th>Personel</th><th>Cinsiyet</th><th>Görev</th><th>Giriş</th><th>Çıkış</th><th class="right">Maaş</th><th class="right">Eksik gün</th><th class="right">FM</th><th class="right">Net</th><th>Durum</th></tr></thead><tbody>' +
+      '<div class="table-wrap"><table class="data"><thead><tr><th>Personel</th><th>Cinsiyet</th><th>Görev</th><th>Giriş</th><th>Çıkış</th><th class="right">Maaş</th><th class="right">Eksik gün</th><th class="right">FM</th><th class="right">Net</th><th>Durum</th><th></th></tr></thead><tbody>' +
       (rows.length ? rows.map(function (x) {
         var p = x.p, r = x.r;
         return '<tr><td><div class="strong">' + esc(p.ad) + '</div>' + (p.not ? '<div class="sub">' + esc(p.not) + '</div>' : '') + '</td>' +
@@ -10610,9 +10731,10 @@ function viewShipments() {
           '<td>' + esc(p.gorev || '—') + '</td><td class="sub">' + (p.iseGiris ? dateTR(p.iseGiris) : '—') + '</td>' +
           '<td class="sub">' + (p.cikisTarihi ? dateTR(p.cikisTarihi) + (p.cikisSebebi ? '<div class="sub">' + esc(p.cikisSebebi) + '</div>' : '') : '—') + '</td>' +
           '<td class="right">' + money(r.maas) + '</td><td class="right">' + nf1(r.eksikGun) + '</td><td class="right">' + nf1(r.fazlaMesai) + '</td>' +
-          '<td class="right strong">' + money(x.net) + '</td><td>' + (p.aktif === false ? '<span class="pill muted">Ayrıldı</span>' : x.has ? personelDurumPill(r.durum) : '<span class="pill warn">Tam ay</span>') + '</td></tr>';
-      }).join('') : '<tr><td colspan="10"><div class="empty">Personel kaydı yok.</div></td></tr>') +
-      '</tbody><tfoot><tr><td colspan="8">TOPLAM</td><td class="right strong">' + money(d.net) + '</td><td></td></tr></tfoot></table></div>' +
+          '<td class="right strong">' + money(x.net) + '</td><td>' + (p.aktif === false ? '<span class="pill muted">Ayrıldı</span>' : x.has ? personelDurumPill(r.durum) : '<span class="pill warn">Tam ay</span>') + '</td>' +
+          '<td><button class="btn btn-sm" data-act="personel-ekstre" data-id="' + p.id + '">Ekstre</button></td></tr>';
+      }).join('') : '<tr><td colspan="11"><div class="empty">Personel kaydı yok.</div></td></tr>') +
+      '</tbody><tfoot><tr><td colspan="8">TOPLAM</td><td class="right strong">' + money(d.net) + '</td><td></td><td></td></tr></tfoot></table></div>' +
       '<p class="muted small" style="padding:10px 14px;margin:0">Bu rapor iç hesaplamadır; SGK, vergi ve yasal kesintiler içermez.</p></div>';
   }
 
@@ -10636,9 +10758,18 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.8.0';
+  var SURUM = '3.9.0';
 
   var YENILIKLER = [
+    {
+      v: '3.9.0', t: '09.11.2026', m: [
+        'Rapor tablolarında başlığa tıklayarak sıralama',
+        'Sevkiyat bekleyen siparişlerinden sipariş detayına geçiş',
+        'Personel raporuna personel bazlı ekstre ve yazdırma',
+        'Personel ekstresinde dönem, kesinti, fazla mesai, net ve ödeme durumu',
+        'Mobilde rapor sekmeleri yatay kaydırma'
+      ]
+    },
     {
       v: '3.8.0', t: '09.11.2026', m: [
         'Raporlara Yönetici Özeti: ciro, tahsilat, alacak, kâr, doluluk ve kalan',
