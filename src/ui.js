@@ -3524,9 +3524,16 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.10.0';
+  var SURUM = '3.11.0';
 
   var YENILIKLER = [
+    {
+      v: '3.11.0', t: '10.11.2026', m: [
+        'Ayarlar → Genel: bir sonraki sevk fişi numarası',
+        'Son kullanılan fiş numarasından küçük değer girilirse otomatik düzeltilir',
+        'Fiş numarası ayarı Excel AYARLAR sayfasında saklanır'
+      ]
+    },
     {
       v: '3.10.0', t: '10.11.2026', m: [
         'Cari ekstre paneli: PDF/yazdır, WhatsApp özeti ve panoya kopyalama',
@@ -5035,8 +5042,8 @@ function viewShipments() {
       '  <div class="field"><label for="setKagit">Sevk fişi kağıdı</label><select id="setKagit" name="kagit" class="select">' +
       ['A4', 'A5'].map(function (k) { return '<option value="' + k + '"' + ((s.kagit || 'A4') === k ? ' selected' : '') + '>' + k + ' (varsayılan)</option>'; }).join('') +
       '</select></div>' +
+      '  <div class="field"><label for="setFisBaslangic">Bir sonraki sevk fişi no</label><input id="setFisBaslangic" name="fisBaslangic" class="input num" type="number" min="1" step="1" value="' + esc(Core.nextFisNo(data)) + '"></div>' +
       '  <div class="field"><label for="setAsorti">Varsayılan asorti (çift / koli)</label><input id="setAsorti" name="varsayilanAsorti" class="input num" type="number" min="1" value="' + esc(s.varsayilanAsorti) + '"></div>' +
-      '  <div class="field"></div>' +
       '  <div class="field span2"><label>Logo</label><div style="display:flex;align-items:center;gap:12px">' +
       '    <div class="thumb lg" id="logoPreview" style="' + (s.logo ? 'background-image:url(&quot;' + esc(s.logo) + '&quot;)' : '') + '">' + (s.logo ? '' : 'LOGO') + '</div>' +
       '    <div style="display:flex;gap:8px">' +
@@ -6665,6 +6672,10 @@ function viewShipments() {
       data.settings.para = String(fd.get('para') || '₺');
       data.settings.kagit = String(fd.get('kagit') || 'A4') === 'A5' ? 'A5' : 'A4';
       data.settings.varsayilanAsorti = Core.num(fd.get('varsayilanAsorti')) || 10;
+      var istenenFis = Math.max(1, Math.floor(Core.num(fd.get('fisBaslangic')) || 1));
+      var sonFis = Math.max(Core.num(data.settings.sonFisNo), data.shipments.reduce(function (m, sh) { return Math.max(m, Core.num(sh.fisNo)); }, 0));
+      data.settings.fisBaslangic = Math.max(istenenFis, sonFis + 1);
+      S.ui.shipFisNo = Core.nextFisNo(data);
       data.settings.logo = String(fd.get('logo') || '');
       setDirty(true);
       renderShell();

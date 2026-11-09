@@ -152,6 +152,7 @@
       dosyaAdi: 'DMR_VERI',
       sonSiparisNo: 0,
       sonFisNo: 0,
+      fisBaslangic: 1,
       varsayilanAsorti: 10,
       personelGunlukSaat: 8,
       personelHaftaTatili: '0,6',
@@ -436,7 +437,8 @@
   function nextFisNo(data) {
     var max = num(data.settings.sonFisNo);
     data.shipments.forEach(function (s) { if (num(s.fisNo) > max) max = num(s.fisNo); });
-    return max + 1;
+    var start = num(data.settings.fisBaslangic) || 1;
+    return Math.max(max + 1, start);
   }
 
   function monthKey(iso) { return (iso || '').slice(0, 7); }
@@ -1816,7 +1818,7 @@
         var key = pick(row, sm, 'k');
         if (!key) continue;
         var val = pick(row, sm, 'v');
-        if (key === 'sonSiparisNo' || key === 'sonFisNo' || key === 'varsayilanAsorti') val = num(val);
+        if (key === 'sonSiparisNo' || key === 'sonFisNo' || key === 'fisBaslangic' || key === 'varsayilanAsorti') val = num(val);
         data.settings[key] = val === undefined || val === null ? '' : val;
       }
     }

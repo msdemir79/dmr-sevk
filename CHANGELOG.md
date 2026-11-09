@@ -2,6 +2,16 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.11.0 — 10.11.2026
+
+### Eklendi
+- **Ayarlar → Genel → Bir sonraki sevk fişi no**.
+- Son kullanılan fiş numarasından küçük değer girilirse sıradaki numaraya yükseltilir.
+- Ayar Excel AYARLAR sayfasında saklanır; yeni fişler bu numaradan devam eder.
+
+### Doğrulama
+- 70 çekirdek test.
+
 ## v3.10.0 — 10.11.2026
 
 ### Eklendi
