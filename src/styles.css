@@ -1123,3 +1123,24 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
 /* --- dashboard son hareketler daraltma --- */
 .feed-collapsed .card-body { display: none; }
 .feed-collapsed .card-head { border-bottom: 0; }
+
+/* --- rapor yönetici özeti --- */
+.report-exec { margin-bottom: 12px; }
+.report-exec .card-body { padding-top: 12px; }
+.report-insight { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-top: 12px; padding: 9px 12px; background: var(--brand-soft); border: 1px solid #c7e8e2; border-radius: 9px; color: var(--brand-dark); font-size: 11.5px; }
+.report-insight > span:not(.report-insight-label) { padding-right: 16px; border-right: 1px solid #b7ded8; }
+.report-insight > span:last-child { border-right: 0; }
+.report-insight-label { font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
+.report-insight b { font-weight: 800; }
+.report-attention { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 9px; padding: 8px 11px; background: var(--warn-soft); border: 1px solid #fcd34d; border-radius: 9px; color: #78350f; font-size: 11px; }
+.report-attention > b { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.report-attention > div { display: flex; flex-wrap: wrap; gap: 7px; }
+.report-attn-link { border: 1px solid #fbbf24; background: #fffbeb; color: #92400e; border-radius: 6px; padding: 3px 7px; font: inherit; font-size: 10.5px; cursor: pointer; }
+.report-attn-link:hover { background: #fef3c7; }
+.report-ok { display: flex; align-items: center; gap: 6px; margin-top: 9px; color: #166534; font-size: 11px; }
+.report-ok svg { width: 14px; height: 14px; }
+.report-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 9px; color: var(--muted); font-size: 10px; }
+.report-legend b { color: var(--ink-2); font-weight: 700; }
+.report-info { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin: 0 0 10px; padding: 0 2px; color: var(--muted); font-size: 11.5px; }
+.report-info b { color: var(--ink-2); font-size: 12px; }
+@media (max-width: 700px) { .report-insight { display: block; } .report-insight > span:not(.report-insight-label) { display: block; border-right: 0; padding: 4px 0; } .report-attention { align-items: flex-start; } }

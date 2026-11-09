@@ -2,6 +2,17 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.8.0 — 09.11.2026
+
+### Eklendi
+- **Yönetici Özeti**: sevk cirosu, tahsilat, açık alacak, brüt kâr, doluluk, kalan sipariş.
+- “Bu dönem” yorumu: en çok satan model, en yüksek bakiyeli cari, geciken sipariş.
+- **Dikkat** uyarıları: maliyetsiz model/satır, fiyatsız sipariş, cari/sevk farkı.
+- Her rapor sekmesinde **ne gösterir** açıklaması ve renk/terim anahtarı.
+- Hızlı dönem: **Bugün**, **Bu hafta** eklendi.
+- Kârlılık ve cari tablolarına **TOPLAM** satırı.
+- Excel/CSV özetine tahsilat oranı, açık alacak, doluluk ve kalan çift.
+
 ## v3.7.0 — 08.11.2026
 
 ### Düzeltildi

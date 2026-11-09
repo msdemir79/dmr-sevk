@@ -1207,6 +1207,7 @@
         case 'order-filter-sheet': openOrderFilterSheet(); break;
         case 'toggle-theme': toggleTheme(); break;
         case 'go-models': go('models'); break;
+        case 'go-orders': S.ui.orderFilter = 'all'; go('orders'); break;
         case 'personel-new': openPersonelForm(null); break;
         case 'personel-edit': openPersonelForm(Core.personelById(data, id)); break;
         case 'personel-del': removePersonel(id); break;
@@ -2593,6 +2594,14 @@ function viewShipments() {
 
   function rPresetRange(p) {
     var today = Core.todayISO();
+    if (p === 'today') return { from: today, to: today };
+    if (p === 'week') {
+      var d0 = rParse(today);
+      var wd = d0.getDay() || 7;
+      d0.setDate(d0.getDate() - (wd - 1));
+      return { from: rISO(d0), to: today };
+    }
+    if (p === 'last30') return { from: rAdd(today, -29), to: today };
     if (p === 'last') {
       var d = rParse(today); d.setMonth(d.getMonth() - 1, 1);
       var f = rISO(d); return { from: f, to: rMonthEnd(f) };
@@ -3070,12 +3079,70 @@ function viewShipments() {
       }).join('') + '</tbody></table></div></div>';
   }
 
+  function reportExecutiveHtml(ctx) {
+    var rev = Core.num(ctx.cur.revenue), col = Core.num(ctx.cur.collection);
+    var tahsil = rev ? col / rev * 100 : 0;
+    var openDebt = (ctx.aging.rows || []).reduce(function (a, r) { return a + Math.max(0, Core.num(r.bakiye)); }, 0);
+    var debtor = (ctx.aging.rows || []).slice().sort(function (a, b) { return Core.num(b.bakiye) - Core.num(a.bakiye); })[0];
+    var ciro = ctx.profit.reduce(function (a, r) { return a + Core.num(r.ciro); }, 0);
+    var kar = ctx.profit.reduce(function (a, r) { return a + Core.num(r.kar); }, 0);
+    var marj = ciro ? kar / ciro * 100 : 0;
+    var t = ctx.orderStatus.totals;
+    var doluluk = Core.num(t.sipC) ? Core.num(t.sevC) / Core.num(t.sipC) * 100 : 0;
+    var kalan = Core.num(t.kalanC);
+    var top = reportTopModels(ctx.cur.lines)[0];
+    var overdue = Core.num(ctx.perf.overdue.d15);
+    var q = ctx.quality;
+    var issues = [];
+    if (q.missingCost.length) issues.push('<button type="button" class="report-attn-link" data-act="go-models">' + q.missingCost.length + ' modelde maliyet yok</button>');
+    if (q.maliyetsiz) issues.push('<button type="button" class="report-attn-link" data-act="go-models">' + q.maliyetsiz + ' maliyetsiz sevk satırı</button>');
+    if (q.kartsiz) issues.push('<button type="button" class="report-attn-link" data-act="go-models">' + q.kartsiz + ' kartsız sevk satırı</button>');
+    if (q.noPrice.length) issues.push('<button type="button" class="report-attn-link" data-act="go-orders">' + q.noPrice.length + ' siparişte fiyat yok</button>');
+    if (overdue) issues.push('<button type="button" class="report-attn-link" data-act="go-orders">' + overdue + ' sipariş 15+ gündür açık</button>');
+    if (Math.abs(q.recon) > 1) issues.push('<span class="report-attn-link">Cari/sevk farkı: ' + money(q.recon) + '</span>');
+
+    var insight = [];
+    if (top) insight.push('<b>' + esc(top.model) + '</b> en çok sevk edilen model · ' + nf0(top.cift) + ' çift');
+    if (debtor && Core.num(debtor.bakiye) > 0) insight.push('<b>' + esc(debtor.ad) + '</b> en yüksek bakiyeli cari · ' + money(debtor.bakiye));
+    if (overdue) insight.push('<b>' + nf0(overdue) + ' sipariş</b> 15 günden uzun süredir açık');
+    if (!insight.length) insight.push('Bu dönemde sevk hareketi yok; sipariş ve cari hareketleri aşağıdaki sekmelerde.');
+
+    return '<div class="card report-exec"><div class="card-head"><div><h2>Yönetici özeti</h2><div class="sub">' + esc(rLabel(ctx.r)) + ' · ' + (ctx.cid ? esc(activeCari().ad) : 'tüm cariler') + '</div></div></div>' +
+      '<div class="card-body">' +
+      '<div class="kpis report-kpis">' +
+      rKpi('Sevk cirosu', money(rev), 'önceki döneme göre ' + rCmp(rev, ctx.prev.revenue), 'info', '') +
+      rKpi('Tahsilat', money(col), 'tahsilat oranı %' + nf1(tahsil), 'ok', '') +
+      rKpi('Açık alacak', money(openDebt), 'yaşlandırma toplamı', 'warn', '') +
+      rKpi('Brüt kâr', money(kar), 'marj %' + nf1(marj) + (q.maliyetsiz ? ' · maliyet eksiği var' : ''), 'ok', '') +
+      rKpi('Sevk doluluğu', '%' + nf1(doluluk), nf0(t.sevC) + ' / ' + nf0(t.sipC) + ' çift', '', '') +
+      rKpi('Kalan sipariş', nf0(kalan) + ' çift', nf0(t.kalanK) + ' koli', 'danger', '') +
+      '</div>' +
+      '<div class="report-insight"><span class="report-insight-label">Bu dönem</span>' + insight.map(function (x) { return '<span>' + x + '</span>'; }).join('') + '</div>' +
+      (issues.length ? '<div class="report-attention"><b>' + ICONS.alert + ' Dikkat</b><div>' + issues.join('') + '</div></div>' : '<div class="report-ok">' + ICONS.check + ' Veri kalitesi uygun; maliyet ve fiyat eksikliği yok.</div>') +
+      '<div class="report-legend"><span><b>Ciro</b> sevk tutarı</span><span><b>Tahsilat</b> cari alacak</span><span><b>Kâr</b> ciro − maliyet</span><span><b>Doluluk</b> sevk / sipariş</span></div>' +
+      '</div></div>';
+  }
+
+  function reportInfoHtml() {
+    var map = {
+      ozet: ['Dönem özeti', 'Satış, tahsilat, kâr ve sipariş dengesini tek bakışta gösterir.'],
+      kar: ['Kârlılık', 'Model ve renk bazında ciro, maliyet, kâr ve marj. Maliyeti olmayan satırlar kâr toplamına katılmaz.'],
+      cari: ['Cari', 'Bakiye, tahsilat ve yaşlandırmayı gösterir. Bir cariye tıklayınca hesap hareketlerine gider.'],
+      siparis: ['Sipariş / Sevk / Kalan', 'Siparişin ne kadarı sevk edildi, ne kadarı kaldı ve hangi durumda olduğunu gösterir.'],
+      sevk: ['Sevkiyat', 'Siparişlerin ne kadar sürede sevk edildiğini ve bekleyen siparişleri gösterir.'],
+      urun: ['Ürün', 'Beden, renk ve asorti dağılımını gösterir.'],
+      personel: ['Personel', 'Aylık net maaş, eksik gün ve ödeme durumunu gösterir. Resmî bordro değildir.']
+    };
+    var x = map[S.ui.reportTab] || map.ozet;
+    return '<div class="report-info"><b>' + x[0] + '</b><span>' + x[1] + '</span></div>';
+  }
+
   function reportToolbar(ctx) {
     var tabs = [['ozet', 'Özet'], ['kar', 'Kârlılık'], ['cari', 'Cari'], ['siparis', 'Sipariş / Sevk / Kalan'], ['sevk', 'Sevkiyat'], ['urun', 'Ürün']];
     if (isAdmin()) tabs.push(['personel', 'Personel']);
     return '<div class="card report-shell"><div class="report-toolbar">' +
       '<div class="field"><label for="reportPreset">Hızlı dönem</label><select id="reportPreset" class="select" data-role="report-preset">' +
-      [['last30', 'Son 30 gün'], ['month', 'Bu ay'], ['last', 'Geçen ay'], ['quarter', 'Bu çeyrek'], ['ytd', 'Yıl başından'], ['custom', 'Özel aralık']].map(function (x) {
+      [['last30', 'Son 30 gün'], ['today', 'Bugün'], ['week', 'Bu hafta'], ['month', 'Bu ay'], ['last', 'Geçen ay'], ['quarter', 'Bu çeyrek'], ['ytd', 'Yıl başından'], ['custom', 'Özel aralık']].map(function (x) {
         return '<option value="' + x[0] + '"' + (S.ui.reportPreset === x[0] ? ' selected' : '') + '>' + x[1] + '</option>';
       }).join('') + '</select></div>' +
       '<div class="field"><label for="reportFrom">Başlangıç</label><input id="reportFrom" type="date" class="input" data-role="report-from" value="' + esc(ctx.r.from) + '"></div>' +
@@ -3110,20 +3177,8 @@ function viewShipments() {
         '<td class="right">' + nf0(x.i.giden) + '</td><td class="right strong">' + nf0(x.i.kalan) + '</td><td class="right">' + money(x.i.kalanTutar) + '</td></tr>';
     }).join('') : '<tr><td colspan="4">' + emptyState('check', 'Bekleyen yok', 'Tüm siparişler sevk edilmiş.', '') + '</td></tr>';
 
-    return '<div class="kpis report-kpis">' +
-      rKpi('Sevk edilen çift', nf0(ctx.cur.cift), ctx.cur.shipments.length + ' fiş', '', rCmp(ctx.cur.cift, ctx.prev.cift)) +
-      rKpi('Sevk tutarı', money(ctx.cur.revenue), 'önceki dönem ' + money(ctx.prev.revenue), 'info', rCmp(ctx.cur.revenue, ctx.prev.revenue)) +
-      rKpi('Tahsilat', money(ctx.cur.collection), ctx.cur.collections.length + ' kayıt', 'ok', rCmp(ctx.cur.collection, ctx.prev.collection)) +
-      rKpi('Brüt kâr', money(ctx.profit.reduce(function (a, r) { return a + r.kar; }, 0)), 'maliyet bazlı', 'warn', '') +
-      rKpi('Gider', money(ctx.cur.expense), ctx.cur.expenses.length + ' gider kaydı', 'danger', '') +
-      rKpi('Net kâr', money(ctx.profit.reduce(function (a, r) { return a + r.kar; }, 0) - ctx.cur.expense), 'gider sonrası', 'ok', '') +
-      '</div>' +
-      reportCompareHtml(ctx) +
-      (q.missingCost.length || q.maliyetsiz || q.noCard.length || q.noPrice.length || Math.abs(q.recon) > 1
-        ? '<div class="report-alert">' + ICONS.alert + ' <b>Veri kalitesi:</b> ' +
-          [q.missingCost.length ? q.missingCost.length + ' modelde maliyet yok' : '', q.maliyetsiz ? q.maliyetsiz + ' maliyetsiz satır' : '', q.kartsiz ? q.kartsiz + ' kartsız satır' : '', q.noCard.length ? q.noCard.length + ' siparişte model kartı yok' : '', q.noPrice.length ? q.noPrice.length + ' siparişte fiyat yok' : '', Math.abs(q.recon) > 1 ? 'cari/sevk farkı ' + money(q.recon) : ''].filter(Boolean).join(' · ') + '</div>'
-        : '') +
-      '<div class="grid-2 even" style="margin-top:14px">' +
+    return reportCompareHtml(ctx) +
+  '<div class="grid-2 even" style="margin-top:14px">' +
       '<div class="card"><div class="card-head"><div><h2>Dönem sevkiyatı</h2><div class="sub">' + esc(rLabel(ctx.r)) + '</div></div></div><div class="card-body">' + reportTrend(ctx) + '</div></div>' +
       '<div class="card"><div class="card-head"><div><h2>En çok satan 5 model</h2><div class="sub">Sevk edilen çift</div></div><button class="btn btn-sm" data-act="go-models">Modeller ' + ICONS.right + '</button></div><div class="card-body">' +
       (top.length ? rBars(top, 'cift', 'model', function (v) { return nf0(v) + ' çift'; }) : emptyState('tag', 'Model verisi yok', '', '')) + '</div></div></div>' +
@@ -3137,6 +3192,7 @@ function viewShipments() {
     var totalCiro = ctx.profit.reduce(function (a, r) { return a + r.ciro; }, 0);
     var totalMal = ctx.profit.reduce(function (a, r) { return a + r.maliyet; }, 0);
     var marj = totalCiro ? Core.round2(totalKar / totalCiro * 100, 1) : 0;
+    var totalCift = ctx.profit.reduce(function (a, r) { return a + Core.num(r.cift); }, 0);
     var modelRows = ctx.modelProfit.slice(0, 15);
     var colorRows = ctx.profit.slice(0, 12);
     return '<div class="kpis report-kpis">' +
@@ -3152,7 +3208,7 @@ function viewShipments() {
       (modelRows.length ? modelRows.map(function (r) {
         return '<tr class="clickable" data-act="report-model" data-model="' + esc(r.model) + '"><td class="strong">' + esc(r.model) + '</td><td class="right">' + nf0(r.cift) + '</td><td class="right">' + money(r.ciro) + '</td><td class="right strong" style="color:' + (r.kar < 0 ? 'var(--alacak)' : 'var(--borc)') + '">' + money(r.kar) + '</td><td class="right">' + (r.maliyetsiz || r.kartsiz ? '<span class="pill warn">maliyetsiz</span>' : '%' + nf1(r.marj)) + '</td></tr>';
       }).join('') : '<tr><td colspan="5">' + emptyState('chart', 'Kâr verisi yok', 'Sevkiyat yapıldıkça oluşur.', '') + '</td></tr>') +
-      '</tbody></table></div></div>' +
+      '</tbody><tfoot><tr><td>TOPLAM</td><td class="right">' + nf0(totalCift) + '</td><td class="right">' + money(totalCiro) + '</td><td class="right strong">' + money(totalKar) + '</td><td class="right">%' + nf1(marj) + '</td></tr></tfoot></table></div></div>' +
       '<div class="card"><div class="card-head"><div><h2>Renk kârlılığı</h2><div class="sub">Kâra göre ilk 12</div></div></div><div class="table-wrap"><table class="data"><thead><tr><th>Model / renk</th><th class="right">Çift</th><th class="right">Kâr</th><th class="right">Marj</th></tr></thead><tbody>' +
       (colorRows.length ? colorRows.map(function (r) {
         return '<tr><td><div class="strong">' + esc(r.model) + '</div><div class="sub">' + esc(r.renk) + '</div></td><td class="right">' + nf0(r.cift) + '</td><td class="right strong">' + money(r.kar) + '</td><td class="right">' + (r.maliyetsiz || r.kartsiz ? '<span class="pill warn">maliyetsiz</span>' : '%' + nf1(r.marj)) + '</td></tr>';
@@ -3173,7 +3229,7 @@ function viewShipments() {
     var debtors = a.rows.filter(function (r) { return r.bakiye > 0; }).slice(0, 12);
     return '<div class="kpis report-kpis">' +
       rKpi('Toplam bakiye', money(a.total), a.rows.length + ' cari', 'warn', '') +
-      rKpi('Tahsilat', money(a.collected), 'FIFO ile tahsil edilen', 'ok', '') +
+      rKpi('Kapatılan borç', money(a.collected), 'FIFO eşleşmesi', 'ok', '') +
       rKpi('Ortalama tahsil süresi', nf1(a.avgDays) + ' gün', 'tahsil edilen borçlar', 'info', '') +
       rKpi('Vadesi geçen', money(a.totals[2] + a.totals[3]), '61+ gün', 'danger', '') +
       '</div>' +
@@ -3187,7 +3243,9 @@ function viewShipments() {
           r.buckets.map(function (v) { return '<td class="right">' + (v ? money(v) : '—') + '</td>'; }).join('') +
           '<td class="right">' + nf0(r.avgDays) + '</td></tr>';
       }).join('') : '<tr><td colspan="7">' + emptyState('wallet', 'Borçlu cari yok', 'Tüm bakiyeler kapalı görünüyor.', '') + '</td></tr>') +
-      '</tbody></table></div></div>' +
+      '</tbody><tfoot><tr><td>TOPLAM</td><td class="right strong">' + money(a.total) + '</td>' +
+      a.totals.map(function (v) { return '<td class="right">' + (v ? money(v) : '—') + '</td>'; }).join('') +
+      '<td class="right">' + nf0(a.avgDays) + '</td></tr></tfoot></table></div></div>' +
       reportCustomerStatusHtml(ctx);
   }
 
@@ -3332,15 +3390,27 @@ function viewShipments() {
 
   function viewReports() {
     var ctx = reportBuild();
-    return reportToolbar(ctx) + '<div class="report-body">' + reportTabHtml(ctx) + '</div>';
+    return reportToolbar(ctx) + '<div class="report-body">' +
+      (S.ui.reportTab === 'personel' ? '' : reportExecutiveHtml(ctx)) +
+      reportInfoHtml() + reportTabHtml(ctx) + '</div>';
   }
 
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.7.0';
+  var SURUM = '3.8.0';
 
   var YENILIKLER = [
+    {
+      v: '3.8.0', t: '09.11.2026', m: [
+        'Raporlara Yönetici Özeti: ciro, tahsilat, alacak, kâr, doluluk ve kalan',
+        'Bu dönem en çok satan model / en yüksek bakiyeli cari / geciken sipariş özeti',
+        'Dikkat uyarıları: maliyetsiz model, fiyatsız sipariş, geciken sipariş',
+        'Her rapor sekmesinde ne gösterdiğini anlatan açıklama ve renk anahtarı',
+        'Bugün / Bu hafta hızlı dönem seçenekleri; kârlılık ve cari toplam satırları',
+        'Excel/CSV özetine tahsilat oranı, açık alacak, doluluk ve kalan çift'
+      ]
+    },
     {
       v: '3.7.0', t: '08.11.2026', m: [
         'Ana sayfada sol menü kayması düzeltildi; menü artık tam yükseklikte sabit kalıyor',
@@ -5983,7 +6053,11 @@ function viewShipments() {
         ['Tahsilat', ctx.cur.collection],
         ['Gider', ctx.cur.expense],
         ['Brüt kâr', ctx.profit.reduce(function (a, r) { return a + r.kar; }, 0)],
-        ['Net kâr', ctx.profit.reduce(function (a, r) { return a + r.kar; }, 0) - ctx.cur.expense]
+        ['Net kâr', ctx.profit.reduce(function (a, r) { return a + r.kar; }, 0) - ctx.cur.expense],
+        ['Tahsilat oranı %', ctx.cur.revenue ? Core.round2(ctx.cur.collection / ctx.cur.revenue * 100, 1) : 0],
+        ['Açık alacak', (ctx.aging.rows || []).reduce(function (a, r) { return a + Math.max(0, Core.num(r.bakiye)); }, 0)],
+        ['Sevk doluluğu %', Core.num(ctx.orderStatus.totals.sipC) ? Core.round2(Core.num(ctx.orderStatus.totals.sevC) / Core.num(ctx.orderStatus.totals.sipC) * 100, 1) : 0],
+        ['Kalan çift', ctx.orderStatus.totals.kalanC]
       ];
       var sheets = [
         { name: 'ÖZET', columns: [{ header: 'METRİK', width: 24 }, { header: 'DEĞER', width: 38 }], rows: ozet },
@@ -6068,6 +6142,10 @@ function viewShipments() {
       add(['Sevk çift', ctx.cur.cift]); add(['Sevk tutarı', ctx.cur.revenue]);
       add(['Tahsilat', ctx.cur.collection]); add(['Gider', ctx.cur.expense]);
       add(['Brüt kâr', ctx.profit.reduce(function (a, r) { return a + r.kar; }, 0)]);
+      add(['Tahsilat oranı %', ctx.cur.revenue ? Core.round2(ctx.cur.collection / ctx.cur.revenue * 100, 1) : 0]);
+      add(['Açık alacak', (ctx.aging.rows || []).reduce(function (a, r) { return a + Math.max(0, Core.num(r.bakiye)); }, 0)]);
+      add(['Sevk doluluğu %', Core.num(ctx.orderStatus.totals.sipC) ? Core.round2(Core.num(ctx.orderStatus.totals.sevC) / Core.num(ctx.orderStatus.totals.sipC) * 100, 1) : 0]);
+      add(['Kalan çift', ctx.orderStatus.totals.kalanC]);
       add([]);
       add(['MODEL KARLILIGI']); add(['Model', 'Çift', 'Ciro', 'Maliyet', 'Kâr', 'Marj %', 'Durum']);
       ctx.modelProfit.forEach(function (r) { add([r.model, r.cift, r.ciro, r.maliyet, r.kar, r.marj, (r.maliyetsiz || r.kartsiz) ? 'MALİYETSİZ' : '']); });
