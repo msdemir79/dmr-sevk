@@ -843,6 +843,8 @@
       maas: round2(num(input.maas)),
       gunlukSaat: num(input.gunlukSaat) || 8,
       cinsiyet: (function (x) { x = String(x || '').toUpperCase(); return x === 'BAY' || x === 'BAYAN' ? x : ''; })(input.cinsiyet),
+      izinHakki: input.izinHakki === undefined ? 14 : Math.max(0, num(input.izinHakki)),
+      avansBakiye: round2(num(input.avansBakiye)),
       iseGiris: toISODate(input.iseGiris) || '',
       cikisTarihi: toISODate(input.cikisTarihi) || '',
       cikisSebebi: String(input.cikisSebebi || '').trim(),
@@ -1517,7 +1519,7 @@
     });
 
     var personelRows = (data.personel || []).map(function (p) {
-      return [p.id, p.ad, p.gorev || '', p.cinsiyet || '', money(p.maas), num(p.gunlukSaat), p.iseGiris || '', p.cikisTarihi || '', p.cikisSebebi || '', p.aktif === false ? 'HAYIR' : 'EVET', p.not || ''];
+      return [p.id, p.ad, p.gorev || '', p.cinsiyet || '', num(p.izinHakki), money(p.avansBakiye), money(p.maas), num(p.gunlukSaat), p.iseGiris || '', p.cikisTarihi || '', p.cikisSebebi || '', p.aktif === false ? 'HAYIR' : 'EVET', p.not || ''];
     });
 
     var puantajRows = (data.puantaj || []).map(function (r) {
@@ -1587,7 +1589,7 @@
           name: SHEET.PERSONEL,
           columns: [
             { header: 'ID', width: 6 }, { header: 'AD SOYAD', width: 26 }, { header: 'GÖREV', width: 18 },
-            { header: 'CİNSİYET', width: 10 }, { header: 'AYLIK MAAŞ', width: 13 }, { header: 'GÜNLÜK SAAT', width: 12 },
+            { header: 'CİNSİYET', width: 10 }, { header: 'İZİN HAKKI', width: 10 }, { header: 'AVANS BAKİYESİ', width: 13 }, { header: 'AYLIK MAAŞ', width: 13 }, { header: 'GÜNLÜK SAAT', width: 12 },
             { header: 'İŞE GİRİŞ', width: 12 }, { header: 'ÇIKIŞ TARİHİ', width: 12 }, { header: 'ÇIKIŞ SEBEBİ', width: 22 },
             { header: 'AKTİF', width: 9 }, { header: 'NOT', width: 30 }
           ],
@@ -1744,6 +1746,7 @@
   var PERSONEL_KEYS = {
     ID: 'id', AD: 'ad', ADSOYAD: 'ad', GOREV: 'gorev', GOREVI: 'gorev', MAAS: 'maas', AYLIKMAAS: 'maas',
     GUNLUKSAAT: 'gunlukSaat', CALISMASAATI: 'gunlukSaat', CINSIYET: 'cinsiyet', CINSIYETI: 'cinsiyet',
+    IZINHAKKI: 'izinHakki', YILLIKIZIN: 'izinHakki', AVANSBAKIYE: 'avansBakiye', AVANS: 'avansBakiye',
     ISEGIRIS: 'iseGiris', ISEGIRISTARIHI: 'iseGiris', CIKISTARIHI: 'cikisTarihi', CIKISSEBEBI: 'cikisSebebi',
     AKTIF: 'aktif', NOT: 'not'
   };
@@ -1902,6 +1905,8 @@
           maas: pick(prow, pm, 'maas'),
           gunlukSaat: pick(prow, pm, 'gunlukSaat'),
           cinsiyet: pick(prow, pm, 'cinsiyet'),
+          izinHakki: pick(prow, pm, 'izinHakki'),
+          avansBakiye: pick(prow, pm, 'avansBakiye'),
           iseGiris: pick(prow, pm, 'iseGiris'),
           cikisTarihi: pick(prow, pm, 'cikisTarihi'),
           cikisSebebi: pick(prow, pm, 'cikisSebebi'),

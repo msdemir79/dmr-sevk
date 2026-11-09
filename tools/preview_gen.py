@@ -276,6 +276,18 @@ BOOT = r"""
       APP.S.view = 'dashboard'; APP.updateChrome(); APP.renderView();
       setTimeout(function () { var b = document.querySelector('[data-act="toggle-side"]'); if (b) b.click(); }, 300);
     }
+    if (h === 'ekstre-panel') {
+      APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var b = document.querySelector('[data-act="ekstre-panel"]'); if (b) b.click(); }, 300);
+    }
+    if (h === 'reminder-list') {
+      APP.S.view = 'ledger'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { var b = document.querySelector('[data-act="reminder-list"]'); if (b) b.click(); }, 300);
+    }
+    if (h === 'palette') {
+      APP.S.view = 'dashboard'; APP.updateChrome(); APP.renderView();
+      setTimeout(function () { if (APP.openPalette) APP.openPalette(); }, 300);
+    }
     if (h === 'report-ekstre') {
       APP.S.view = 'reports'; APP.S.ui.reportTab = 'personel'; APP.updateChrome(); APP.renderView();
       setTimeout(function () { var b = document.querySelector('[data-act="personel-ekstre"]'); if (b) b.click(); }, 300);

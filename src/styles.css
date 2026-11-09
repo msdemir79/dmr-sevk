@@ -1161,3 +1161,11 @@ html[data-theme="dark"] select option { background: var(--surface); color: var(-
   .report-toolbar { align-items: stretch; }
   .report-toolbar .report-range { width: 100%; }
 }
+
+/* --- cari ekstre paylaşım / hatırlatma --- */
+.ekstre-share { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.reminder-list { max-height: 460px; overflow: auto; border: 1px solid var(--line); border-radius: 9px; }
+.reminder-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 11px; border-bottom: 1px solid var(--line); }
+.reminder-row:last-child { border-bottom: 0; }
+.reminder-row b { display: block; font-size: 12px; }
+.reminder-row span { display: block; color: var(--muted); font-size: 10.5px; margin-top: 2px; }

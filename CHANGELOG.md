@@ -2,6 +2,24 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.10.0 — 10.11.2026
+
+### Eklendi
+- **Cari ekstre paneli**:
+  - PDF / yazdır
+  - WhatsApp özeti
+  - Panoya kopyalama
+- **Vade hatırlatma**: 61+ günlük borçlu cariler, WhatsApp mesajı.
+- **Personel izin hakkı / kalan izin** ve **avans bakiyesi** alanları.
+- Hızlı aramada **personel** ve **cari hareketleri**.
+- Klavye kısayolları:
+  - **Ctrl+K** arama
+  - **Ctrl+S** kaydet
+  - **Alt+N** yeni sipariş
+  - **Alt+C** yeni cari
+  - **Alt+M** yeni model
+  - **Alt+R** raporlar
+
 ## v3.9.0 — 09.11.2026
 
 ### Eklendi

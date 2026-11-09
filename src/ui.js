@@ -1058,7 +1058,8 @@
     } else if (S.view === 'models') {
       actions.push(btn('Yeni model', 'model-new', 'btn btn-primary', 'plus'));
     } else if (S.view === 'ledger') {
-      actions.push(btn('Ekstre yazdır', 'print-ekstre', 'btn', 'print'));
+      actions.push(btn('Ekstre / Paylaş', 'ekstre-panel', 'btn', 'print'));
+      actions.push(btn('Vade hatırlatma', 'reminder-list', 'btn', 'history'));
       actions.push(btn('Tahsilat', 'ledger-tahsilat', 'btn btn-primary', 'wallet'));
       actions.push(btn('Gider', 'ledger-gider', 'btn', 'receipt'));
       actions.push(btn('Hareket ekle', 'ledger-new', 'btn', 'plus'));
@@ -1161,6 +1162,8 @@
         case 'ledger-new': openLedgerForm(null); break;
         case 'ledger-del': removeLedger(id); break;
         case 'print-ekstre': printEkstre(); break;
+        case 'ekstre-panel': openEkstrePanel(); break;
+        case 'reminder-list': openReminderList(); break;
         case 'ship-print': printShipment(id); break;
         case 'ship-view': previewShipment(id); break;
         case 'ship-del': removeShipment(id); break;
@@ -2179,6 +2182,19 @@ function viewShipments() {
     return S.ui.personelMonth || Core.todayISO().slice(0, 7);
   }
 
+  function personelIzinKullanilan(p, yil) {
+    var n = 0;
+    (data.puantaj || []).forEach(function (r) {
+      if (r.personelId !== p.id || String(r.ay || '').slice(0, 4) !== String(yil)) return;
+      n += Core.countGun(r.gunler || '', 'I');
+    });
+    return n;
+  }
+
+  function personelIzinKalan(p, yil) {
+    return Math.max(0, Core.num(p.izinHakki) - personelIzinKullanilan(p, yil));
+  }
+
   function personelWeekends() {
     var raw = data.settings.personelHaftaTatili;
     if (raw === undefined || raw === null) raw = '0,6';
@@ -2230,12 +2246,13 @@ function viewShipments() {
     var list = data.personel || [];
     if (!list.length) return emptyState('users', 'Henüz personel yok', 'İlk personeli ekleyerek puantaj ve maaş takibine başlayın.',
       '<button class="btn btn-primary" data-act="personel-new">' + ICONS.plus + ' Yeni personel</button>');
-    return '<div class="table-wrap"><table class="data"><thead><tr><th>Personel</th><th>Görev</th><th>Cinsiyet</th><th class="right">Aylık maaş</th><th class="right">Günlük saat</th><th class="right">İşe giriş</th><th>Çıkış</th><th>Durum</th><th></th></tr></thead><tbody>' +
+    return '<div class="table-wrap"><table class="data"><thead><tr><th>Personel</th><th>Görev</th><th>Cinsiyet</th><th class="right">Aylık maaş</th><th class="right">Günlük saat</th><th class="right">İşe giriş</th><th>Çıkış</th><th>İzin / Avans</th><th>Durum</th><th></th></tr></thead><tbody>' +
       list.map(function (p) {
         return '<tr><td><div class="strong">' + esc(p.ad) + '</div>' + (p.not ? '<div class="sub">' + esc(p.not) + '</div>' : '') + '</td>' +
           '<td>' + esc(p.gorev || '—') + '</td><td>' + (p.cinsiyet === 'BAY' ? 'Bay' : p.cinsiyet === 'BAYAN' ? 'Bayan' : '—') + '</td><td class="right">' + money(p.maas) + '</td><td class="right">' + nf1(p.gunlukSaat) + '</td>' +
           '<td class="right">' + (p.iseGiris ? dateTR(p.iseGiris) : '—') + '</td>' +
           '<td class="sub">' + (p.cikisTarihi ? dateTR(p.cikisTarihi) + (p.cikisSebebi ? '<div class="sub">' + esc(p.cikisSebebi) + '</div>' : '') : '—') + '</td>' +
+          '<td><div>' + nf1(personelIzinKalan(p, ay.slice(0, 4))) + ' / ' + nf1(p.izinHakki) + ' gün</div><div class="sub">Avans ' + money(p.avansBakiye) + '</div></td>' +
           '<td>' + (p.aktif === false ? '<span class="pill muted">' + (p.cikisTarihi ? 'Ayrıldı' : 'Pasif') + '</span>' : '<span class="pill ok">Aktif</span>') + '</td>' +
           '<td><div class="row-actions">' +
           '<button class="btn btn-icon" data-act="personel-edit" data-id="' + p.id + '" title="Düzenle" aria-label="Düzenle">' + ICONS.edit + '</button>' +
@@ -2329,7 +2346,7 @@ function viewShipments() {
   function openPersonelForm(p) {
     if (!isAdmin()) return toast('Bu işlem için yönetici yetkisi gerekli.', 'err');
     var isEdit = !!p;
-    var x = p || { ad: '', gorev: '', cinsiyet: '', maas: '', gunlukSaat: data.settings.personelGunlukSaat || 8, iseGiris: Core.todayISO(), cikisTarihi: '', cikisSebebi: '', aktif: true, not: '' };
+    var x = p || { ad: '', gorev: '', cinsiyet: '', izinHakki: 14, avansBakiye: 0, maas: '', gunlukSaat: data.settings.personelGunlukSaat || 8, iseGiris: Core.todayISO(), cikisTarihi: '', cikisSebebi: '', aktif: true, not: '' };
     var m = openModal({
       title: isEdit ? 'Personeli düzenle' : 'Yeni personel',
       subtitle: 'İç maaş hesabı · resmî bordro değildir',
@@ -2338,6 +2355,8 @@ function viewShipments() {
         '<div class="field"><label for="prGorev">Görev</label><input id="prGorev" class="input" value="' + esc(x.gorev) + '"></div>' +
         '<div class="field"><label for="prCinsiyet">Cinsiyet</label><select id="prCinsiyet" class="select"><option value="">Seçin</option>' +
         '<option value="BAY"' + (x.cinsiyet === 'BAY' ? ' selected' : '') + '>Bay</option><option value="BAYAN"' + (x.cinsiyet === 'BAYAN' ? ' selected' : '') + '>Bayan</option></select></div>' +
+        '<div class="field"><label for="prIzin">Yıllık izin hakkı (gün)</label><input id="prIzin" class="input num" inputmode="decimal" value="' + esc(x.izinHakki) + '"></div>' +
+        '<div class="field"><label for="prAvans">Avans bakiyesi</label><input id="prAvans" class="input num" inputmode="decimal" value="' + esc(x.avansBakiye) + '"></div>' +
         '<div class="field"><label for="prMaas">Aylık maaş *</label><input id="prMaas" class="input num" inputmode="decimal" value="' + esc(x.maas) + '"></div>' +
         '<div class="field"><label for="prSaat">Günlük çalışma saati</label><input id="prSaat" class="input num" inputmode="decimal" value="' + esc(x.gunlukSaat) + '"></div>' +
         '<div class="field"><label for="prGiris">İşe giriş</label><input id="prGiris" class="input" type="date" value="' + esc(x.iseGiris) + '"></div>' +
@@ -2353,6 +2372,7 @@ function viewShipments() {
       e.preventDefault();
       var payload = {
         ad: $('#prAd', m.el).value, gorev: $('#prGorev', m.el).value, cinsiyet: $('#prCinsiyet', m.el).value,
+        izinHakki: $('#prIzin', m.el).value, avansBakiye: $('#prAvans', m.el).value,
         maas: $('#prMaas', m.el).value, gunlukSaat: $('#prSaat', m.el).value,
         iseGiris: $('#prGiris', m.el).value, cikisTarihi: $('#prCikis', m.el).value,
         cikisSebebi: $('#prCikisSebep', m.el).value, not: $('#prNot', m.el).value,
@@ -2611,7 +2631,7 @@ function viewShipments() {
       title: 'Personel ekstresi · ' + p.ad,
       subtitle: (p.gorev || '—') + ' · tüm dönemler · iç hesaplama',
       size: 'xwide',
-      body: '<div class="ekstre-meta"><div><span>Giriş</span><b>' + (p.iseGiris ? dateTR(p.iseGiris) : '—') + '</b></div><div><span>Çıkış</span><b>' + (p.cikisTarihi ? dateTR(p.cikisTarihi) : '—') + '</b></div><div><span>Durum</span><b>' + (p.aktif === false ? 'Ayrıldı' : 'Aktif') + '</b></div><div><span>Kayıt</span><b>' + rows.length + ' dönem</b></div></div>' +
+      body: '<div class="ekstre-meta"><div><span>Giriş</span><b>' + (p.iseGiris ? dateTR(p.iseGiris) : '—') + '</b></div><div><span>Çıkış</span><b>' + (p.cikisTarihi ? dateTR(p.cikisTarihi) : '—') + '</b></div><div><span>Durum</span><b>' + (p.aktif === false ? 'Ayrıldı' : 'Aktif') + '</b></div><div><span>Kayıt</span><b>' + rows.length + ' dönem</b></div><div><span>İzin</span><b>' + nf1(personelIzinKalan(p, Core.todayISO().slice(0, 4))) + ' / ' + nf1(p.izinHakki) + ' gün</b></div><div><span>Avans</span><b>' + money(p.avansBakiye) + '</b></div></div>' +
         '<div class="table-wrap" style="max-height:none">' + personelEkstreTableHtml(p, rows, false) + '</div><p class="muted small" style="margin:10px 0 0">Bu ekstre resmî bordro değildir; SGK, vergi ve yasal kesintiler içermez.</p>',
       footer: '<button class="btn" data-modal-close>Kapat</button><button class="btn btn-primary" id="btnEkstrePrint">' + ICONS.print + ' Yazdır</button>'
     });
@@ -2630,6 +2650,7 @@ function viewShipments() {
       '<div class="pf-meta"><div class="row"><span class="k">PERSONEL</span><span class="v">' + esc(p.ad) + '</span></div>' +
       '<div class="row"><span class="k">GÖREV</span><span class="v">' + esc(p.gorev || '—') + '</span></div>' +
       '<div class="row"><span class="k">GİRİŞ / ÇIKIŞ</span><span class="v">' + (p.iseGiris ? dateTR(p.iseGiris) : '—') + ' / ' + (p.cikisTarihi ? dateTR(p.cikisTarihi) : '—') + '</span></div>' +
+      '<div class="row"><span class="k">İZİN / AVANS</span><span class="v">' + nf1(personelIzinKalan(p, Core.todayISO().slice(0, 4))) + ' / ' + nf1(p.izinHakki) + ' gün · ' + money(p.avansBakiye) + '</span></div>' +
       '<div class="row"><span class="k">DURUM</span><span class="v">' + (p.aktif === false ? 'Ayrıldı' : 'Aktif') + ' · ' + rows.length + ' dönem</span></div></div>' +
       personelEkstreTableHtml(p, rows, true) +
       '<div class="ekstre-sum"><span>Toplam net: <b>' + money(total) + '</b></span><span>Ödenen: <b>' + money(paid) + '</b></span><span>Kalan: <b>' + money(total - paid) + '</b></span></div>' +
@@ -3468,7 +3489,7 @@ function viewShipments() {
       rKpi('Bu ay işten çıkan', nf0(d.cikan), monthName(d.ay), 'warn', '') +
       rKpi('Toplam personel', nf0(d.all.length), 'tüm kayıtlar', '', '') +
       '</div></div>' +
-      '<div class="table-wrap"><table class="data"><thead><tr><th>Personel</th><th>Cinsiyet</th><th>Görev</th><th>Giriş</th><th>Çıkış</th><th class="right">Maaş</th><th class="right">Eksik gün</th><th class="right">FM</th><th class="right">Net</th><th>Durum</th><th></th></tr></thead><tbody>' +
+      '<div class="table-wrap"><table class="data"><thead><tr><th>Personel</th><th>Cinsiyet</th><th>Görev</th><th>Giriş</th><th>Çıkış</th><th class="right">Maaş</th><th class="right">Eksik gün</th><th class="right">FM</th><th class="right">Net</th><th>İzin / Avans</th><th>Durum</th><th></th></tr></thead><tbody>' +
       (rows.length ? rows.map(function (x) {
         var p = x.p, r = x.r;
         return '<tr><td><div class="strong">' + esc(p.ad) + '</div>' + (p.not ? '<div class="sub">' + esc(p.not) + '</div>' : '') + '</td>' +
@@ -3476,10 +3497,10 @@ function viewShipments() {
           '<td>' + esc(p.gorev || '—') + '</td><td class="sub">' + (p.iseGiris ? dateTR(p.iseGiris) : '—') + '</td>' +
           '<td class="sub">' + (p.cikisTarihi ? dateTR(p.cikisTarihi) + (p.cikisSebebi ? '<div class="sub">' + esc(p.cikisSebebi) + '</div>' : '') : '—') + '</td>' +
           '<td class="right">' + money(r.maas) + '</td><td class="right">' + nf1(r.eksikGun) + '</td><td class="right">' + nf1(r.fazlaMesai) + '</td>' +
-          '<td class="right strong">' + money(x.net) + '</td><td>' + (p.aktif === false ? '<span class="pill muted">Ayrıldı</span>' : x.has ? personelDurumPill(r.durum) : '<span class="pill warn">Tam ay</span>') + '</td>' +
+          '<td class="right strong">' + money(x.net) + '</td><td><div>' + nf1(personelIzinKalan(p, d.ay.slice(0, 4))) + ' / ' + nf1(p.izinHakki) + ' gün</div><div class="sub">Avans ' + money(p.avansBakiye) + '</div></td><td>' + (p.aktif === false ? '<span class="pill muted">Ayrıldı</span>' : x.has ? personelDurumPill(r.durum) : '<span class="pill warn">Tam ay</span>') + '</td>' +
           '<td><button class="btn btn-sm" data-act="personel-ekstre" data-id="' + p.id + '">Ekstre</button></td></tr>';
-      }).join('') : '<tr><td colspan="11"><div class="empty">Personel kaydı yok.</div></td></tr>') +
-      '</tbody><tfoot><tr><td colspan="8">TOPLAM</td><td class="right strong">' + money(d.net) + '</td><td></td><td></td></tr></tfoot></table></div>' +
+      }).join('') : '<tr><td colspan="12"><div class="empty">Personel kaydı yok.</div></td></tr>') +
+      '</tbody><tfoot><tr><td colspan="8">TOPLAM</td><td class="right strong">' + money(d.net) + '</td><td></td><td></td><td></td></tr></tfoot></table></div>' +
       '<p class="muted small" style="padding:10px 14px;margin:0">Bu rapor iç hesaplamadır; SGK, vergi ve yasal kesintiler içermez.</p></div>';
   }
 
@@ -3503,9 +3524,18 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.9.0';
+  var SURUM = '3.10.0';
 
   var YENILIKLER = [
+    {
+      v: '3.10.0', t: '10.11.2026', m: [
+        'Cari ekstre paneli: PDF/yazdır, WhatsApp özeti ve panoya kopyalama',
+        'Vade hatırlatma: 61+ günlük borçlu cariler ve WhatsApp mesajı',
+        'Personel izin hakkı ve kalan izin; avans bakiyesi alanı',
+        'Hızlı aramada personel ve cari hareketleri',
+        'Alt+N yeni sipariş, Alt+C yeni cari, Alt+M yeni model, Alt+R raporlar'
+      ]
+    },
     {
       v: '3.9.0', t: '09.11.2026', m: [
         'Rapor tablolarında başlığa tıklayarak sıralama',
@@ -4136,11 +4166,11 @@ function viewShipments() {
   function openPalette() {
     var m = openModal({
       title: 'Hızlı arama',
-      subtitle: 'Komut, model, cari veya fiş no yazın · Ctrl+K',
+      subtitle: 'Cari, model, sipariş, fiş, personel veya komut arayın · Ctrl+K',
       body: '<div class="palette"><div class="search">' + ICONS.search +
         '<input class="input" id="palInput" placeholder="Ara…" autocomplete="off" spellcheck="false"></div>' +
         '<div class="pal-list" id="palList"></div></div>',
-      footer: '<span class="muted small">↑ ↓ gez · Enter aç · Esc kapat</span>'
+      footer: '<span class="muted small">↑ ↓ gez · Enter aç · Esc kapat · Alt+N yeni sipariş</span>'
     });
     var input = $('#palInput', m.el);
     var listEl = $('#palList', m.el);
@@ -4156,6 +4186,7 @@ function viewShipments() {
         { tur: 'Komut', ad: 'Sevk fişleri', alt: 'Fiş listesi', fn: function () { go('shipments'); } },
         { tur: 'Komut', ad: 'Yeni model', alt: 'Model kartı oluştur', fn: function () { openModelForm(null); } },
         { tur: 'Komut', ad: 'Yeni cari', alt: 'Cari hesap oluştur', fn: function () { openCariForm(null); } },
+        { tur: 'Komut', ad: 'Personel', alt: 'Puantaj ve maaş', fn: function () { go('personel'); } },
         { tur: 'Komut', ad: 'Raporlar', alt: 'Satış ve sevk raporları', fn: function () { go('reports'); } },
         { tur: 'Komut', ad: 'Ayarlar', alt: 'Firma, renk ve şablonlar', fn: function () { go('settings'); } },
         { tur: 'Komut', ad: 'Güncelleme kontrol et', alt: 'GitHub Releases', fn: function () { checkUpdates(true); } },
@@ -4180,7 +4211,7 @@ function viewShipments() {
         if (sc.indexOf(q) >= 0) out.push({ tur: 'Sipariş', ad: o.model, alt: cariAdi(o.cariId) + ' · #' + o.sipno, fn: function () { openOrderForm(o); } });
       });
       data.cariler.forEach(function (c) {
-        if ((c.ad + ' ' + (c.kod || '')).toLocaleLowerCase('tr-TR').indexOf(q) >= 0) {
+        if ((c.ad + ' ' + (c.kod || '') + ' ' + (c.tel || '') + ' ' + (c.vergiNo || '')).toLocaleLowerCase('tr-TR').indexOf(q) >= 0) {
           out.push({ tur: 'Cari', ad: c.ad, alt: 'Bakiye ' + money(Core.balance(data, c.id)), fn: function () { setActiveCari(c.id); go('cariler'); } });
         }
       });
@@ -4194,7 +4225,15 @@ function viewShipments() {
           out.push({ tur: 'Model', ad: k.model, alt: 'Liste ' + money(k.fiyat), fn: function () { openModelForm(k); } });
         }
       });
-      return out.slice(0, 14);
+      if (isAdmin()) (data.personel || []).forEach(function (p) {
+        var sc = [p.ad, p.gorev, p.cinsiyet === 'BAY' ? 'bay' : p.cinsiyet === 'BAYAN' ? 'bayan' : '', p.cikisSebebi].join(' ').toLocaleLowerCase('tr-TR');
+        if (sc.indexOf(q) >= 0) out.push({ tur: 'Personel', ad: p.ad, alt: (p.gorev || '') + (p.aktif === false ? ' · ayrıldı' : ' · aktif'), fn: function () { go('personel'); } });
+      });
+      (data.ledger || []).forEach(function (r) {
+        var sc = [r.aciklama, cariAdi(r.cariId), r.fisNo].join(' ').toLocaleLowerCase('tr-TR');
+        if (sc.indexOf(q) >= 0) out.push({ tur: 'Hareket', ad: r.aciklama || 'Cari hareket', alt: cariAdi(r.cariId) + ' · ' + dateTR(r.tarih) + ' · ' + money(r.borc ? r.borc : -r.alacak), fn: function () { setActiveCari(r.cariId); go('ledger'); } });
+      });
+      return out.slice(0, 20);
     }
 
     function render() {
@@ -6143,6 +6182,77 @@ function viewShipments() {
     $('#btnPrintDoc', m.el).addEventListener('click', function () { m.close(); printShipment(id, kagit, pvOpts); });
   }
 
+  function ekstreSummaryText(cari, rows, from, to) {
+    var borc = rows.reduce(function (a, r) { return a + Core.num(r.borc); }, 0);
+    var alacak = rows.reduce(function (a, r) { return a + Core.num(r.alacak); }, 0);
+    return 'Sayın ' + (cari.ad || '') + ',\n' +
+      'DMR AYAKKABI hesap ekstreniz\n' +
+      'Dönem: ' + ((from || to) ? ((from ? dateTR(from) : '—') + ' — ' + (to ? dateTR(to) : '—')) : 'Tüm dönem') + '\n' +
+      'Borç: ' + money(borc) + '\nAlacak: ' + money(alacak) + '\nBakiye: ' + money(borc - alacak) + '\n' +
+      'Bilginize sunarız.';
+  }
+
+  function cariPhone(c) {
+    return String((c && c.tel) || '').replace(/[^\d]/g, '');
+  }
+
+  function waUrl(phone, text) {
+    return 'https://wa.me/' + (phone ? (phone.indexOf('90') === 0 ? phone : '90' + phone.replace(/^0/, '')) : '') + '?text=' + encodeURIComponent(text);
+  }
+
+  function openEkstrePanel() {
+    if (!S.ui.cariId) { toast('Ekstre için önce bir cari seçin.', 'err'); return; }
+    var cari = activeCari();
+    var rows = filteredLedger();
+    if (!rows.length) { toast('Bu dönemde hareket yok.', 'err'); return; }
+    var borc = rows.reduce(function (a, r) { return a + Core.num(r.borc); }, 0);
+    var alacak = rows.reduce(function (a, r) { return a + Core.num(r.alacak); }, 0);
+    var text = ekstreSummaryText(cari, rows, S.ui.ledgerFrom, S.ui.ledgerTo);
+    var m = openModal({
+      title: 'Cari ekstresi · ' + cari.ad,
+      subtitle: 'PDF, yazdırma ve paylaşım',
+      body: '<div class="ekstre-meta"><div><span>Dönem</span><b>' + ((S.ui.ledgerFrom || S.ui.ledgerTo) ? ((S.ui.ledgerFrom ? dateTR(S.ui.ledgerFrom) : '—') + ' — ' + (S.ui.ledgerTo ? dateTR(S.ui.ledgerTo) : '—')) : 'Tüm dönem') + '</b></div>' +
+        '<div><span>Hareket</span><b>' + rows.length + '</b></div><div><span>Borç</span><b>' + money(borc) + '</b></div><div><span>Alacak</span><b>' + money(alacak) + '</b></div>' +
+        '<div><span>Bakiye</span><b>' + money(borc - alacak) + '</b></div></div>' +
+        '<p class="muted small" style="margin:10px 0">PDF için yazdır penceresinde <b>PDF olarak kaydet</b> seçin. WhatsApp’a özet gönderilir.</p>' +
+        '<div class="ekstre-share">' +
+        '<button class="btn btn-primary" id="ekPdf">' + ICONS.print + ' PDF / Yazdır</button>' +
+        '<button class="btn" id="ekWa">WhatsApp</button>' +
+        '<button class="btn" id="ekCopy">Özeti kopyala</button>' +
+        '</div>',
+      footer: '<button class="btn" data-modal-close>Kapat</button>'
+    });
+    $('#ekPdf', m.el).addEventListener('click', function () { m.close(); printEkstre(); toast('Yazdır penceresinde PDF olarak kaydedebilirsiniz.', ''); });
+    $('#ekWa', m.el).addEventListener('click', function () {
+      var url = waUrl(cariPhone(cari), text);
+      window.open(url, '_blank', 'noopener');
+    });
+    $('#ekCopy', m.el).addEventListener('click', function () {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { toast('Ekstre özeti kopyalandı', 'ok'); }, function () { toast('Kopyalanamadı', 'err'); });
+      } else { toast('Panoya kopyalama desteklenmiyor', 'err'); }
+    });
+  }
+
+  function openReminderList() {
+    var aging = reportAging(Core.todayISO(), null);
+    var rows = (aging.rows || []).filter(function (r) { return Core.num(r.bakiye) > 0 && (Core.num(r.buckets[2]) + Core.num(r.buckets[3])) > 0; })
+      .sort(function (a, b) { return Core.num(b.bakiye) - Core.num(a.bakiye); });
+    var body = rows.length ? rows.map(function (r) {
+      var c = data.cariler.filter(function (x) { return x.id === r.cariId; })[0] || {};
+      var phone = cariPhone(c);
+      var text = 'Sayın ' + (r.ad || '') + ', ' + money(r.bakiye) + ' bakiyeniz bulunmaktadır. Bilginize sunarız.';
+      return '<div class="reminder-row"><div><b>' + esc(r.ad) + '</b><span>' + money(r.bakiye) + ' · 61+ gün: ' + money(Core.num(r.buckets[2]) + Core.num(r.buckets[3])) + '</span></div>' +
+        '<a class="btn btn-sm" href="' + esc(waUrl(phone, text)) + '" target="_blank" rel="noopener">WhatsApp</a></div>';
+    }).join('') : '<p class="muted small" style="padding:12px">61+ günlük borçlu cari yok.</p>';
+    openModal({
+      title: 'Vade hatırlatma',
+      subtitle: '61+ günlük bakiyesi olan cariler',
+      body: '<div class="reminder-list">' + body + '</div><p class="muted small" style="margin:10px 0 0">Vade alanı olmadığı için yaşlandırma 61+ gün esas alınır.</p>',
+      footer: '<button class="btn" data-modal-close>Kapat</button>'
+    });
+  }
+
   function printEkstre() {
     if (!S.ui.cariId) { toast('Ekstre için önce bir cari seçin.', 'err'); return; }
     var rows = filteredLedger();
@@ -6701,6 +6811,14 @@ function viewShipments() {
       if (document.querySelector('.modal-backdrop')) return;
       e.preventDefault();
       openPalette();
+      return;
+    }
+    if (e.altKey && !e.ctrlKey && !e.metaKey && data && S.user && !document.querySelector('.modal-backdrop')) {
+      var k = String(e.key).toLowerCase();
+      if (k === 'n') { e.preventDefault(); openOrderForm(null); }
+      else if (k === 'c') { e.preventDefault(); openCariForm(null); }
+      else if (k === 'm') { e.preventDefault(); openModelForm(null); }
+      else if (k === 'r') { e.preventDefault(); go('reports'); }
     }
   });
 
