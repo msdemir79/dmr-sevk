@@ -158,6 +158,7 @@
       varsayilanAsorti: 10,
       personelGunlukSaat: 8,
       personelHaftaTatili: '0,6',
+  panelDuzen: 'a',
       logo: '',
       kurulum: ''
     };

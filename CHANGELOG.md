@@ -2,6 +2,31 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.15.0 — 10.11.2026
+
+### Değişti
+- Panel yeni **Dengeli Kokpit** düzenine geçti.
+- 6 KPI: açık sipariş, bu ay sevkiyat, cari bakiye, bu ay tahsilat, Kasa + Banka, Personel.
+- Sağ sütunda **Kasa & Banka** hesapları ve **Personel** özeti.
+- Personel: aktif sayı, aylık net maaş, avans bakiyesi, kalan izin, yeni başlayan, bay/bayan.
+- Kasa: toplam bakiye, hesap kırılımı, son 7 gün giriş/çıkış.
+- Altta en çok satan modeller, aylık sevkiyat ve cari dağılımı.
+- Sevkiyat bekleyen siparişler ve son hareketler korundu.
+
+### Doğrulama
+- 72 çekirdek test.
+
+## v3.14.1 — 10.11.2026
+
+### Düzeltildi
+- Koyu temada tablo satırı hover’ı beyaz kalmıyor; tema yüzey rengi kullanılıyor.
+- Sol menü kısa ekranlarda kendi içinde kaydırılıyor.
+- Alt bilgi kutusu (kullanıcı, Excel, sürüm/yenilikler) sabit ve erişilebilir.
+- Kısa ekranlar için menü ve alt bilgi kompaktlaştırıldı.
+
+### Doğrulama
+- 72 çekirdek test.
+
 ## v3.14.0 — 10.11.2026
 
 ### Eklendi

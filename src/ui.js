@@ -190,7 +190,7 @@
       shipListSearch: '', shipListPage: 1,
       reportMonth: Core.todayISO().slice(0, 7),
     reportTab: 'ozet', reportPreset: 'last30', reportOnlyOpen: false,
-    personelTab: 'liste', personelMonth: Core.todayISO().slice(0, 7), settingsTab: 'genel', reportPersonelMonth: Core.todayISO().slice(0, 7), sideCollapsed: false, dashFeedCollapsed: false, kasaFilterHesap: 0, kasaFilterTur: '', kasaFilterFrom: '', kasaFilterTo: '', ekstreType: 'ozet',
+    personelTab: 'liste', personelMonth: Core.todayISO().slice(0, 7), settingsTab: 'genel', reportPersonelMonth: Core.todayISO().slice(0, 7), sideCollapsed: false, dashFeedCollapsed: false, kasaFilterHesap: 0, kasaFilterTur: '', kasaFilterFrom: '', kasaFilterTo: '', ekstreType: 'ozet', panelPreview: '',
     reportFrom: (function () { var d = new Date(); d.setDate(d.getDate() - 29); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(),
     reportTo: Core.todayISO(),
     },
@@ -967,10 +967,23 @@
     return document.documentElement.getAttribute('data-theme') === 'dark';
   }
 
-  function toggleTheme() {
-    document.documentElement.setAttribute('data-theme', isDark() ? 'light' : 'dark');
-    try { localStorage.setItem('dmr:theme', isDark() ? 'dark' : 'light'); } catch (e) { }
+  function setTheme(mode) {
+    document.documentElement.setAttribute('data-theme', mode === 'dark' ? 'dark' : 'light');
+    try { localStorage.setItem('dmr:theme', mode === 'dark' ? 'dark' : 'light'); } catch (e) { }
     updateFileChip();
+  }
+
+  function toggleTheme() {
+    setTheme(isDark() ? 'light' : 'dark');
+  }
+
+  function setPanelDuzen(mode) {
+    var next = mode === 'b' ? 'b' : 'a';
+    data.settings.panelDuzen = next;
+    S.ui.panelPreview = '';
+    setDirty(true);
+    renderView();
+    toast(next === 'b' ? 'Panel düzeni: Sade Finans' : 'Panel düzeni: Dengeli Kokpit', 'ok');
   }
 
   function openLightbox(src, label) {
@@ -1186,6 +1199,10 @@
         case 'cari-del': removeCari(id); break;
         case 'pick-cari': setActiveCari(id); break;
         case 'go-cariler': go('cariler'); break;
+        case 'go-kasa': go('kasa'); break;
+        case 'go-personel': go('personel'); break;
+        case 'theme-set': setTheme(id); renderView(); break;
+        case 'panel-set': setPanelDuzen(id); break;
         case 'lock': lockSession(); break;
         case 'user-new': openUserForm(null); break;
         case 'user-edit': openUserForm(Core.kullaniciById(data, id)); break;
@@ -1549,7 +1566,163 @@
       '</div>';
   }
 
+  function panelData() {
+    var cid = S.ui.cariId;
+    var cari = activeCari();
+    var st = Core.stats(data, cid);
+    var shipped = Core.shippedMap(data);
+    var pending = data.orders.map(function (o) { return { o: o, i: Core.orderInfo(data, o, shipped) }; })
+      .filter(function (x) { return (!cid || x.o.cariId === cid) && x.i.kalan > 0; })
+      .sort(function (a, b) { return b.i.kalanTutar - a.i.kalanTutar; }).slice(0, 5);
+    var recent = Core.ledgerWithBalance(data, cid).reverse().slice(0, 6);
+    var series = monthlySeries(6, cid);
+    var accounts = data.hesaplar || [];
+    var kasaTotal = Core.hesapToplam(data);
+    var today = Core.todayISO();
+    var weekDate = new Date();
+    weekDate.setDate(weekDate.getDate() - 6);
+    var weekFrom = weekDate.getFullYear() + '-' + String(weekDate.getMonth() + 1).padStart(2, '0') + '-' + String(weekDate.getDate()).padStart(2, '0');
+    var kasaRecent = Core.kasaRows(data, { from: weekFrom, to: today });
+    var kasaIn = kasaRecent.reduce(function (a, k) { return a + (k.yon === 'GIRIS' ? Core.num(k.tutar) : 0); }, 0);
+    var kasaOut = kasaRecent.reduce(function (a, k) { return a + (k.yon === 'CIKIS' ? Core.num(k.tutar) : 0); }, 0);
+    var aktif = (data.personel || []).filter(function (p) { return p.aktif !== false; });
+    var ay = Core.todayISO().slice(0, 7);
+    var maas = 0, avans = 0, izin = 0, baslayan = 0;
+    aktif.forEach(function (p) {
+      var r = Core.getPuantaj(data, p.id, ay);
+      if (r) maas += Core.num(r.net);
+      avans += Core.num(p.avansBakiye);
+      izin += personelIzinKalan(p, Core.todayISO().slice(0, 4));
+      if ((p.iseGiris || '').slice(0, 7) === ay) baslayan++;
+    });
+    var counts = { open: 0, partial: 0, done: 0 };
+    data.orders.forEach(function (o) {
+      if (cid && o.cariId !== cid) return;
+      var i = Core.orderInfo(data, o, shipped);
+      if (i.kalan <= 0) counts.done++;
+      else if (i.giden > 0) counts.partial++;
+      else counts.open++;
+    });
+    var status = [
+      { label: 'Açık', value: counts.open, color: '#0f766e' },
+      { label: 'Kısmi sevk', value: counts.partial, color: '#f59e0b' },
+      { label: 'Tamamlandı', value: counts.done, color: '#94a3b8' }
+    ];
+    var tops = topModelRows(cid, 5);
+    var balances = data.cariler.map(function (c) {
+      return { ad: c.ad, bakiye: Core.stats(data, c.id).balance };
+    }).sort(function (a, b) { return Math.abs(b.bakiye) - Math.abs(a.bakiye); }).slice(0, 5);
+    return { cid: cid, cari: cari, st: st, pending: pending, recent: recent, series: series, accounts: accounts,
+      kasaTotal: kasaTotal, kasaIn: kasaIn, kasaOut: kasaOut, aktif: aktif, maas: maas, avans: avans,
+      izin: izin, baslayan: baslayan, status: status, tops: tops, balances: balances };
+  }
+
+  function pdKpi(icon, label, value, foot, tone) {
+    return '<div class="pd-kpi ' + (tone || '') + '"><div class="pd-kpi-top"><span class="pd-kpi-icon">' + icon + '</span><span>' + esc(label) + '</span></div>' +
+      '<div class="pd-kpi-value">' + value + '</div><div class="pd-kpi-foot">' + foot + '</div></div>';
+  }
+
+  function pdKasaCard(d, compact) {
+    var max = Math.max.apply(null, d.accounts.map(function (h) { return Math.abs(Core.hesapBakiye(data, h.id)); }).concat([1]));
+    var accounts = d.accounts.length ? d.accounts.map(function (h) {
+      var b = Core.hesapBakiye(data, h.id);
+      return '<div class="pd-account"><div class="pd-account-row"><div><b>' + esc(h.ad) + '</b><span>' + (h.tur === 'BANKA' ? 'Banka' : 'Nakit') + '</span></div><strong>' + money(b) + '</strong></div>' +
+        '<div class="pd-account-bar"><i style="width:' + Math.max(4, Math.round(Math.abs(b) / max * 100)) + '%"></i></div></div>';
+    }).join('') : '<div class="empty-mini">Kasa hesabı tanımlı değil.</div>';
+    return '<div class="card pd-card"><div class="card-head"><div><div class="pd-eyebrow">FİNANS</div><h2>Kasa & Banka</h2><div class="sub">Nakit ve banka bakiyeleri</div></div>' +
+      (isAdmin() ? '<button class="btn btn-sm" data-act="go-kasa">Tümü ' + ICONS.right + '</button>' : '') + '</div>' +
+      '<div class="card-body"><div class="pd-fin-total">' + money(d.kasaTotal) + '</div><div class="pd-dayrow"><span class="in">' + ICONS.arrowUp + ' Son 7 gün giriş ' + money(d.kasaIn) + '</span><span class="out">' + ICONS.arrowDown + ' Çıkış ' + money(d.kasaOut) + '</span></div>' +
+      '<div class="pd-accounts">' + accounts + '</div>' + (compact ? '' : '') + '</div></div>';
+  }
+
+  function pdPersonelCard(d) {
+    return '<div class="card pd-card"><div class="card-head"><div><div class="pd-eyebrow">EKİP</div><h2>Personel</h2><div class="sub">Aktif kadro ve bu ay</div></div>' +
+      (isAdmin() ? '<button class="btn btn-sm" data-act="go-personel">Tümü ' + ICONS.right + '</button>' : '') + '</div>' +
+      '<div class="card-body"><div class="pd-personel-top"><div><b>' + nf0(d.aktif.length) + '</b><span>aktif personel</span></div><div><b>' + money(d.maas) + '</b><span>bu ay net maaş</span></div></div>' +
+      '<div class="pd-personel-grid"><div><span>Avans bakiyesi</span><b>' + money(d.avans) + '</b></div><div><span>Kalan izin</span><b>' + nf1(d.izin) + ' gün</b></div><div><span>Bu ay başlayan</span><b>' + nf0(d.baslayan) + '</b></div><div><span>Bay / Bayan</span><b>' + nf0(d.aktif.filter(function (p) { return p.cinsiyet === 'BAY'; }).length) + ' / ' + nf0(d.aktif.filter(function (p) { return p.cinsiyet === 'BAYAN'; }).length) + '</b></div></div></div></div>';
+  }
+
+  function pdPendingCard(d) {
+    var body = d.pending.length ? d.pending.map(function (x) {
+      return '<tr><td><div class="cell-model">' + thumbHtml(x.o) + '<div style="min-width:0"><div class="mname">' + esc(x.o.model) + '</div><div class="mcolor">' + esc(x.o.renk || '—') + ' · #' + esc(x.o.sipno) + '</div></div></div></td>' +
+        '<td class="right strong">' + nf0(x.i.kalan) + '</td><td class="right">' + nf1(x.i.kalanKoli) + '</td><td class="right strong">' + money(x.i.kalanTutar) + '</td>' +
+        '<td class="right"><button class="btn btn-sm" data-act="order-ship" data-id="' + x.o.id + '">Sevk et</button></td></tr>';
+    }).join('') : '<tr><td colspan="5">' + emptyState('check', 'Bekleyen sipariş yok', 'Tüm siparişlerin sevkiyatı tamamlanmış.', '') + '</td></tr>';
+    return '<div class="card pd-card"><div class="card-head"><div><div class="pd-eyebrow">OPERASYON</div><h2>Sevkiyat bekleyen siparişler</h2><div class="sub">Kalan çifte göre en yüksek tutarlar</div></div>' +
+      '<button class="btn btn-sm" data-act="go-orders">Tümü ' + ICONS.right + '</button></div>' +
+      '<div class="card-body flush"><div class="table-wrap short"><table class="data"><thead><tr><th>Model</th><th class="right">Kalan çift</th><th class="right">Koli</th><th class="right">Kalan tutar</th><th></th></tr></thead><tbody>' + body + '</tbody></table></div></div></div>';
+  }
+
+  function pdRecentCard(d) {
+    var body = d.recent.length ? d.recent.map(function (r) {
+      var tutar = Core.num(r.borc) > 0 ? r.borc : r.alacak;
+      return '<div class="feed-item"><div class="feed-dot ' + (Core.num(r.borc) > 0 ? 'borc' : 'alacak') + '"></div><div class="feed-main"><b>' + esc(r.aciklama || r.islem) + '</b><span>' +
+        (!d.cid ? esc(cariAdi(r.cariId)) + ' · ' : '') + dateTR(r.tarih) + ' · ' + esc(r.islem) + '</span></div><div class="feed-amt ' + (Core.num(r.borc) > 0 ? 'borc' : 'alacak') + '">' + (Core.num(r.borc) > 0 ? '+' : '−') + nf2(tutar) + '</div></div>';
+    }).join('') : emptyState('wallet', 'Henüz hareket yok', 'Sevk fişi oluşturduğunuzda burada görünür.', '');
+    return '<div class="card pd-card"><div class="card-head"><div><div class="pd-eyebrow">CARİ</div><h2>Son hareketler</h2><div class="sub">' + (d.cid ? esc(d.cari.ad) : 'Tüm cariler') + '</div></div><button class="btn btn-sm" data-act="go-ledger">Cari hesap ' + ICONS.right + '</button></div><div class="card-body flush"><div class="feed">' + body + '</div></div></div>';
+  }
+
+  function pdChartCard(d) {
+    var max = Math.max.apply(null, d.series.map(function (m) { return m.tutar; }).concat([1]));
+    var bars = d.series.map(function (m) {
+      var h = Math.max(4, Math.round((m.tutar / max) * 100));
+      return '<div class="bar-item" title="' + esc(m.label) + ': ' + money(m.tutar) + '"><div class="bar-value">' + (m.tutar ? nf0(m.tutar / 1000) + 'b' : '') + '</div><div class="bar-track"><div class="bar-fill" style="height:' + h + '%"></div></div><div class="bar-label">' + esc(m.label) + '</div></div>';
+    }).join('');
+    return '<div class="card pd-card"><div class="card-head"><div><div class="pd-eyebrow">SATIŞ</div><h2>Aylık sevkiyat</h2><div class="sub">Son 6 ay · sevk tutarı</div></div><button class="btn btn-sm" data-act="go-reports">Raporlar ' + ICONS.right + '</button></div><div class="card-body"><div class="bars">' + bars + '</div></div></div>';
+  }
+
+  function pdTopCard(d) {
+    var max = Math.max.apply(null, d.tops.map(function (x) { return x.cift; }).concat([1]));
+    var body = d.tops.length ? d.tops.map(function (x) {
+      var img = modelImageFor(x.model);
+      return '<div class="hbar"><div class="hbar-head"><div class="mini-thumb" style="' + (img ? 'background-image:url(&quot;' + esc(img) + '&quot;)' : '') + '">' + (img ? '' : esc(String(x.model).slice(0, 2))) + '</div><b>' + esc(x.model) + '</b><span>' + nf0(x.cift) + ' çift</span></div><div class="hbar-track"><i style="width:' + Math.max(4, Math.round(x.cift / max * 100)) + '%"></i></div></div>';
+    }).join('') : emptyState('box', 'Henüz sevkiyat yok', 'İlk sevkten sonra burada görünür.', '');
+    return '<div class="card pd-card"><div class="card-head"><div><div class="pd-eyebrow">PERFORMANS</div><h2>En çok satan modeller</h2><div class="sub">Sevk edilen çift · ilk 5</div></div><button class="btn btn-sm" data-act="go-reports">Raporlar ' + ICONS.right + '</button></div><div class="card-body">' + body + '</div></div>';
+  }
+
+  function pdStatusCard(d) {
+    var total = d.status.reduce(function (a, x) { return a + x.value; }, 0);
+    return '<div class="card pd-card"><div class="card-head"><div><div class="pd-eyebrow">DURUM</div><h2>Sevk durumu</h2><div class="sub">Siparişlerin sevk durumu</div></div></div><div class="card-body"><div class="donut-wrap">' + donutSvg(d.status, 112) + '<div class="donut-center"><b>' + nf0(total) + '</b><span>sipariş</span></div></div><div class="legend">' + d.status.map(function (x) { return '<div><i style="background:' + x.color + '"></i><span>' + x.label + '</span><b>' + nf0(x.value) + '</b></div>'; }).join('') + '</div></div></div>';
+  }
+
+  function pdCariCard(d) {
+    var max = Math.max.apply(null, d.balances.map(function (x) { return Math.abs(x.bakiye); }).concat([1]));
+    var body = d.balances.length ? d.balances.map(function (x) {
+      var neg = x.bakiye < 0;
+      return '<div class="hbar"><div class="hbar-head"><b>' + esc(x.ad) + '</b><span style="color:' + (neg ? 'var(--alacak)' : 'var(--borc)') + '">' + nf2(x.bakiye) + '</span></div><div class="hbar-track"><i class="' + (neg ? 'ok' : 'borc') + '" style="width:' + Math.max(4, Math.round(Math.abs(x.bakiye) / max * 100)) + '%"></i></div></div>';
+    }).join('') : emptyState('wallet', 'Cari yok', 'Cari ekleyince burada görünür.', '');
+    return '<div class="card pd-card"><div class="card-head"><div><div class="pd-eyebrow">CARİ</div><h2>Cari dağılımı</h2><div class="sub">Mutlak bakiyeye göre ilk 5</div></div><button class="btn btn-sm" data-act="go-cariler">Cariler ' + ICONS.right + '</button></div><div class="card-body">' + body + '</div></div>';
+  }
+
+  function viewDashboardA() {
+    var d = panelData();
+    var kpis = pdKpi(ICONS.box, 'Açık sipariş', nf0(d.st.openOrders) + ' <small>/ ' + nf0(d.st.orderCount) + '</small>', 'Kalan <b>' + nf0(d.st.remainingCift) + ' çift</b> · ' + money0(d.st.openValue), '') +
+      pdKpi(ICONS.truck, 'Bu ay sevkiyat', nf0(d.st.monthShipmentQty) + ' <small>çift</small>', money(d.st.monthShipment), 'warn') +
+      pdKpi(ICONS.receipt, 'Cari bakiye', nf2(d.st.balance) + ' <small>' + (data.settings.para || '₺') + '</small>', d.cid ? esc(d.cari.ad) : data.cariler.length + ' cari hesap', d.st.balance < 0 ? 'ok' : 'danger') +
+      pdKpi(ICONS.arrowDown, 'Bu ay tahsilat', nf0(d.st.monthCollection) + ' <small>' + (data.settings.para || '₺') + '</small>', data.ledger.filter(function (r) { return r.islem === 'TAHSİLAT' && (!d.cid || r.cariId === d.cid) && (r.tarih || '').slice(0, 7) === Core.todayISO().slice(0, 7); }).length + ' tahsilat kaydı', 'info') +
+      (isAdmin() ? pdKpi(ICONS.wallet, 'Kasa + Banka', money(d.kasaTotal), d.accounts.length + ' hesap · 7 gün net ' + money(d.kasaIn - d.kasaOut), 'ok') : '') +
+      (isAdmin() ? pdKpi(ICONS.users, 'Personel', nf0(d.aktif.length) + ' <small>aktif</small>', 'Bu ay net ' + money(d.maas), '') : '');
+    return '<div class="pd-kpis">' + kpis + '</div>' +
+      '<div class="pd-grid"><div class="pd-main">' + pdPendingCard(d) + pdRecentCard(d) + '</div>' +
+      '<aside class="pd-side">' + (isAdmin() ? pdKasaCard(d) + pdPersonelCard(d) + pdStatusCard(d) : pdStatusCard(d)) + '</aside></div>' +
+      '<div class="pd-bottom">' + pdTopCard(d) + pdChartCard(d) + pdCariCard(d) + '</div>';
+  }
+
+  function viewDashboardB() {
+    var d = panelData();
+    var kpis = pdKpi(ICONS.receipt, 'Cari bakiye', nf2(d.st.balance) + ' <small>' + (data.settings.para || '₺') + '</small>', d.cid ? esc(d.cari.ad) : data.cariler.length + ' cari hesap', d.st.balance < 0 ? 'ok' : 'danger') +
+      pdKpi(ICONS.arrowDown, 'Bu ay tahsilat', nf0(d.st.monthCollection) + ' <small>' + (data.settings.para || '₺') + '</small>', 'Tahsilat ve kasa girişleri', 'info') +
+      (isAdmin() ? pdKpi(ICONS.wallet, 'Kasa + Banka', money(d.kasaTotal), d.accounts.length + ' hesap · 7 gün net ' + money(d.kasaIn - d.kasaOut), 'ok') : '') +
+      pdKpi(ICONS.truck, 'Bu ay sevkiyat', nf0(d.st.monthShipmentQty) + ' <small>çift</small>', money(d.st.monthShipment), 'warn');
+    return '<div class="pd-kpis pd-kpis-4">' + kpis + '</div>' +
+      '<div class="pd-grid"><div class="pd-main">' + pdPendingCard(d) + pdRecentCard(d) + '</div>' +
+      '<aside class="pd-side">' + (isAdmin() ? pdKasaCard(d) + pdPersonelCard(d) + pdStatusCard(d) : pdStatusCard(d)) + '</aside></div>' +
+      '<div class="pd-bottom pd-bottom-2">' + pdTopCard(d) + pdCariCard(d) + '</div>';
+  }
+
   function viewDashboard() {
+    if (S.ui.panelPreview === 'b' || (data.settings && data.settings.panelDuzen === 'b')) return viewDashboardB();
+    return viewDashboardA();
     try { S.ui.dashFeedCollapsed = localStorage.getItem('dmr:feedCollapsed') === '1'; } catch (e) { }
     var cid = S.ui.cariId;
     var cari = activeCari();
@@ -3819,9 +3992,24 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.14.0';
+  var SURUM = '3.15.0';
 
   var YENILIKLER = [
+    {
+      v: '3.15.0', t: '10.11.2026', m: [
+        'Yeni Dengeli Kokpit paneli varsayılan oldu',
+        'Panelde Kasa & Banka ve Personel özeti',
+        '6 KPI: sipariş, sevkiyat, cari, tahsilat, kasa, personel',
+        'Aylık sevkiyat, en çok satan modeller ve cari dağılımı korundu'
+      ]
+    },
+    {
+      v: '3.14.1', t: '10.11.2026', m: [
+        'Koyu temada tablo satırı hover rengi düzeltildi; yazılar okunur kaldı',
+        'Sol menü kısa ekranlarda kaydırılabilir; alt bilgi kutusu sabit kaldı',
+        'Kısa ekranlarda menü ve alt bilgi daha kompakt'
+      ]
+    },
     {
       v: '3.14.0', t: '10.11.2026', m: [
         'Cari ekstre: Özet / Ürün detaylı seçimi',
@@ -5336,9 +5524,10 @@ function viewShipments() {
     }).join('');
 
     var active = S.ui.settingsTab || 'genel';
-    if (['genel', 'personel', 'katalog', 'kullanicilar', 'veri'].indexOf(active) < 0) active = 'genel';
+    if (['genel', 'gorunum', 'personel', 'katalog', 'kullanicilar', 'veri'].indexOf(active) < 0) active = 'genel';
     var tabs = [
       ['genel', 'Genel', ''],
+      ['gorunum', 'Tema ve görsel', ''],
       ['personel', 'Personel', ''],
       ['katalog', 'Katalog', (data.renkler || []).length + ' renk · ' + (data.asortiSablonlari || []).length + ' şablon'],
       ['kullanicilar', 'Kullanıcılar & Güvenlik', (data.kullanicilar || []).length + ' kullanıcı'],
@@ -5398,7 +5587,23 @@ function viewShipments() {
       '  <button class="btn btn-sm" data-act="open-changelog">' + ICONS.history + ' Yenilikler</button>' +
       '</div></div>';
 
-    var wd = String(s.personelHaftaTatili === undefined ? '0,6' : s.personelHaftaTatili).split(',');
+    var panelSecili = (s.panelDuzen === 'b') ? 'b' : 'a';
+    var gorunum = '<div class="card"><div class="card-head"><div><h2>Tema</h2><div class="sub">Arayüz renkleri; bu cihazda saklanır</div></div></div><div class="card-body">' +
+      '<div class="theme-choice-grid">' +
+      '<button type="button" class="theme-choice' + (!isDark() ? ' active' : '') + '" data-act="theme-set" data-id="light"><span class="theme-swatch light"></span><b>Açık tema</b><small>Gündüz kullanımı</small></button>' +
+      '<button type="button" class="theme-choice' + (isDark() ? ' active' : '') + '" data-act="theme-set" data-id="dark"><span class="theme-swatch dark"></span><b>Koyu tema</b><small>Gece / düşük ışık</small></button>' +
+      '</div></div></div>' +
+      '<div class="card"><div class="card-head"><div><h2>Panel düzeni</h2><div class="sub">Ana ekranın bilgi yoğunluğu; Excel AYARLAR sayfasında saklanır</div></div></div><div class="card-body">' +
+      '<div class="panel-choice-grid">' +
+      '<button type="button" class="panel-choice' + (panelSecili === 'a' ? ' active' : '') + '" data-act="panel-set" data-id="a">' +
+      '<div class="pc-preview pc-a"><div class="pc-kpis">' + '<i></i>'.repeat(6) + '</div><div class="pc-body"><div class="pc-main"><div class="pc-block tall"></div><div class="pc-block"></div></div><div class="pc-side"><div class="pc-block"></div><div class="pc-block"></div></div></div><div class="pc-bottom"><i></i><i></i><i></i></div></div>' +
+      '<b>Dengeli Kokpit</b><small>6 KPI · kasa/personel · grafikler</small></button>' +
+      '<button type="button" class="panel-choice' + (panelSecili === 'b' ? ' active' : '') + '" data-act="panel-set" data-id="b">' +
+      '<div class="pc-preview pc-b"><div class="pc-kpis four">' + '<i></i>'.repeat(4) + '</div><div class="pc-body"><div class="pc-main"><div class="pc-block tall"></div><div class="pc-block"></div></div><div class="pc-side"><div class="pc-block"></div><div class="pc-block"></div></div></div><div class="pc-bottom two"><i></i><i></i></div></div>' +
+      '<b>Sade Finans</b><small>4 KPI · daha fazla boşluk</small></button>' +
+      '</div><p class="muted small" style="margin:12px 0 0">Panel düzeni değişikliği dosyaya kaydedilir; tema yalnızca bu tarayıcıda tutulur.</p></div></div>';
+
+        var wd = String(s.personelHaftaTatili === undefined ? '0,6' : s.personelHaftaTatili).split(',');
     var cmt = wd.indexOf('6') >= 0, paz = wd.indexOf('0') >= 0;
     var personelAyar = '<div class="card"><div class="card-head"><div><h2>Personel varsayılanları</h2><div class="sub">Yeni personel ve toplu puantaj için geçerli</div></div></div>' +
       '<form id="personelAyarForm" class="card-body form-grid g2">' +
@@ -5472,6 +5677,7 @@ function viewShipments() {
       '</div>' +
       '<div class="settings-tabs">' + tabHtml + '</div>' +
       group('genel', genel) +
+      group('gorunum', gorunum) +
       group('personel', personelAyar) +
       group('katalog', katalog) +
       group('kullanicilar', kullanicilar) +
