@@ -2,6 +2,17 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.15.1 — 11.11.2026
+
+### Düzeltildi
+- **Ayarlar → Tema ve görsel → Koyu tema** seçimi çalışmıyordu.
+- **Panel düzeni → Sade Finans (B)** seçimi çalışmıyordu.
+- Nedeni: `light/dark/a/b` metin değerlerinin sayıya çevrilmesi (`parseInt` → `NaN`).
+- Tema ve panel seçimleri artık ham `data-id` değerini kullanıyor.
+
+### Doğrulama
+- 72 çekirdek test.
+
 ## v3.15.0 — 10.11.2026
 
 ### Değişti

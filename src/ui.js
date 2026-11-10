@@ -1201,8 +1201,8 @@
         case 'go-cariler': go('cariler'); break;
         case 'go-kasa': go('kasa'); break;
         case 'go-personel': go('personel'); break;
-        case 'theme-set': setTheme(id); renderView(); break;
-        case 'panel-set': setPanelDuzen(id); break;
+        case 'theme-set': setTheme(el.dataset.id); renderView(); break;
+        case 'panel-set': setPanelDuzen(el.dataset.id); break;
         case 'lock': lockSession(); break;
         case 'user-new': openUserForm(null); break;
         case 'user-edit': openUserForm(Core.kullaniciById(data, id)); break;
@@ -3992,9 +3992,16 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.15.0';
+  var SURUM = '3.15.1';
 
   var YENILIKLER = [
+    {
+      v: '3.15.1', t: '11.11.2026', m: [
+        'Tema ve görsel: koyu tema seçimi düzeltildi',
+        'Panel düzeni: Sade Finans (B) seçimi düzeltildi',
+        'Metin data-id değerleri artık sayıya çevrilmiyor'
+      ]
+    },
     {
       v: '3.15.0', t: '10.11.2026', m: [
         'Yeni Dengeli Kokpit paneli varsayılan oldu',
