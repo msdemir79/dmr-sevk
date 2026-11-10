@@ -681,15 +681,21 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
 .pf-foot { margin-top: 18px; border-top: 1px solid #ccc; padding-top: 6px; font-size: 9.5px; color: #777; display: flex; justify-content: space-between; }
 
 .ekstre-table { table-layout: fixed; }
-.ekstre-table td, .ekstre-table th { font-size: 9.6px; padding: 4px 5px; }
-.ekstre-table th { font-size: 8.7px; }
+.ekstre-table td { font-size: 10.8px; font-weight: 500; padding: 6px 5px; line-height: 1.25; }
+.ekstre-table th { font-size: 9.3px; padding: 6px 5px; }
 .ekstre-table td.date, .ekstre-table td.fis, .ekstre-table td.n,
 .ekstre-table th.n { white-space: nowrap !important; overflow-wrap: normal !important; word-break: normal !important; }
-.ekstre-table td.n { width: auto; }
+.ekstre-table td.date { font-size: 10.8px; font-weight: 500; }
+.ekstre-table td.n { width: auto; font-weight: 600; }
 .ekstre-table td.aciklama { overflow-wrap: break-word !important; word-break: normal !important; }
-.ekstre-table tfoot td { font-size: 9.8px; white-space: nowrap !important; }
+.ekstre-table tfoot td { font-size: 11px; white-space: nowrap !important; }
 .ekstre-table th { white-space: nowrap !important; }
 .ekstre-table tbody tr:nth-child(even) td { background: #fafafa; }
+.ekstre-detail td { font-size: 9.6px; padding: 5px 4px; }
+.ekstre-detail th { font-size: 8.4px; padding: 5px 4px; }
+.ekstre-detail td.aciklama b { font-weight: 700; }
+.ekstre-detail td.n { font-weight: 600; }
+.ekstre-detail-doc { width: 297mm; }
 
 /* A5 sevk fişi */
 .print-doc.a5 {

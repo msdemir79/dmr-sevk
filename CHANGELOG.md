@@ -2,6 +2,23 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.14.0 — 10.11.2026
+
+### Eklendi
+- Cari ekstrede **Özet / Ürün detaylı** seçimi.
+- Ürün detaylı ekstre:
+  - Model ve renk
+  - Koli ve çift
+  - Birim fiyat
+  - Satır tutarı
+  - Borç / alacak / bakiye
+- A4 **yatay** yazdırma.
+- Tahsilat, gider ve devir satırları ürün satırlarından ayrı.
+- Beden kırılımı yok.
+
+### Doğrulama
+- 72 çekirdek test.
+
 ## v3.13.1 — 10.11.2026
 
 ### Düzeltildi

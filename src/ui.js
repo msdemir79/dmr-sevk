@@ -190,7 +190,7 @@
       shipListSearch: '', shipListPage: 1,
       reportMonth: Core.todayISO().slice(0, 7),
     reportTab: 'ozet', reportPreset: 'last30', reportOnlyOpen: false,
-    personelTab: 'liste', personelMonth: Core.todayISO().slice(0, 7), settingsTab: 'genel', reportPersonelMonth: Core.todayISO().slice(0, 7), sideCollapsed: false, dashFeedCollapsed: false, kasaFilterHesap: 0, kasaFilterTur: '', kasaFilterFrom: '', kasaFilterTo: '',
+    personelTab: 'liste', personelMonth: Core.todayISO().slice(0, 7), settingsTab: 'genel', reportPersonelMonth: Core.todayISO().slice(0, 7), sideCollapsed: false, dashFeedCollapsed: false, kasaFilterHesap: 0, kasaFilterTur: '', kasaFilterFrom: '', kasaFilterTo: '', ekstreType: 'ozet',
     reportFrom: (function () { var d = new Date(); d.setDate(d.getDate() - 29); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(),
     reportTo: Core.todayISO(),
     },
@@ -1381,6 +1381,7 @@
     printShipment: printShipment,
     shipmentDocHtml: shipmentDocHtml,
     ekstreDocHtml: ekstreDocHtml,
+    ekstreDetayDocHtml: ekstreDetayDocHtml,
     buildBytes: writeBytes,
     readData: function (sheets) { return Core.readData(sheets); },
     beginSession: beginSession,
@@ -3818,9 +3819,17 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.13.1';
+  var SURUM = '3.14.0';
 
   var YENILIKLER = [
+    {
+      v: '3.14.0', t: '10.11.2026', m: [
+        'Cari ekstre: Özet / Ürün detaylı seçimi',
+        'Ürün detaylı ekstre: model, renk, koli, çift, birim fiyat, tutar ve bakiye',
+        'Ürün detaylı ekstre A4 yatay yazdırılır; beden kırılımı yok',
+        'Tahsilat ve giderler ürün satırlarından ayrı gösterilir'
+      ]
+    },
     {
       v: '3.13.1', t: '10.11.2026', m: [
         'Cari ekstre yazdırma düzeni: tarih ve tutarlar kırılmıyor',
@@ -6424,7 +6433,7 @@ function viewShipments() {
       '<div class="row"><span class="k">DÜZENLEME</span><span class="v">' + dateTR(Core.todayISO()) + '</span></div>' +
       '<div class="row"><span class="k">BAKİYE</span><span class="v">' + money(bakiye) + '</span></div>' +
       '</div>' +
-      '<table class="pf-table ekstre-table"><colgroup><col style="width:68px"><col style="width:44px"><col><col style="width:78px"><col style="width:78px"><col style="width:84px"></colgroup><thead><tr><th>TARİH</th><th>FİŞ</th><th>AÇIKLAMA</th><th class="n">BORÇ</th><th class="n">ALACAK</th><th class="n">BAKİYE</th></tr></thead>' +
+      '<table class="pf-table ekstre-table"><colgroup><col style="width:88px"><col style="width:46px"><col><col style="width:84px"><col style="width:84px"><col style="width:90px"></colgroup><thead><tr><th>TARİH</th><th>FİŞ</th><th>AÇIKLAMA</th><th class="n">BORÇ</th><th class="n">ALACAK</th><th class="n">BAKİYE</th></tr></thead>' +
       '<tbody>' + (body || '<tr><td colspan="6" style="text-align:center">Kayıt yok</td></tr>') + '</tbody>' +
       '<tfoot><tr><td colspan="3">TOPLAM</td><td class="n">' + nf2(borc) + '</td><td class="n">' + nf2(alacak) + '</td><td class="n">' + nf2(bakiye) + '</td></tr></tfoot>' +
       '</table>' +
@@ -6433,7 +6442,78 @@ function viewShipments() {
       '</div>';
   }
 
-  function printHtml(html, kagit) {
+  function ekstreDetayRows(rows) {
+    var out = [], groups = {};
+    rows.forEach(function (r) {
+      var cift = Core.num(r.cift), koli = Core.num(r.koli);
+      var urun = String(r.model || String(r.aciklama || '').split(' / ')[0] || '').trim();
+      var renk = String(r.renk || String(r.aciklama || '').split(' / ')[1] || '').trim();
+      if (urun && renk) {
+        var renkEsc = renk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        var temiz = urun.replace(new RegExp('\\s*(?:[-/]\\s*)?' + renkEsc + '\\s*$', 'i'), '').trim();
+        if (temiz) urun = temiz;
+      }
+      var isProduct = cift > 0 || koli > 0 || r.islem === 'SATIŞ';
+      if (!isProduct) {
+        var label = r.islem === 'TAHSİLAT' ? 'Tahsilat' : r.islem === 'GİDER' ? 'Gider' : r.islem === 'DEVRİ' ? 'Devir bakiyesi' : r.islem === 'ALIŞ' ? 'Alış' : r.islem === 'GELİR' ? 'Gelir' : (r.islem || 'Hareket');
+        out.push({ r: r, urun: label, renk: '', koli: 0, cift: 0, fiyat: 0, tutar: 0, borc: Core.num(r.borc), alacak: Core.num(r.alacak), group: false });
+        return;
+      }
+      var key = [r.tarih, r.fisNo || '', urun, renk, r.islem, r.sevkId || 0].join('|');
+      if (groups[key]) {
+        var g = groups[key];
+        g.koli += koli; g.cift += cift; g.tutar += Core.num(r.tutar); g.borc += Core.num(r.borc); g.alacak += Core.num(r.alacak);
+        return;
+      }
+      var x = { r: r, urun: urun || '—', renk: renk, koli: koli, cift: cift, fiyat: Core.num(r.fiyat), tutar: Core.num(r.tutar), borc: Core.num(r.borc), alacak: Core.num(r.alacak), group: true };
+      groups[key] = x; out.push(x);
+    });
+    var bakiye = 0;
+    out.forEach(function (x) {
+      if (x.group && x.cift > 0 && (!x.fiyat || x.fiyat <= 0)) x.fiyat = x.tutar / x.cift;
+      if (x.group && x.cift > 0 && x.fiyat > 0 && !x.tutar) x.tutar = x.cift * x.fiyat;
+      bakiye += x.borc - x.alacak;
+      x.bakiye = bakiye;
+    });
+    return out;
+  }
+
+  function ekstreDetayDocHtml(rows, from, to, cari) {
+    var eksCari = cari || { ad: '' };
+    var detay = ekstreDetayRows(rows);
+    var borc = detay.reduce(function (a, x) { return a + x.borc; }, 0);
+    var alacak = detay.reduce(function (a, x) { return a + x.alacak; }, 0);
+    var bakiye = borc - alacak;
+    var totalKoli = detay.reduce(function (a, x) { return a + x.koli; }, 0);
+    var totalCift = detay.reduce(function (a, x) { return a + x.cift; }, 0);
+    var totalTutar = detay.reduce(function (a, x) { return a + x.tutar; }, 0);
+    var body = detay.map(function (x) {
+      return '<tr><td class="date">' + dateTR(x.r.tarih) + '</td><td class="fis">' + esc(x.r.fisNo || '') + '</td>' +
+        '<td class="aciklama"><b>' + esc(x.urun) + '</b></td><td>' + esc(x.renk || '—') + '</td>' +
+        '<td class="n">' + (x.group ? nf1(x.koli) : '—') + '</td><td class="n">' + (x.group ? nf0(x.cift) : '—') + '</td>' +
+        '<td class="n">' + (x.group && x.fiyat ? nf2(x.fiyat) : '—') + '</td><td class="n">' + (x.group && x.tutar ? nf2(x.tutar) : '—') + '</td>' +
+        '<td class="n">' + (x.borc ? nf2(x.borc) : '') + '</td><td class="n">' + (x.alacak ? nf2(x.alacak) : '') + '</td>' +
+        '<td class="n">' + nf2(x.bakiye) + '</td></tr>';
+    }).join('');
+    return '<div class="print-doc ekstre-detail-doc">' +
+      docHeader('CARİ HESAP EKSTRESİ', 'ÜRÜN DETAYLI') +
+      '<div class="pf-meta">' +
+      '<div class="row"><span class="k">CARİ</span><span class="v">' + esc(eksCari.ad) + '</span></div>' +
+      '<div class="row"><span class="k">DÖNEM</span><span class="v">' + (from ? dateTR(from) : 'Başlangıç') + ' — ' + (to ? dateTR(to) : dateTR(Core.todayISO())) + '</span></div>' +
+      '<div class="row"><span class="k">DÜZENLEME</span><span class="v">' + dateTR(Core.todayISO()) + '</span></div>' +
+      '<div class="row"><span class="k">BAKİYE</span><span class="v">' + money(bakiye) + '</span></div>' +
+      '</div>' +
+      '<table class="pf-table ekstre-table ekstre-detail"><colgroup><col style="width:74px"><col style="width:42px"><col><col style="width:90px"><col style="width:50px"><col style="width:56px"><col style="width:72px"><col style="width:82px"><col style="width:80px"><col style="width:80px"><col style="width:88px"></colgroup>' +
+      '<thead><tr><th>TARİH</th><th>FİŞ</th><th>ÜRÜN</th><th>RENK</th><th class="n">KOLİ</th><th class="n">ÇİFT</th><th class="n">BİRİM FİYAT</th><th class="n">TUTAR</th><th class="n">BORÇ</th><th class="n">ALACAK</th><th class="n">BAKİYE</th></tr></thead>' +
+      '<tbody>' + (body || '<tr><td colspan="11" style="text-align:center">Kayıt yok</td></tr>') + '</tbody>' +
+      '<tfoot><tr><td colspan="4">TOPLAM</td><td class="n">' + nf1(totalKoli) + '</td><td class="n">' + nf0(totalCift) + '</td><td></td><td class="n">' + nf2(totalTutar) + '</td><td class="n">' + nf2(borc) + '</td><td class="n">' + nf2(alacak) + '</td><td class="n">' + nf2(bakiye) + '</td></tr></tfoot>' +
+      '</table>' +
+      '<div class="pf-sign"><div class="line">HESABI VEREN</div><div class="line">HESABI ALAN</div></div>' +
+      '<div class="pf-foot"><span>' + esc(data.settings.firmaAdi) + '</span><span>' + esc(eksCari.ad) + '</span></div>' +
+      '</div>';
+  }
+
+  function printHtml(html, kagit, yatay) {
     var a5 = kagit === 'A5';
     var st = document.getElementById('printPageStyle');
     if (!st) {
@@ -6441,7 +6521,7 @@ function viewShipments() {
       st.id = 'printPageStyle';
       document.head.appendChild(st);
     }
-    st.textContent = '@page { size: ' + (a5 ? 'A5 portrait' : 'A4 portrait') + '; margin: ' + (a5 ? '6mm' : '12mm') + '; }';
+    st.textContent = '@page { size: ' + (a5 ? 'A5' : 'A4') + ' ' + (yatay ? 'landscape' : 'portrait') + '; margin: ' + (a5 ? '6mm' : (yatay ? '9mm' : '12mm')) + '; }';
     var root = document.getElementById('printRoot');
     root.innerHTML = html;
     document.body.classList.add('printing');
@@ -6561,6 +6641,7 @@ function viewShipments() {
       body: '<div class="ekstre-meta"><div><span>Dönem</span><b>' + ((S.ui.ledgerFrom || S.ui.ledgerTo) ? ((S.ui.ledgerFrom ? dateTR(S.ui.ledgerFrom) : '—') + ' — ' + (S.ui.ledgerTo ? dateTR(S.ui.ledgerTo) : '—')) : 'Tüm dönem') + '</b></div>' +
         '<div><span>Hareket</span><b>' + rows.length + '</b></div><div><span>Borç</span><b>' + money(borc) + '</b></div><div><span>Alacak</span><b>' + money(alacak) + '</b></div>' +
         '<div><span>Bakiye</span><b>' + money(borc - alacak) + '</b></div></div>' +
+        '<div class="field" style="max-width:340px;margin:8px 0"><label for="ekstreType">Ekstre türü</label><select id="ekstreType" class="select"><option value="ozet"' + (S.ui.ekstreType === 'detay' ? '' : ' selected') + '>Özet ekstre (A4 dikey)</option><option value="detay"' + (S.ui.ekstreType === 'detay' ? ' selected' : '') + '>Ürün detaylı ekstre (A4 yatay)</option></select></div>' +
         '<p class="muted small" style="margin:10px 0">PDF için yazdır penceresinde <b>PDF olarak kaydet</b> seçin. WhatsApp’a özet gönderilir.</p>' +
         '<div class="ekstre-share">' +
         '<button class="btn btn-primary" id="ekPdf">' + ICONS.print + ' PDF / Yazdır</button>' +
@@ -6569,7 +6650,8 @@ function viewShipments() {
         '</div>',
       footer: '<button class="btn" data-modal-close>Kapat</button>'
     });
-    $('#ekPdf', m.el).addEventListener('click', function () { m.close(); printEkstre(); toast('Yazdır penceresinde PDF olarak kaydedebilirsiniz.', ''); });
+    $('#ekstreType', m.el).addEventListener('change', function () { S.ui.ekstreType = this.value; });
+    $('#ekPdf', m.el).addEventListener('click', function () { S.ui.ekstreType = $('#ekstreType', m.el).value; m.close(); printEkstre(); toast('Yazdır penceresinde PDF olarak kaydedebilirsiniz.', ''); });
     $('#ekWa', m.el).addEventListener('click', function () {
       var url = waUrl(cariPhone(cari), text);
       window.open(url, '_blank', 'noopener');
@@ -6604,7 +6686,8 @@ function viewShipments() {
     if (!S.ui.cariId) { toast('Ekstre için önce bir cari seçin.', 'err'); return; }
     var rows = filteredLedger();
     if (!rows.length) { toast('Yazdırılacak hareket yok.', 'err'); return; }
-    printHtml(ekstreDocHtml(rows, S.ui.ledgerFrom, S.ui.ledgerTo, activeCari()));
+    var detay = S.ui.ekstreType === 'detay';
+    printHtml(detay ? ekstreDetayDocHtml(rows, S.ui.ledgerFrom, S.ui.ledgerTo, activeCari()) : ekstreDocHtml(rows, S.ui.ledgerFrom, S.ui.ledgerTo, activeCari()), '', detay);
   }
 
   function reportFileBase() {

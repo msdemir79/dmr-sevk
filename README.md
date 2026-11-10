@@ -22,6 +22,7 @@ Tek bir HTML dosyası olarak çalışan, verilerini seçtiğiniz **Excel (.xlsx)
 - Daraltılabilir menü, toplu puantaj sağ tık menüsü ve katlanabilir Son hareketler
 - Yönetici özetli, açıklamalı ve sıralanabilir rapor merkezi
 - Cari ekstre paylaşımı, vade hatırlatma, personel izin/avans
+- Cari ekstre: özet ve ürün detaylı (A4 yatay)
 - Ayarlar’dan sevk fişi başlangıç numarası
 - Kasa & Banka hesapları; günlük rapor, transfer, cari ve personel ödemeleriyle entegrasyon
 - Personel bazlı ekstre ve yazdırma
@@ -81,7 +82,7 @@ Planlanan geliştirmeler ve tasarım notları: [ROADMAP.md](ROADMAP.md). Örnek:
 
 ## Sürüm
 
-Güncel sürüm: **v3.13.1**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
+Güncel sürüm: **v3.14.0**. Ayrıntılar için `CHANGELOG.md`. Sürümler Git etiketi ve GitHub Release olarak yayımlanır; Release ekine tek dosyalık `DMR_SEVK.html` eklenir.
 
 ### Yeni sürüm çıkarma
 
