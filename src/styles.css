@@ -680,7 +680,16 @@ table.pf-table tfoot td { font-weight: 700; background: #f4f4f4; }
 .pf-sign .line { border-top: 1px solid #333; padding-top: 6px; font-size: 11px; }
 .pf-foot { margin-top: 18px; border-top: 1px solid #ccc; padding-top: 6px; font-size: 9.5px; color: #777; display: flex; justify-content: space-between; }
 
-.ekstre-table td, .ekstre-table th { font-size: 10.5px; }
+.ekstre-table { table-layout: fixed; }
+.ekstre-table td, .ekstre-table th { font-size: 9.6px; padding: 4px 5px; }
+.ekstre-table th { font-size: 8.7px; }
+.ekstre-table td.date, .ekstre-table td.fis, .ekstre-table td.n,
+.ekstre-table th.n { white-space: nowrap !important; overflow-wrap: normal !important; word-break: normal !important; }
+.ekstre-table td.n { width: auto; }
+.ekstre-table td.aciklama { overflow-wrap: break-word !important; word-break: normal !important; }
+.ekstre-table tfoot td { font-size: 9.8px; white-space: nowrap !important; }
+.ekstre-table th { white-space: nowrap !important; }
+.ekstre-table tbody tr:nth-child(even) td { background: #fafafa; }
 
 /* A5 sevk fişi */
 .print-doc.a5 {

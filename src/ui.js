@@ -3818,9 +3818,17 @@ function viewShipments() {
   /* ------------------------------------------------------------------ */
   /* Sürüm                                                               */
   /* ------------------------------------------------------------------ */
-  var SURUM = '3.13.0';
+  var SURUM = '3.13.1';
 
   var YENILIKLER = [
+    {
+      v: '3.13.1', t: '10.11.2026', m: [
+        'Cari ekstre yazdırma düzeni: tarih ve tutarlar kırılmıyor',
+        'Ekstrede boş fiş numarası “null” görünmüyor',
+        'Hesap bilgisi açıklamanın altında; tablo 6 sütuna sadeleşti',
+        'Toplam satırı ve sütun hizaları düzeltildi'
+      ]
+    },
     {
       v: '3.13.0', t: '10.11.2026', m: [
         'Kasa & Banka: günlük kasa raporu ve hesap defteri filtreleri',
@@ -6401,9 +6409,9 @@ function viewShipments() {
     var bakiye = borc - alacak;
     var body = rows.map(function (r) {
       var k = r.kasaId ? Core.kasaById(data, r.kasaId) : null;
-      return '<tr><td>' + dateTR(r.tarih) + '</td><td>' + esc(r.fisNo || '') + '</td>' +
-        '<td class="sub">' + (k ? esc(hesapAdi(k.hesapId)) : '—') + '</td>' +
-        '<td>' + esc(r.aciklama) + '</td>' +
+      var fis = r.fisNo === null || r.fisNo === undefined || String(r.fisNo).toLowerCase() === 'null' ? '' : String(r.fisNo);
+      return '<tr><td class="date">' + dateTR(r.tarih) + '</td><td class="fis">' + esc(fis) + '</td>' +
+        '<td class="aciklama">' + esc(r.aciklama || '') + (k ? '<div class="pf-sub">' + esc(hesapAdi(k.hesapId)) + '</div>' : '') + '</td>' +
         '<td class="n">' + (Core.num(r.borc) ? nf2(r.borc) : '') + '</td>' +
         '<td class="n">' + (Core.num(r.alacak) ? nf2(r.alacak) : '') + '</td>' +
         '<td class="n">' + nf2(r.bakiye) + '</td></tr>';
@@ -6416,7 +6424,7 @@ function viewShipments() {
       '<div class="row"><span class="k">DÜZENLEME</span><span class="v">' + dateTR(Core.todayISO()) + '</span></div>' +
       '<div class="row"><span class="k">BAKİYE</span><span class="v">' + money(bakiye) + '</span></div>' +
       '</div>' +
-      '<table class="pf-table ekstre-table"><thead><tr><th style="width:66px">TARİH</th><th style="width:44px">FİŞ</th><th style="width:58px">HESAP</th><th>AÇIKLAMA</th><th style="width:74px">BORÇ</th><th style="width:74px">ALACAK</th><th style="width:78px">BAKİYE</th></tr></thead>' +
+      '<table class="pf-table ekstre-table"><colgroup><col style="width:68px"><col style="width:44px"><col><col style="width:78px"><col style="width:78px"><col style="width:84px"></colgroup><thead><tr><th>TARİH</th><th>FİŞ</th><th>AÇIKLAMA</th><th class="n">BORÇ</th><th class="n">ALACAK</th><th class="n">BAKİYE</th></tr></thead>' +
       '<tbody>' + (body || '<tr><td colspan="6" style="text-align:center">Kayıt yok</td></tr>') + '</tbody>' +
       '<tfoot><tr><td colspan="3">TOPLAM</td><td class="n">' + nf2(borc) + '</td><td class="n">' + nf2(alacak) + '</td><td class="n">' + nf2(bakiye) + '</td></tr></tfoot>' +
       '</table>' +

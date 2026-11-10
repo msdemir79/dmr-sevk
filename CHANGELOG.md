@@ -2,6 +2,18 @@
 
 Tüm önemli değişiklikler bu dosyada tutulur. Sürümler `vMAJOR.MINOR.PATCH` etiketleriyle işaretlenir.
 
+## v3.13.1 — 10.11.2026
+
+### Düzeltildi
+- Cari ekstre yazdırma tablosu sadeleştirildi.
+- Tarih ve tutarların satır içinde kırılması engellendi.
+- `FİŞ` alanında boş kayıtların “null” görünmesi giderildi.
+- Hesap bilgisi ayrı kolon yerine açıklamanın altına alındı.
+- Toplam satırı ve sütun hizaları düzeltildi.
+
+### Doğrulama
+- 72 çekirdek test.
+
 ## v3.13.0 — 10.11.2026
 
 ### Eklendi
